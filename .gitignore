@@ -1,0 +1,36 @@
+# Build outputs
+build/
+cmake-build-*/
+*.o
+*.obj
+*.a
+*.so
+*.dylib
+*.dll
+*.exe
+
+# Local executables
+gro_test
+
+# CMake generated files
+CMakeCache.txt
+CMakeFiles/
+Makefile.in
+cmake_install.cmake
+compile_commands.json
+
+# Test and coverage artifacts
+*.gcda
+*.gcno
+*.gcov
+coverage/
+
+# Editor and OS files
+.DS_Store
+*.swp
+*.swo
+*~
+
+# Local environment files
+.env
+.env.*

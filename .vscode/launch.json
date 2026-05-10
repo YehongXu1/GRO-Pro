@@ -1,0 +1,16 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug gro_test",
+            "type": "lldb",
+            "request": "launch",
+            "program": "${workspaceFolder}/gro_test",
+            "args": ["config/config.yaml"],
+            "cwd": "${workspaceFolder}",
+            "preLaunchTask": "Make: Build",
+            "stopOnEntry": false,
+            "console": "integratedTerminal"
+        }
+    ]
+}
