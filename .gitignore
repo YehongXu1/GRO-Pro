@@ -14,6 +14,7 @@ gro_test
 svp_test
 gor_test
 sor_test
+fahl_test
 
 # CMake generated files
 CMakeCache.txt
@@ -37,3 +38,6 @@ coverage/
 # Local environment files
 .env
 .env.*
+
+# Notes
+notes/
