@@ -6,12 +6,14 @@ LIB_DIRS = -L/usr/local/lib
 LIBS = /opt/homebrew/opt/libomp/lib/libomp.a
 
 # 源文件和目标
-SOURCES_LIB = src/core.cpp src/gro.cpp
-SOURCES_TEST = tests/gro_test.cpp
+SOURCES_LIB = src/core.cpp src/gro.cpp src/svp.cpp src/gor.cpp src/sor.cpp
 OBJECTS_LIB = $(SOURCES_LIB:.cpp=.o)
-OBJECTS_TEST = $(SOURCES_TEST:.cpp=.o)
+GRO_TEST_OBJECTS = tests/gro_test.o
+SVP_TEST_OBJECTS = tests/svp_test.o
+GOR_TEST_OBJECTS = tests/gor_test.o
+SOR_TEST_OBJECTS = tests/sor_test.o
 
-TARGET = gro_test
+TARGETS = gro_test svp_test gor_test sor_test
 
 .PHONY: all build clean test help
 
@@ -19,11 +21,20 @@ TARGET = gro_test
 all: test
 
 # 构建项目
-build: $(TARGET)
+build: $(TARGETS)
 	@echo "✓ 构建完成"
 
 # 链接可执行文件
-$(TARGET): $(OBJECTS_LIB) $(OBJECTS_TEST)
+gro_test: $(OBJECTS_LIB) $(GRO_TEST_OBJECTS)
+	$(CXX) $(CXXFLAGS) $(OPENMP_FLAGS) -o $@ $^ $(LIB_DIRS) $(LIBS)
+
+svp_test: $(OBJECTS_LIB) $(SVP_TEST_OBJECTS)
+	$(CXX) $(CXXFLAGS) $(OPENMP_FLAGS) -o $@ $^ $(LIB_DIRS) $(LIBS)
+
+gor_test: $(OBJECTS_LIB) $(GOR_TEST_OBJECTS)
+	$(CXX) $(CXXFLAGS) $(OPENMP_FLAGS) -o $@ $^ $(LIB_DIRS) $(LIBS)
+
+sor_test: $(OBJECTS_LIB) $(SOR_TEST_OBJECTS)
 	$(CXX) $(CXXFLAGS) $(OPENMP_FLAGS) -o $@ $^ $(LIB_DIRS) $(LIBS)
 
 # 编译 .cpp 文件为 .o 文件
@@ -32,12 +43,15 @@ $(TARGET): $(OBJECTS_LIB) $(OBJECTS_TEST)
 
 # 运行测试
 test: build
-	./$(TARGET) config/config.yaml
+	./gro_test config/config.yaml
+	./svp_test config/config.yaml
+	./gor_test config/config.yaml
+	./sor_test config/config.yaml
 	@echo "✓ 测试完成"
 
 # 清理构建输出
 clean:
-	@rm -f $(OBJECTS_LIB) $(OBJECTS_TEST) $(TARGET)
+	@rm -f $(OBJECTS_LIB) $(GRO_TEST_OBJECTS) $(SVP_TEST_OBJECTS) $(GOR_TEST_OBJECTS) $(SOR_TEST_OBJECTS) $(TARGETS)
 	@echo "✓ 清理完成"
 
 # 重新构建

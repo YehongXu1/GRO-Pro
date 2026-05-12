@@ -1,6 +1,8 @@
 #pragma once
 
 #include <chrono>
+#include <cstddef>
+#include <functional>
 #include <map>
 #include <string>
 #include <unordered_map>
@@ -21,6 +23,13 @@ using Coordinate = std::pair<double, double>;
 using Clock = std::chrono::steady_clock;
 
 constexpr int kInvalidId = -1;
+
+struct PairHash {
+    template <class T1, class T2>
+    std::size_t operator()(const std::pair<T1, T2>& p) const {
+        return std::hash<T1>()(p.first) ^ (std::hash<T2>()(p.second) << 1);
+    }
+};
 
 struct Edge {
     EdgeId id = kInvalidId;
@@ -97,6 +106,14 @@ Graph read_graph(const std::string& graph_path, const std::string& coordinates_p
 Graph read_graph(const InputConfig& config);
 std::vector<Query> read_queries(const std::string& queries_path);
 std::vector<Query> read_queries(const InputConfig& config);
+
+Route shortest_path(const Graph& graph, const Query& query);
+std::vector<Cost> reverse_shortest_distances(
+    const Graph& graph,
+    NodeId destination);
+Cost route_edge_length(
+    const Graph& graph,
+    const std::vector<EdgeId>& edge_ids);
 
 Cost bpr_travel_time(const Edge& edge, Flow flow, const TrafficOptions& options);
 

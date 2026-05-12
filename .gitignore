@@ -11,6 +11,9 @@ cmake-build-*/
 
 # Local executables
 gro_test
+svp_test
+gor_test
+sor_test
 
 # CMake generated files
 CMakeCache.txt

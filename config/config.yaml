@@ -16,3 +16,5 @@ gamma: 0.5
 impact_weight: 0.15
 theta_percentile: 0.90
 min_slot_width: 600
+svp_k: 3
+svp_theta: 0.80

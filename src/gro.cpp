@@ -1,4 +1,5 @@
 #include "gro.hpp"
+#include "svp.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -151,6 +152,12 @@ AlgorithmOptions load_algorithm_options(
     if (auto it = parameters.find("baseline_fraction_to_reroute"); it != parameters.end()) {
         options.baseline_fraction_to_reroute = parse_percent(it->second);
     }
+    if (auto it = parameters.find("svp_k"); it != parameters.end()) {
+        options.svp_k = std::stoi(it->second);
+    }
+    if (auto it = parameters.find("svp_theta"); it != parameters.end()) {
+        options.svp_theta = parse_percent(it->second);
+    }
     if (auto it = parameters.find("enable_timing_log"); it != parameters.end()) {
         options.enable_timing_log = parse_bool(it->second);
     }
@@ -175,55 +182,7 @@ const Graph& GROAlgorithm::graph() const {
 Route GROAlgorithm::shortest_path(
     const Query& query,
     const std::vector<Cost>*) const {
-    Route route;
-    route.query_id = query.id;
-    route.departure_time = query.departure_time;
-
-    gro::data_structures::IndexedHeap<4, Cost, NodeId> heap(graph_.node_coordinates.size());
-    std::vector<Cost> distances(graph_.node_coordinates.size(), std::numeric_limits<Cost>::max());
-    std::vector<EdgeId> parent(graph_.node_coordinates.size(), kInvalidId);
-    
-    heap.push_or_update(query.origin, query.departure_time);
-    distances[query.origin] = query.departure_time;
-
-    while (!heap.empty()) {
-        auto element = heap.extract_min();
-        NodeId node_id = element.id;
-        Cost distance = element.key;
-
-        if (node_id == query.destination) {
-            break;
-        }
-
-        if (distance > distances[node_id]) {
-            continue;
-        }
-
-        for (EdgeId edge_id : graph_.outgoing_edges[node_id]) {
-            const Edge& edge = graph_.edges[edge_id];
-            Cost new_distance = distance + edge.free_flow_time;
-            if (new_distance < distances[edge.to]) {
-                distances[edge.to] = new_distance;
-                parent[edge.to] = edge_id;
-                heap.push_or_update(edge.to, new_distance);
-            }
-        }
-    }
-
-    if (distances[query.destination] == std::numeric_limits<Cost>::max()) {
-        return route;  
-    }
-    
-
-    route.travel_time = distances[query.destination] - query.departure_time;
-    for (NodeId current = query.destination; current != query.origin; ) {
-        EdgeId edge_id = parent[current];
-        route.edge_ids.push_back(edge_id);
-        current = graph_.edges[edge_id].from;
-    }   
-    std::reverse(route.edge_ids.begin(), route.edge_ids.end());
-
-    return route;
+    return gro::shortest_path(graph_, query);
 }
 
 std::vector<Route> GROAlgorithm::compute_initial_routes(
@@ -1418,6 +1377,21 @@ std::vector<Route> GROAlgorithm::baseline_reroute_queries(
     return routes;
 }
 
+std::vector<Route> GROAlgorithm::svp_routes(
+    const Query& query,
+    int k,
+    int theta_percent) const {
+    return gro::svp_routes(graph_, query, k, theta_percent);
+}
+
+std::vector<Route> GROAlgorithm::compute_svp_baseline_routes(
+    const std::vector<Query>& queries) const {
+    return gro::compute_svp_baseline_routes(
+        graph_,
+        queries,
+        SVPOptions{options_.svp_k, options_.svp_theta});
+}
+
 
 AlgorithmResult GROAlgorithm::run(const std::vector<Query>& queries) const {
     auto total_start = Clock::now();
@@ -1533,6 +1507,41 @@ AlgorithmResult GROAlgorithm::run_baseline_gro(const std::vector<Query> &queries
     log_timing(options_.enable_timing_log, "baseline_run_total",
                static_cast<long long>(queries.size()), total_start);
     return algResult;
+}
+
+AlgorithmResult GROAlgorithm::run_svp_baseline(const std::vector<Query>& queries) const {
+    auto total_start = Clock::now();
+    AlgorithmResult result;
+
+    auto phase_start = Clock::now();
+    result.initial_routes = compute_initial_routes(queries);
+    log_timing(options_.enable_timing_log, "svp_initial_routes",
+               static_cast<long long>(queries.size()), phase_start);
+
+    phase_start = Clock::now();
+    std::vector<Route> initial_routes = result.initial_routes;
+    TrafficResult initial_traffic =
+        evaluate_traffic(graph_, queries, initial_routes, traffic_options_);
+    result.initial_total_travel_time = initial_traffic.total_travel_time;
+    log_timing(options_.enable_timing_log, "svp_initial_evaluate_traffic",
+               static_cast<long long>(queries.size()), phase_start);
+
+    phase_start = Clock::now();
+    result.final_routes = compute_svp_baseline_routes(queries);
+    log_timing(options_.enable_timing_log, "svp_routes",
+               static_cast<long long>(queries.size()), phase_start);
+
+    phase_start = Clock::now();
+    std::vector<Route> final_routes = result.final_routes;
+    TrafficResult final_traffic =
+        evaluate_traffic(graph_, queries, final_routes, traffic_options_);
+    result.final_total_travel_time = final_traffic.total_travel_time;
+    log_timing(options_.enable_timing_log, "svp_final_evaluate_traffic",
+               static_cast<long long>(queries.size()), phase_start);
+
+    log_timing(options_.enable_timing_log, "svp_run_total",
+               static_cast<long long>(queries.size()), total_start);
+    return result;
 }
 
 }  // namespace gro

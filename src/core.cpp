@@ -347,6 +347,102 @@ std::vector<Query> read_queries(const InputConfig& config) {
     return read_queries(config.queries_path);
 }
 
+Route shortest_path(const Graph& graph, const Query& query) {
+    Route route;
+    route.query_id = query.id;
+    route.departure_time = query.departure_time;
+
+    if (query.origin == query.destination) {
+        return route;
+    }
+
+    data_structures::IndexedHeap<4, Cost, NodeId> heap(graph.vertex_count);
+    std::vector<Cost> distances(graph.vertex_count, std::numeric_limits<Cost>::max());
+    std::vector<EdgeId> parent(graph.vertex_count, kInvalidId);
+
+    heap.push_or_update(query.origin, 0);
+    distances[query.origin] = 0;
+
+    while (!heap.empty()) {
+        auto element = heap.extract_min();
+        NodeId node_id = element.id;
+        Cost distance = element.key;
+
+        if (node_id == query.destination) {
+            break;
+        }
+
+        if (distance > distances[node_id]) {
+            continue;
+        }
+
+        for (EdgeId edge_id : graph.outgoing_edges[node_id]) {
+            const Edge& edge = graph.edges[edge_id];
+            Cost new_distance = distance + edge.free_flow_time;
+            if (new_distance < distances[edge.to]) {
+                distances[edge.to] = new_distance;
+                parent[edge.to] = edge_id;
+                heap.push_or_update(edge.to, new_distance);
+            }
+        }
+    }
+
+    if (distances[query.destination] == std::numeric_limits<Cost>::max()) {
+        return route;
+    }
+
+    route.travel_time = distances[query.destination];
+    for (NodeId current = query.destination; current != query.origin; ) {
+        EdgeId edge_id = parent[current];
+        route.edge_ids.push_back(edge_id);
+        current = graph.edges[edge_id].from;
+    }
+    std::reverse(route.edge_ids.begin(), route.edge_ids.end());
+    return route;
+}
+
+std::vector<Cost> reverse_shortest_distances(
+    const Graph& graph,
+    NodeId destination) {
+    const Cost infinity = std::numeric_limits<Cost>::max() / 4;
+    std::vector<Cost> distances(graph.vertex_count, infinity);
+    std::vector<char> settled(graph.vertex_count, 0);
+    data_structures::IndexedHeap<4, Cost, NodeId> heap(graph.vertex_count);
+
+    distances[destination] = 0;
+    heap.push_or_update(destination, 0);
+
+    while (!heap.empty()) {
+        auto element = heap.extract_min();
+        NodeId node_id = element.id;
+        if (settled[node_id]) {
+            continue;
+        }
+        settled[node_id] = 1;
+
+        for (EdgeId edge_id : graph.incoming_edges[node_id]) {
+            const Edge& edge = graph.edges[edge_id];
+            Cost next_distance = distances[node_id] + edge.free_flow_time;
+            if (next_distance < distances[edge.from]) {
+                distances[edge.from] = next_distance;
+                heap.push_or_update(edge.from, next_distance);
+            }
+        }
+    }
+
+    return distances;
+}
+
+Cost route_edge_length(const Graph& graph, const std::vector<EdgeId>& edge_ids) {
+    Cost length = 0;
+    for (EdgeId edge_id : edge_ids) {
+        if (edge_id >= 0 && edge_id < static_cast<EdgeId>(graph.edges.size())) {
+            length += graph.edges[edge_id].free_flow_time;
+        }
+    }
+    return length;
+}
+
 Cost bpr_travel_time(const Edge& edge, Flow flow, const TrafficOptions& options) {
     Flow capacity = edge.capacity > 0 ? edge.capacity : 1;
     Flow safe_flow = flow > 0 ? flow : 0;
