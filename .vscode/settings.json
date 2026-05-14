@@ -1,0 +1,11 @@
+{
+    "C_Cpp.default.configurationProvider": "",
+    "C_Cpp.default.compilerPath": "/usr/bin/clang++",
+    "C_Cpp.default.cppStandard": "c++17",
+    "C_Cpp.default.includePath": [
+        "${workspaceFolder}/include",
+        "/usr/local/include",
+        "/opt/homebrew/opt/libomp/include"
+    ],
+    "C_Cpp.debugShortcut": false
+}

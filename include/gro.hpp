@@ -58,9 +58,7 @@ struct AlgorithmOptions {
     int delta_compress = 1200; // in seconds
     int anchor_window = 1200; // in seconds
     int anchor_threshold = 20; // flow deviation, in percent of capacity
-    int baseline_fraction_to_reroute = 10; // in percent
-    int svp_k = 3;
-    int svp_theta = 80; // in percent
+    int baseline_fraction_to_reroute = 30; // in percent
     bool enable_timing_log = false;
 };
 
@@ -95,7 +93,7 @@ public:
         const std::vector<Query>& queries) const;
 
     TrafficDependencyGraph build_tdg(
-        const TrafficResult& result) const;
+        TrafficResult& result) const;
 
     TrafficDependencyGraph compress_tdg(
         TrafficResult& result) const;
@@ -151,19 +149,9 @@ public:
         const std::vector<Query>& queries, 
         const TrafficResult& result) const;
 
-    std::vector<Route> svp_routes(
-        const Query& query,
-        int k,
-        int theta_percent) const;
-
-    std::vector<Route> compute_svp_baseline_routes(
-        const std::vector<Query>& queries) const;
-
     AlgorithmResult run(const std::vector<Query>& queries) const;
 
     AlgorithmResult run_baseline_gro(const std::vector<Query>& queries) const;
-
-    AlgorithmResult run_svp_baseline(const std::vector<Query>& queries) const;
 
 private:
     Graph graph_;

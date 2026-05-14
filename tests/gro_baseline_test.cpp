@@ -2,8 +2,7 @@
 
 #include <cstdlib>
 #include <exception>
-
-#include <iterator>
+#include <iostream>
 #include <vector>
 
 namespace {
@@ -16,9 +15,7 @@ void require(bool condition, const char* message) {
 
 }  // namespace
 
-
 int main(int argc, char** argv) {
-
     const std::string config_path = argc > 1 ? argv[1] : "config/config.yaml";
 
     gro::InputConfig input = gro::load_input_config(config_path);
@@ -26,7 +23,7 @@ int main(int argc, char** argv) {
 
     std::cout << "Graph loaded: " << graph.vertex_count << " vertices, "
               << graph.edge_count << " edges." << std::endl;
-              
+
     std::vector<gro::Query> queries = gro::read_queries(input);
     gro::AlgorithmOptions algorithm_options = gro::load_algorithm_options(config_path);
     gro::TrafficOptions traffic_options = gro::load_traffic_options(config_path);
@@ -35,12 +32,12 @@ int main(int argc, char** argv) {
     require(!queries.empty(), "queries should not be empty");
 
     gro::GROAlgorithm algorithm(graph, algorithm_options, traffic_options);
-    gro::AlgorithmResult result = algorithm.run(queries);
+    gro::AlgorithmResult result = algorithm.run_baseline_gro(queries);
     require(result.final_routes.size() == queries.size(),
-            "GRO should return one route per query");
+            "GRO baseline should return one route per query");
     require(result.final_total_travel_time >= 0,
-            "GRO final total travel time should be non-negative");
+            "GRO baseline final total travel time should be non-negative");
 
-    std::cout << "GRO Done!" << std::endl;
+    std::cout << "GRO Baseline Done!" << std::endl;
     return 0;
 }

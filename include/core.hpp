@@ -8,6 +8,7 @@
 #include <unordered_map>
 #include <utility>
 #include <vector>
+#include <iostream>
 #include <unordered_set>
 
 namespace gro {
@@ -132,7 +133,7 @@ void log_timing(
     int iteration,
     const char* operation,
     long long count,
-    long long microseconds);
+    long long elapsed_microseconds);
 
 void log_timing(
     bool enabled,
@@ -145,12 +146,25 @@ void log_timing(
     bool enabled,
     const char* operation,
     long long count,
-    long long microseconds);
+    long long elapsed_microseconds);
 
 void log_timing(
     bool enabled,
     const char* operation,
     long long count,
     Clock::time_point start);
+
+void log_metric(
+    bool enabled,
+    int iteration,
+    const char* metric,
+    long long count,
+    long long value);
+
+void log_metric(
+    bool enabled,
+    const char* metric,
+    long long count,
+    long long value);
 
 }  // namespace gro

@@ -6,6 +6,7 @@
 #include <chrono>
 #include <filesystem>
 #include <fstream>
+#include <iomanip>
 #include <iostream>
 #include <limits>
 #include <sstream>
@@ -81,6 +82,64 @@ int parse_percent(const std::string& value) {
     return negative ? -static_cast<int>(percent) : static_cast<int>(percent);
 }
 
+std::string seconds_text(long long microseconds) {
+    std::ostringstream out;
+    out << std::fixed << std::setprecision(6)
+        << static_cast<double>(microseconds) / 1000000.0;
+    return out.str();
+}
+
+std::string timing_label(const char* operation) {
+    std::string op = operation ? operation : "";
+    if (op == "initial_routes" || op == "baseline_initial_routes") {
+        return "INITIAL_ROUTES";
+    }
+    if (op == "evaluate_traffic" ||
+        op == "final_evaluate_traffic" ||
+        op == "baseline_evaluate_traffic" ||
+        op == "baseline_final_evaluate_traffic") {
+        return "EVALUATE";
+    }
+    if (op == "build_tdg" || op == "compress_tdg") {
+        return "TDG";
+    }
+    if (op == "compute_impact") {
+        return "IMPACT";
+    }
+    if (op == "iteration_total" || op == "baseline_iteration_total") {
+        return "ITERATION";
+    }
+    if (op == "run_total" || op == "baseline_run_total") {
+        return "RUN";
+    }
+    if (op == "baseline_reroute_queries") {
+        return "BASELINE_REROUTE";
+    }
+    return op.empty() ? "TIMING" : op;
+}
+
+std::string timing_count_label(const char* operation) {
+    std::string op = operation ? operation : "";
+    if (op == "build_tdg" || op == "compress_tdg" || op == "compute_impact") {
+        return "size";
+    }
+    if (op == "iteration_total" || op == "baseline_iteration_total") {
+        return "selected_count";
+    }
+    return "query_count";
+}
+
+std::string metric_label(const char* metric) {
+    std::string name = metric ? metric : "";
+    if (name == "total_travel_time" ||
+        name == "final_total_travel_time" ||
+        name == "baseline_total_travel_time" ||
+        name == "baseline_final_total_travel_time") {
+        return "TOTAL_TRAVEL_TIME";
+    }
+    return name.empty() ? "METRIC" : name;
+}
+
 }  // namespace
 
 ParameterMap load_parameter_file(const std::string& path) {
@@ -141,11 +200,10 @@ void log_timing(
         return;
     }
 
-    std::cerr << "TIMING,"
-              << iteration << ','
-              << operation << ','
-              << count << ','
-              << microseconds << '\n';
+    std::cerr << timing_label(operation) << ','
+              << "iteration=" << iteration << ','
+              << timing_count_label(operation) << '=' << count << ','
+              << "time_sec=" << seconds_text(microseconds) << '\n';
 }
 
 void log_timing(
@@ -171,6 +229,30 @@ void log_timing(
     long long count,
     Clock::time_point start) {
     log_timing(enabled, -1, operation, count, elapsed_us(start));
+}
+
+void log_metric(
+    bool enabled,
+    int iteration,
+    const char* metric,
+    long long count,
+    long long value) {
+    if (!enabled) {
+        return;
+    }
+
+    std::cerr << metric_label(metric) << ','
+              << "iteration=" << iteration << ','
+              << "query_count=" << count << ','
+              << "value=" << value << '\n';
+}
+
+void log_metric(
+    bool enabled,
+    const char* metric,
+    long long count,
+    long long value) {
+    log_metric(enabled, -1, metric, count, value);
 }
 
 InputConfig load_input_config(const std::string& path) {
@@ -214,9 +296,6 @@ TrafficOptions load_traffic_options(const std::string& path, TrafficOptions defa
     }
     if (auto it = parameters.find("beta"); it != parameters.end()) {
         options.beta = parse_integer(it->second);
-    }
-    if (auto it = parameters.find("max_travel_time"); it != parameters.end()) {
-        options.max_travel_time = static_cast<Time>(std::stoll(it->second));
     }
     if (auto it = parameters.find("max_time"); it != parameters.end()) {
         options.max_travel_time = static_cast<Time>(std::stoll(it->second));

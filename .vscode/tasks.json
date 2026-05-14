@@ -4,6 +4,9 @@
             "label": "Make: Build",
             "type": "shell",
             "command": "make",
+            "args": [
+                "build"
+            ],
             "problemMatcher": [
                 "$gcc"
             ],
@@ -19,11 +22,104 @@
         {
             "label": "Make: Test",
             "type": "shell",
-            "command": "make test",
+            "command": "make",
+            "args": [
+                "test"
+            ],
             "group": {
                 "kind": "test",
                 "isDefault": true
             },
+            "presentation": {
+                "reveal": "always",
+                "panel": "new"
+            }
+        },
+        {
+            "label": "Run gro_test",
+            "type": "shell",
+            "command": "make",
+            "args": [
+                "run-gro"
+            ],
+            "problemMatcher": [
+                "$gcc"
+            ],
+            "presentation": {
+                "reveal": "always",
+                "panel": "new"
+            }
+        },
+        {
+            "label": "Run svp_test",
+            "type": "shell",
+            "command": "make",
+            "args": [
+                "run-svp"
+            ],
+            "problemMatcher": [
+                "$gcc"
+            ],
+            "presentation": {
+                "reveal": "always",
+                "panel": "new"
+            }
+        },
+        {
+            "label": "Run gro_baseline_test",
+            "type": "shell",
+            "command": "make",
+            "args": [
+                "run-gro-baseline"
+            ],
+            "problemMatcher": [
+                "$gcc"
+            ],
+            "presentation": {
+                "reveal": "always",
+                "panel": "new"
+            }
+        },
+        {
+            "label": "Run gor_test",
+            "type": "shell",
+            "command": "make",
+            "args": [
+                "run-gor"
+            ],
+            "problemMatcher": [
+                "$gcc"
+            ],
+            "presentation": {
+                "reveal": "always",
+                "panel": "new"
+            }
+        },
+        {
+            "label": "Run sor_test",
+            "type": "shell",
+            "command": "make",
+            "args": [
+                "run-sor"
+            ],
+            "problemMatcher": [
+                "$gcc"
+            ],
+            "presentation": {
+                "reveal": "always",
+                "panel": "new"
+            }
+        },
+        {
+            "label": "Run fahl_test",
+            "type": "shell",
+            "command": "make",
+            "args": [
+                "run-fahl"
+            ],
+            "problemMatcher": [
+                "$gcc"
+            ],
             "presentation": {
                 "reveal": "always",
                 "panel": "new"

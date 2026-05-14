@@ -11,6 +11,7 @@ cmake-build-*/
 
 # Local executables
 gro_test
+gro_baseline_test
 svp_test
 gor_test
 sor_test

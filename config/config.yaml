@@ -1,16 +1,16 @@
 # GRO config.
 # Supported format: top-level key: value only.
 
-graph_path: ../tests/small_network.txt
-coordinates_path:
-queries_path: ../tests/small_queries.txt
+graph_path: ../data/MH.txt
+coordinates_path:../data/MH_NodeIDLonLat.txt
+queries_path: ../data/MH_Hop40Rep4-16.txt
 
 alpha: 0.15
 beta: 4.0
 max_time: 3600
 
 max_iterations: 5
-# enable_timing_log: true
+enable_timing_log: true
 lambda: 0.45
 gamma: 0.5
 impact_weight: 0.15
