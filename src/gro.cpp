@@ -231,6 +231,10 @@ AlgorithmOptions load_algorithm_options(
     if (auto it = parameters.find("baseline_fraction_to_reroute"); it != parameters.end()) {
         options.baseline_fraction_to_reroute = parse_percent(it->second);
     }
+    if (auto it = parameters.find("baseline_random_seed"); it != parameters.end()) {
+        options.baseline_random_seed =
+            static_cast<unsigned int>(std::stoul(it->second));
+    }
     if (auto it = parameters.find("enable_timing_log"); it != parameters.end()) {
         options.enable_timing_log = parse_bool(it->second);
     }

@@ -31,12 +31,16 @@ struct Options {
     std::filesystem::path query_dir = "data/MH_Synthetic_query_sets";
     std::filesystem::path output_path = "python/results/mh_synthetic_all_cpp.csv";
     std::vector<std::string> algorithms = {
-        "gro",
-        "random_baseline",
-        "selection_td_baseline",
-        "normal_selection_gro_reroute"};
+        "tdg",
+        "baseline",
+        "tdg_selection_baseline",
+        "tdg_reroute_baseline"};
     bool timing_log = false;
     int max_files = 0;
+    int hop_filter = -1;
+    int rep_filter = -1;
+    int seed_filter = -1;
+    int max_iterations = -1;
 };
 
 std::vector<std::string> split_csv(const std::string& text) {
@@ -75,6 +79,14 @@ Options parse_args(int argc, char** argv) {
             options.algorithms = split_csv(require_value(arg));
         } else if (arg == "--max-files") {
             options.max_files = std::stoi(require_value(arg));
+        } else if (arg == "--max-iterations") {
+            options.max_iterations = std::stoi(require_value(arg));
+        } else if (arg == "--hop") {
+            options.hop_filter = std::stoi(require_value(arg));
+        } else if (arg == "--rep") {
+            options.rep_filter = std::stoi(require_value(arg));
+        } else if (arg == "--seed") {
+            options.seed_filter = std::stoi(require_value(arg));
         } else if (arg == "--timing-log") {
             options.timing_log = true;
         } else {
@@ -119,21 +131,57 @@ std::vector<Dataset> discover_datasets(const std::filesystem::path& query_dir) {
     return datasets;
 }
 
+std::vector<Dataset> filter_datasets(
+    const std::vector<Dataset>& datasets,
+    const Options& options) {
+    std::vector<Dataset> filtered;
+    for (const Dataset& dataset : datasets) {
+        if (options.hop_filter >= 0 && dataset.hop != options.hop_filter) {
+            continue;
+        }
+        if (options.rep_filter >= 0 && dataset.rep != options.rep_filter) {
+            continue;
+        }
+        if (options.seed_filter >= 0 && dataset.seed != options.seed_filter) {
+            continue;
+        }
+        filtered.push_back(dataset);
+    }
+    return filtered;
+}
+
+std::string canonical_algorithm_name(const std::string& algorithm) {
+    if (algorithm == "gro") {
+        return "tdg";
+    }
+    if (algorithm == "random_baseline") {
+        return "baseline";
+    }
+    if (algorithm == "selection_td_baseline") {
+        return "tdg_selection_baseline";
+    }
+    if (algorithm == "normal_selection_gro_reroute") {
+        return "tdg_reroute_baseline";
+    }
+    return algorithm;
+}
+
 gro::AlgorithmResult run_algorithm(
     const std::string& algorithm,
     const gro::GROAlgorithm& runner,
     const std::vector<gro::Query>& queries) {
-    if (algorithm == "gro") {
+    std::string canonical_algorithm = canonical_algorithm_name(algorithm);
+    if (canonical_algorithm == "tdg") {
         return runner.run(queries);
     }
-    if (algorithm == "random_baseline") {
-        return runner.run_baseline_gro(queries);
+    if (canonical_algorithm == "baseline") {
+        return runner.run_baseline(queries);
     }
-    if (algorithm == "selection_td_baseline") {
-        return runner.run_selection_td_baseline(queries);
+    if (canonical_algorithm == "tdg_selection_baseline") {
+        return runner.run_tdg_selection_baseline(queries);
     }
-    if (algorithm == "normal_selection_gro_reroute") {
-        return runner.run_normal_selection_gro_reroute_baseline(queries);
+    if (canonical_algorithm == "tdg_reroute_baseline") {
+        return runner.run_tdg_reroute_baseline(queries);
     }
     throw std::runtime_error("Unknown algorithm: " + algorithm);
 }
@@ -172,11 +220,15 @@ int main(int argc, char** argv) {
         gro::Graph graph = gro::read_graph(input);
         gro::AlgorithmOptions algorithm_options =
             gro::load_algorithm_options(options.config_path);
+        if (options.max_iterations >= 0) {
+            algorithm_options.max_iterations = options.max_iterations;
+        }
         algorithm_options.enable_timing_log = options.timing_log;
         gro::TrafficOptions traffic_options =
             gro::load_traffic_options(options.config_path);
 
-        std::vector<Dataset> datasets = discover_datasets(options.query_dir);
+        std::vector<Dataset> datasets =
+            filter_datasets(discover_datasets(options.query_dir), options);
         if (options.max_files > 0 &&
             static_cast<std::size_t>(options.max_files) < datasets.size()) {
             datasets.resize(static_cast<std::size_t>(options.max_files));
@@ -201,7 +253,9 @@ int main(int argc, char** argv) {
             query_input.queries_path = dataset.path.string();
             std::vector<gro::Query> queries = gro::read_queries(query_input);
 
-            for (const std::string& algorithm : options.algorithms) {
+            for (const std::string& requested_algorithm : options.algorithms) {
+                std::string algorithm =
+                    canonical_algorithm_name(requested_algorithm);
                 std::cerr << "[run] " << algorithm << ' ' << dataset.name()
                           << " queries=" << queries.size() << "\n";
                 gro::GROAlgorithm runner(graph, algorithm_options, traffic_options);

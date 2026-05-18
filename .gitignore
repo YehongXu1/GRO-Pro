@@ -12,6 +12,7 @@ cmake-build-*/
 # Local executables
 gro_test
 gro_baseline_test
+gro_selection_debug_test
 svp_test
 gor_test
 sor_test
@@ -40,5 +41,9 @@ coverage/
 .env
 .env.*
 
-# Notes
-notes/
+# temporary files
+tmp/
+
+#python
+.python
+ 

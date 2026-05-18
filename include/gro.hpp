@@ -60,6 +60,7 @@ struct AlgorithmOptions {
     int anchor_window = 1200; // in seconds
     int anchor_threshold = 20; // flow deviation, in percent of capacity
     int baseline_fraction_to_reroute = 30; // in percent
+    unsigned int baseline_random_seed = 0;
     bool enable_timing_log = false;
 };
 
@@ -161,11 +162,12 @@ public:
 
     AlgorithmResult run(const std::vector<Query>& queries) const;
 
-    AlgorithmResult run_baseline_gro(const std::vector<Query>& queries) const;
+    AlgorithmResult run_baseline(const std::vector<Query>& queries) const;
 
-    AlgorithmResult run_selection_td_baseline(const std::vector<Query>& queries) const;
+    AlgorithmResult run_tdg_selection_baseline(
+        const std::vector<Query>& queries) const;
 
-    AlgorithmResult run_normal_selection_gro_reroute_baseline(
+    AlgorithmResult run_tdg_reroute_baseline(
         const std::vector<Query>& queries) const;
 
 private:

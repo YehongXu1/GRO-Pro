@@ -19,14 +19,15 @@ std::string seconds_text(long long microseconds) {
 
 std::vector<QueryId> select_normal_baseline_queries(
     std::size_t query_count,
-    int fraction_to_reroute) {
+    int fraction_to_reroute,
+    unsigned int random_seed) {
     int clamped_fraction = std::clamp(fraction_to_reroute, 0, 100);
     std::vector<QueryId> query_ids(query_count);
     std::iota(query_ids.begin(), query_ids.end(), 0);
     std::shuffle(
         query_ids.begin(),
         query_ids.end(),
-        std::mt19937{std::random_device{}()});
+        std::mt19937{random_seed});
 
     std::size_t reroute_count =
         static_cast<std::size_t>(clamped_fraction) *
@@ -93,7 +94,7 @@ void log_selection_td_initial(
         return;
     }
 
-    std::cerr << "SELECTION_TD_INITIAL,"
+    std::cerr << "TDG_SELECTION_BASELINE_INITIAL,"
               << "initial_routes_sec=" << seconds_text(initial_routes_us) << '\n';
 }
 
@@ -116,7 +117,7 @@ void log_selection_td_iteration(
         return;
     }
 
-    std::cerr << "SELECTION_TD,"
+    std::cerr << "TDG_SELECTION_BASELINE,"
               << "iteration=" << iteration << ','
               << "tdg_size=" << tdg_size << ','
               << "candidate_count=" << candidate_count << ','
@@ -141,7 +142,7 @@ void log_selection_td_final(
         return;
     }
 
-    std::cerr << "SELECTION_TD_FINAL,"
+    std::cerr << "TDG_SELECTION_BASELINE_FINAL,"
               << "total_travel_time=" << total_travel_time << ','
               << "evaluate_sec=" << seconds_text(evaluate_us) << ','
               << "run_sec=" << seconds_text(run_us) << '\n';
@@ -154,7 +155,7 @@ void log_normal_selection_gro_initial(
         return;
     }
 
-    std::cerr << "NORMAL_SELECTION_GRO_REROUTE_INITIAL,"
+    std::cerr << "TDG_REROUTE_BASELINE_INITIAL,"
               << "initial_routes_sec=" << seconds_text(initial_routes_us) << '\n';
 }
 
@@ -177,7 +178,7 @@ void log_normal_selection_gro_iteration(
         return;
     }
 
-    std::cerr << "NORMAL_SELECTION_GRO_REROUTE,"
+    std::cerr << "TDG_REROUTE_BASELINE,"
               << "iteration=" << iteration << ','
               << "tdg_size=" << tdg_size << ','
               << "selected_count=" << selected_count << ','
@@ -202,7 +203,7 @@ void log_normal_selection_gro_final(
         return;
     }
 
-    std::cerr << "NORMAL_SELECTION_GRO_REROUTE_FINAL,"
+    std::cerr << "TDG_REROUTE_BASELINE_FINAL,"
               << "total_travel_time=" << total_travel_time << ','
               << "evaluate_sec=" << seconds_text(evaluate_us) << ','
               << "run_sec=" << seconds_text(run_us) << '\n';
@@ -210,7 +211,7 @@ void log_normal_selection_gro_final(
 
 }  // namespace
 
-AlgorithmResult GROAlgorithm::run_baseline_gro(
+AlgorithmResult GROAlgorithm::run_baseline(
     const std::vector<Query>& queries) const {
     auto total_start = Clock::now();
     auto phase_start = Clock::now();
@@ -239,7 +240,9 @@ AlgorithmResult GROAlgorithm::run_baseline_gro(
         std::vector<QueryId> query_ids =
             select_normal_baseline_queries(
                 queries.size(),
-                options_.baseline_fraction_to_reroute);
+                options_.baseline_fraction_to_reroute,
+                options_.baseline_random_seed +
+                    static_cast<unsigned int>(iteration));
         long long select_us = elapsed_us(phase_start);
         (void)select_us;
 
@@ -278,7 +281,7 @@ AlgorithmResult GROAlgorithm::run_baseline_gro(
     return result;
 }
 
-AlgorithmResult GROAlgorithm::run_selection_td_baseline(
+AlgorithmResult GROAlgorithm::run_tdg_selection_baseline(
     const std::vector<Query>& queries) const {
     auto total_start = Clock::now();
     auto phase_start = Clock::now();
@@ -389,7 +392,7 @@ AlgorithmResult GROAlgorithm::run_selection_td_baseline(
     return result;
 }
 
-AlgorithmResult GROAlgorithm::run_normal_selection_gro_reroute_baseline(
+AlgorithmResult GROAlgorithm::run_tdg_reroute_baseline(
     const std::vector<Query>& queries) const {
     auto total_start = Clock::now();
     auto phase_start = Clock::now();
@@ -426,7 +429,9 @@ AlgorithmResult GROAlgorithm::run_normal_selection_gro_reroute_baseline(
         std::vector<QueryId> selected_query_ids =
             select_normal_baseline_queries(
                 queries.size(),
-                options_.baseline_fraction_to_reroute);
+                options_.baseline_fraction_to_reroute,
+                options_.baseline_random_seed +
+                    static_cast<unsigned int>(iteration));
         long long select_us = elapsed_us(phase_start);
 
         phase_start = Clock::now();
