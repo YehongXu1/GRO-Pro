@@ -7,6 +7,7 @@
 #include <functional>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 #include <set>
@@ -70,6 +71,7 @@ AlgorithmOptions load_algorithm_options(
 struct AlgorithmResult {
     std::vector<Route> initial_routes;
     std::vector<Route> final_routes;
+    std::vector<Cost> total_travel_time_by_iteration;
     Cost initial_total_travel_time = 0;
     Cost final_total_travel_time = 0;
 };
@@ -118,6 +120,14 @@ public:
         const std::vector<Cost>& node_impacts) const;
 
     std::vector<QueryId> select_queries(
+        const std::unordered_set<QueryId>& candidate_query_ids,
+        const std::vector<Query>& queries,
+        const TrafficResult& result,
+        const TrafficDependencyGraph& tdg,
+        const std::vector<Cost>& node_impacts,
+        int iteration = -1) const;
+
+    std::vector<QueryId> select_queries(
         const std::vector<Query>& queries,
         const TrafficResult& result,
         const TrafficDependencyGraph& tdg,
@@ -152,6 +162,11 @@ public:
     AlgorithmResult run(const std::vector<Query>& queries) const;
 
     AlgorithmResult run_baseline_gro(const std::vector<Query>& queries) const;
+
+    AlgorithmResult run_selection_td_baseline(const std::vector<Query>& queries) const;
+
+    AlgorithmResult run_normal_selection_gro_reroute_baseline(
+        const std::vector<Query>& queries) const;
 
 private:
     Graph graph_;

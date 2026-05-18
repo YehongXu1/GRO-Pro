@@ -1,0 +1,508 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1320" height="900" viewBox="0 0 1320 900">
+<rect width="100%" height="100%" fill="white"/>
+<style>text{font-family:Arial,Helvetica,sans-serif;fill:#222}.axis{stroke:#333;stroke-width:1}.grid{stroke:#ddd;stroke-width:1}.line{fill:none;stroke-width:2.4}.tick{font-size:11px}.title{font-size:14px;font-weight:700}.label{font-size:13px}.legend{font-size:13px}</style>
+<text x="660.0" y="28" text-anchor="middle" class="title">MH Synthetic: GRO vs GRO Baseline</text>
+<line x1="72" y1="50" x2="100" y2="50" stroke="#1f77b4" stroke-width="3"/>
+<circle cx="86" cy="50" r="3.5" fill="#1f77b4"/>
+<text x="108" y="54" class="legend">gro</text>
+<line x1="222" y1="50" x2="250" y2="50" stroke="#d62728" stroke-width="3"/>
+<circle cx="236" cy="50" r="3.5" fill="#d62728"/>
+<text x="258" y="54" class="legend">baseline</text>
+<rect x="72.00" y="76.00" width="375.33" height="213.33" fill="white" stroke="#aaa"/>
+<text x="259.67" y="66.00" text-anchor="middle" class="title">Hop=10, Rep=1</text>
+<line x1="72.00" y1="289.33" x2="72.00" y2="293.33" class="axis"/>
+<text x="72.00" y="307.33" text-anchor="middle" class="tick">0</text>
+<line x1="109.53" y1="289.33" x2="109.53" y2="293.33" class="axis"/>
+<line x1="147.07" y1="289.33" x2="147.07" y2="293.33" class="axis"/>
+<text x="147.07" y="307.33" text-anchor="middle" class="tick">2</text>
+<line x1="184.60" y1="289.33" x2="184.60" y2="293.33" class="axis"/>
+<line x1="222.13" y1="289.33" x2="222.13" y2="293.33" class="axis"/>
+<text x="222.13" y="307.33" text-anchor="middle" class="tick">4</text>
+<line x1="259.67" y1="289.33" x2="259.67" y2="293.33" class="axis"/>
+<line x1="297.20" y1="289.33" x2="297.20" y2="293.33" class="axis"/>
+<text x="297.20" y="307.33" text-anchor="middle" class="tick">6</text>
+<line x1="334.73" y1="289.33" x2="334.73" y2="293.33" class="axis"/>
+<line x1="372.27" y1="289.33" x2="372.27" y2="293.33" class="axis"/>
+<text x="372.27" y="307.33" text-anchor="middle" class="tick">8</text>
+<line x1="409.80" y1="289.33" x2="409.80" y2="293.33" class="axis"/>
+<line x1="447.33" y1="289.33" x2="447.33" y2="293.33" class="axis"/>
+<text x="447.33" y="307.33" text-anchor="middle" class="tick">10</text>
+<line x1="72.00" y1="289.33" x2="447.33" y2="289.33" class="grid"/>
+<text x="64.00" y="293.33" text-anchor="end" class="tick">22.5M</text>
+<line x1="72.00" y1="236.00" x2="447.33" y2="236.00" class="grid"/>
+<text x="64.00" y="240.00" text-anchor="end" class="tick">23.9M</text>
+<line x1="72.00" y1="182.67" x2="447.33" y2="182.67" class="grid"/>
+<text x="64.00" y="186.67" text-anchor="end" class="tick">25.3M</text>
+<line x1="72.00" y1="129.33" x2="447.33" y2="129.33" class="grid"/>
+<text x="64.00" y="133.33" text-anchor="end" class="tick">26.8M</text>
+<line x1="72.00" y1="76.00" x2="447.33" y2="76.00" class="grid"/>
+<text x="64.00" y="80.00" text-anchor="end" class="tick">28.4M</text>
+<line x1="72.00" y1="289.33" x2="447.33" y2="289.33" class="axis"/>
+<line x1="72.00" y1="76.00" x2="72.00" y2="289.33" class="axis"/>
+<polyline points="72.00,121.01 109.53,166.96 147.07,195.30 184.60,180.17 222.13,187.06 259.67,188.00 297.20,192.82 334.73,182.11 372.27,189.08 409.80,186.61 447.33,187.97" class="line" stroke="#1f77b4"/>
+<circle cx="72.00" cy="121.01" r="3.2" fill="#1f77b4"/>
+<circle cx="109.53" cy="166.96" r="3.2" fill="#1f77b4"/>
+<circle cx="147.07" cy="195.30" r="3.2" fill="#1f77b4"/>
+<circle cx="184.60" cy="180.17" r="3.2" fill="#1f77b4"/>
+<circle cx="222.13" cy="187.06" r="3.2" fill="#1f77b4"/>
+<circle cx="259.67" cy="188.00" r="3.2" fill="#1f77b4"/>
+<circle cx="297.20" cy="192.82" r="3.2" fill="#1f77b4"/>
+<circle cx="334.73" cy="182.11" r="3.2" fill="#1f77b4"/>
+<circle cx="372.27" cy="189.08" r="3.2" fill="#1f77b4"/>
+<circle cx="409.80" cy="186.61" r="3.2" fill="#1f77b4"/>
+<circle cx="447.33" cy="187.97" r="3.2" fill="#1f77b4"/>
+<polyline points="72.00,121.01 109.53,193.24 147.07,218.60 184.60,222.88 222.13,229.60 259.67,230.95 297.20,233.43 334.73,226.95 372.27,229.03 409.80,242.01 447.33,231.06" class="line" stroke="#d62728"/>
+<circle cx="72.00" cy="121.01" r="3.2" fill="#d62728"/>
+<circle cx="109.53" cy="193.24" r="3.2" fill="#d62728"/>
+<circle cx="147.07" cy="218.60" r="3.2" fill="#d62728"/>
+<circle cx="184.60" cy="222.88" r="3.2" fill="#d62728"/>
+<circle cx="222.13" cy="229.60" r="3.2" fill="#d62728"/>
+<circle cx="259.67" cy="230.95" r="3.2" fill="#d62728"/>
+<circle cx="297.20" cy="233.43" r="3.2" fill="#d62728"/>
+<circle cx="334.73" cy="226.95" r="3.2" fill="#d62728"/>
+<circle cx="372.27" cy="229.03" r="3.2" fill="#d62728"/>
+<circle cx="409.80" cy="242.01" r="3.2" fill="#d62728"/>
+<circle cx="447.33" cy="231.06" r="3.2" fill="#d62728"/>
+<rect x="493.33" y="76.00" width="375.33" height="213.33" fill="white" stroke="#aaa"/>
+<text x="681.00" y="66.00" text-anchor="middle" class="title">Hop=10, Rep=2</text>
+<line x1="493.33" y1="289.33" x2="493.33" y2="293.33" class="axis"/>
+<text x="493.33" y="307.33" text-anchor="middle" class="tick">0</text>
+<line x1="530.87" y1="289.33" x2="530.87" y2="293.33" class="axis"/>
+<line x1="568.40" y1="289.33" x2="568.40" y2="293.33" class="axis"/>
+<text x="568.40" y="307.33" text-anchor="middle" class="tick">2</text>
+<line x1="605.93" y1="289.33" x2="605.93" y2="293.33" class="axis"/>
+<line x1="643.47" y1="289.33" x2="643.47" y2="293.33" class="axis"/>
+<text x="643.47" y="307.33" text-anchor="middle" class="tick">4</text>
+<line x1="681.00" y1="289.33" x2="681.00" y2="293.33" class="axis"/>
+<line x1="718.53" y1="289.33" x2="718.53" y2="293.33" class="axis"/>
+<text x="718.53" y="307.33" text-anchor="middle" class="tick">6</text>
+<line x1="756.07" y1="289.33" x2="756.07" y2="293.33" class="axis"/>
+<line x1="793.60" y1="289.33" x2="793.60" y2="293.33" class="axis"/>
+<text x="793.60" y="307.33" text-anchor="middle" class="tick">8</text>
+<line x1="831.13" y1="289.33" x2="831.13" y2="293.33" class="axis"/>
+<line x1="868.67" y1="289.33" x2="868.67" y2="293.33" class="axis"/>
+<text x="868.67" y="307.33" text-anchor="middle" class="tick">10</text>
+<line x1="493.33" y1="289.33" x2="868.67" y2="289.33" class="grid"/>
+<text x="485.33" y="293.33" text-anchor="end" class="tick">54.6M</text>
+<line x1="493.33" y1="236.00" x2="868.67" y2="236.00" class="grid"/>
+<text x="485.33" y="240.00" text-anchor="end" class="tick">58.2M</text>
+<line x1="493.33" y1="182.67" x2="868.67" y2="182.67" class="grid"/>
+<text x="485.33" y="186.67" text-anchor="end" class="tick">62.1M</text>
+<line x1="493.33" y1="129.33" x2="868.67" y2="129.33" class="grid"/>
+<text x="485.33" y="133.33" text-anchor="end" class="tick">66.2M</text>
+<line x1="493.33" y1="76.00" x2="868.67" y2="76.00" class="grid"/>
+<text x="485.33" y="80.00" text-anchor="end" class="tick">70.6M</text>
+<line x1="493.33" y1="289.33" x2="868.67" y2="289.33" class="axis"/>
+<line x1="493.33" y1="76.00" x2="493.33" y2="289.33" class="axis"/>
+<polyline points="493.33,129.35 530.87,116.33 568.40,168.04 605.93,162.00 643.47,172.18 681.00,177.56 718.53,175.01 756.07,177.08 793.60,185.30 831.13,180.95 868.67,185.17" class="line" stroke="#1f77b4"/>
+<circle cx="493.33" cy="129.35" r="3.2" fill="#1f77b4"/>
+<circle cx="530.87" cy="116.33" r="3.2" fill="#1f77b4"/>
+<circle cx="568.40" cy="168.04" r="3.2" fill="#1f77b4"/>
+<circle cx="605.93" cy="162.00" r="3.2" fill="#1f77b4"/>
+<circle cx="643.47" cy="172.18" r="3.2" fill="#1f77b4"/>
+<circle cx="681.00" cy="177.56" r="3.2" fill="#1f77b4"/>
+<circle cx="718.53" cy="175.01" r="3.2" fill="#1f77b4"/>
+<circle cx="756.07" cy="177.08" r="3.2" fill="#1f77b4"/>
+<circle cx="793.60" cy="185.30" r="3.2" fill="#1f77b4"/>
+<circle cx="831.13" cy="180.95" r="3.2" fill="#1f77b4"/>
+<circle cx="868.67" cy="185.17" r="3.2" fill="#1f77b4"/>
+<polyline points="493.33,129.35 530.87,199.49 568.40,209.95 605.93,223.40 643.47,226.57 681.00,243.56 718.53,239.16 756.07,240.51 793.60,246.93 831.13,228.04 868.67,241.48" class="line" stroke="#d62728"/>
+<circle cx="493.33" cy="129.35" r="3.2" fill="#d62728"/>
+<circle cx="530.87" cy="199.49" r="3.2" fill="#d62728"/>
+<circle cx="568.40" cy="209.95" r="3.2" fill="#d62728"/>
+<circle cx="605.93" cy="223.40" r="3.2" fill="#d62728"/>
+<circle cx="643.47" cy="226.57" r="3.2" fill="#d62728"/>
+<circle cx="681.00" cy="243.56" r="3.2" fill="#d62728"/>
+<circle cx="718.53" cy="239.16" r="3.2" fill="#d62728"/>
+<circle cx="756.07" cy="240.51" r="3.2" fill="#d62728"/>
+<circle cx="793.60" cy="246.93" r="3.2" fill="#d62728"/>
+<circle cx="831.13" cy="228.04" r="3.2" fill="#d62728"/>
+<circle cx="868.67" cy="241.48" r="3.2" fill="#d62728"/>
+<rect x="914.67" y="76.00" width="375.33" height="213.33" fill="white" stroke="#aaa"/>
+<text x="1102.33" y="66.00" text-anchor="middle" class="title">Hop=10, Rep=4</text>
+<line x1="914.67" y1="289.33" x2="914.67" y2="293.33" class="axis"/>
+<text x="914.67" y="307.33" text-anchor="middle" class="tick">0</text>
+<line x1="952.20" y1="289.33" x2="952.20" y2="293.33" class="axis"/>
+<line x1="989.73" y1="289.33" x2="989.73" y2="293.33" class="axis"/>
+<text x="989.73" y="307.33" text-anchor="middle" class="tick">2</text>
+<line x1="1027.27" y1="289.33" x2="1027.27" y2="293.33" class="axis"/>
+<line x1="1064.80" y1="289.33" x2="1064.80" y2="293.33" class="axis"/>
+<text x="1064.80" y="307.33" text-anchor="middle" class="tick">4</text>
+<line x1="1102.33" y1="289.33" x2="1102.33" y2="293.33" class="axis"/>
+<line x1="1139.87" y1="289.33" x2="1139.87" y2="293.33" class="axis"/>
+<text x="1139.87" y="307.33" text-anchor="middle" class="tick">6</text>
+<line x1="1177.40" y1="289.33" x2="1177.40" y2="293.33" class="axis"/>
+<line x1="1214.93" y1="289.33" x2="1214.93" y2="293.33" class="axis"/>
+<text x="1214.93" y="307.33" text-anchor="middle" class="tick">8</text>
+<line x1="1252.47" y1="289.33" x2="1252.47" y2="293.33" class="axis"/>
+<line x1="1290.00" y1="289.33" x2="1290.00" y2="293.33" class="axis"/>
+<text x="1290.00" y="307.33" text-anchor="middle" class="tick">10</text>
+<line x1="914.67" y1="289.33" x2="1290.00" y2="289.33" class="grid"/>
+<text x="906.67" y="293.33" text-anchor="end" class="tick">132.0M</text>
+<line x1="914.67" y1="236.00" x2="1290.00" y2="236.00" class="grid"/>
+<text x="906.67" y="240.00" text-anchor="end" class="tick">144.2M</text>
+<line x1="914.67" y1="182.67" x2="1290.00" y2="182.67" class="grid"/>
+<text x="906.67" y="186.67" text-anchor="end" class="tick">157.6M</text>
+<line x1="914.67" y1="129.33" x2="1290.00" y2="129.33" class="grid"/>
+<text x="906.67" y="133.33" text-anchor="end" class="tick">172.2M</text>
+<line x1="914.67" y1="76.00" x2="1290.00" y2="76.00" class="grid"/>
+<text x="906.67" y="80.00" text-anchor="end" class="tick">188.2M</text>
+<line x1="914.67" y1="289.33" x2="1290.00" y2="289.33" class="axis"/>
+<line x1="914.67" y1="76.00" x2="914.67" y2="289.33" class="axis"/>
+<polyline points="914.67,164.02 952.20,121.73 989.73,105.42 1027.27,105.32 1064.80,121.82 1102.33,120.63 1139.87,132.02 1177.40,135.08 1214.93,156.52 1252.47,158.78 1290.00,168.99" class="line" stroke="#1f77b4"/>
+<circle cx="914.67" cy="164.02" r="3.2" fill="#1f77b4"/>
+<circle cx="952.20" cy="121.73" r="3.2" fill="#1f77b4"/>
+<circle cx="989.73" cy="105.42" r="3.2" fill="#1f77b4"/>
+<circle cx="1027.27" cy="105.32" r="3.2" fill="#1f77b4"/>
+<circle cx="1064.80" cy="121.82" r="3.2" fill="#1f77b4"/>
+<circle cx="1102.33" cy="120.63" r="3.2" fill="#1f77b4"/>
+<circle cx="1139.87" cy="132.02" r="3.2" fill="#1f77b4"/>
+<circle cx="1177.40" cy="135.08" r="3.2" fill="#1f77b4"/>
+<circle cx="1214.93" cy="156.52" r="3.2" fill="#1f77b4"/>
+<circle cx="1252.47" cy="158.78" r="3.2" fill="#1f77b4"/>
+<circle cx="1290.00" cy="168.99" r="3.2" fill="#1f77b4"/>
+<polyline points="914.67,164.02 952.20,198.73 989.73,212.62 1027.27,237.61 1064.80,217.25 1102.33,233.87 1139.87,249.78 1177.40,252.98 1214.93,258.51 1252.47,255.50 1290.00,239.83" class="line" stroke="#d62728"/>
+<circle cx="914.67" cy="164.02" r="3.2" fill="#d62728"/>
+<circle cx="952.20" cy="198.73" r="3.2" fill="#d62728"/>
+<circle cx="989.73" cy="212.62" r="3.2" fill="#d62728"/>
+<circle cx="1027.27" cy="237.61" r="3.2" fill="#d62728"/>
+<circle cx="1064.80" cy="217.25" r="3.2" fill="#d62728"/>
+<circle cx="1102.33" cy="233.87" r="3.2" fill="#d62728"/>
+<circle cx="1139.87" cy="249.78" r="3.2" fill="#d62728"/>
+<circle cx="1177.40" cy="252.98" r="3.2" fill="#d62728"/>
+<circle cx="1214.93" cy="258.51" r="3.2" fill="#d62728"/>
+<circle cx="1252.47" cy="255.50" r="3.2" fill="#d62728"/>
+<circle cx="1290.00" cy="239.83" r="3.2" fill="#d62728"/>
+<rect x="72.00" y="347.33" width="375.33" height="213.33" fill="white" stroke="#aaa"/>
+<text x="259.67" y="337.33" text-anchor="middle" class="title">Hop=20, Rep=1</text>
+<line x1="72.00" y1="560.67" x2="72.00" y2="564.67" class="axis"/>
+<text x="72.00" y="578.67" text-anchor="middle" class="tick">0</text>
+<line x1="109.53" y1="560.67" x2="109.53" y2="564.67" class="axis"/>
+<line x1="147.07" y1="560.67" x2="147.07" y2="564.67" class="axis"/>
+<text x="147.07" y="578.67" text-anchor="middle" class="tick">2</text>
+<line x1="184.60" y1="560.67" x2="184.60" y2="564.67" class="axis"/>
+<line x1="222.13" y1="560.67" x2="222.13" y2="564.67" class="axis"/>
+<text x="222.13" y="578.67" text-anchor="middle" class="tick">4</text>
+<line x1="259.67" y1="560.67" x2="259.67" y2="564.67" class="axis"/>
+<line x1="297.20" y1="560.67" x2="297.20" y2="564.67" class="axis"/>
+<text x="297.20" y="578.67" text-anchor="middle" class="tick">6</text>
+<line x1="334.73" y1="560.67" x2="334.73" y2="564.67" class="axis"/>
+<line x1="372.27" y1="560.67" x2="372.27" y2="564.67" class="axis"/>
+<text x="372.27" y="578.67" text-anchor="middle" class="tick">8</text>
+<line x1="409.80" y1="560.67" x2="409.80" y2="564.67" class="axis"/>
+<line x1="447.33" y1="560.67" x2="447.33" y2="564.67" class="axis"/>
+<text x="447.33" y="578.67" text-anchor="middle" class="tick">10</text>
+<line x1="72.00" y1="560.67" x2="447.33" y2="560.67" class="grid"/>
+<text x="64.00" y="564.67" text-anchor="end" class="tick">45.4M</text>
+<line x1="72.00" y1="507.33" x2="447.33" y2="507.33" class="grid"/>
+<text x="64.00" y="511.33" text-anchor="end" class="tick">49.6M</text>
+<line x1="72.00" y1="454.00" x2="447.33" y2="454.00" class="grid"/>
+<text x="64.00" y="458.00" text-anchor="end" class="tick">54.1M</text>
+<line x1="72.00" y1="400.67" x2="447.33" y2="400.67" class="grid"/>
+<text x="64.00" y="404.67" text-anchor="end" class="tick">59.0M</text>
+<line x1="72.00" y1="347.33" x2="447.33" y2="347.33" class="grid"/>
+<text x="64.00" y="351.33" text-anchor="end" class="tick">64.4M</text>
+<line x1="72.00" y1="560.67" x2="447.33" y2="560.67" class="axis"/>
+<line x1="72.00" y1="347.33" x2="72.00" y2="560.67" class="axis"/>
+<polyline points="72.00,377.09 109.53,423.65 147.07,446.93 184.60,460.43 222.13,472.32 259.67,498.61 297.20,504.56 334.73,514.60 372.27,506.78 409.80,502.81 447.33,500.90" class="line" stroke="#1f77b4"/>
+<circle cx="72.00" cy="377.09" r="3.2" fill="#1f77b4"/>
+<circle cx="109.53" cy="423.65" r="3.2" fill="#1f77b4"/>
+<circle cx="147.07" cy="446.93" r="3.2" fill="#1f77b4"/>
+<circle cx="184.60" cy="460.43" r="3.2" fill="#1f77b4"/>
+<circle cx="222.13" cy="472.32" r="3.2" fill="#1f77b4"/>
+<circle cx="259.67" cy="498.61" r="3.2" fill="#1f77b4"/>
+<circle cx="297.20" cy="504.56" r="3.2" fill="#1f77b4"/>
+<circle cx="334.73" cy="514.60" r="3.2" fill="#1f77b4"/>
+<circle cx="372.27" cy="506.78" r="3.2" fill="#1f77b4"/>
+<circle cx="409.80" cy="502.81" r="3.2" fill="#1f77b4"/>
+<circle cx="447.33" cy="500.90" r="3.2" fill="#1f77b4"/>
+<polyline points="72.00,377.09 109.53,442.33 147.07,498.87 184.60,484.84 222.13,505.61 259.67,512.63 297.20,509.41 334.73,501.63 372.27,521.55 409.80,529.39 447.33,528.53" class="line" stroke="#d62728"/>
+<circle cx="72.00" cy="377.09" r="3.2" fill="#d62728"/>
+<circle cx="109.53" cy="442.33" r="3.2" fill="#d62728"/>
+<circle cx="147.07" cy="498.87" r="3.2" fill="#d62728"/>
+<circle cx="184.60" cy="484.84" r="3.2" fill="#d62728"/>
+<circle cx="222.13" cy="505.61" r="3.2" fill="#d62728"/>
+<circle cx="259.67" cy="512.63" r="3.2" fill="#d62728"/>
+<circle cx="297.20" cy="509.41" r="3.2" fill="#d62728"/>
+<circle cx="334.73" cy="501.63" r="3.2" fill="#d62728"/>
+<circle cx="372.27" cy="521.55" r="3.2" fill="#d62728"/>
+<circle cx="409.80" cy="529.39" r="3.2" fill="#d62728"/>
+<circle cx="447.33" cy="528.53" r="3.2" fill="#d62728"/>
+<rect x="493.33" y="347.33" width="375.33" height="213.33" fill="white" stroke="#aaa"/>
+<text x="681.00" y="337.33" text-anchor="middle" class="title">Hop=20, Rep=2</text>
+<line x1="493.33" y1="560.67" x2="493.33" y2="564.67" class="axis"/>
+<text x="493.33" y="578.67" text-anchor="middle" class="tick">0</text>
+<line x1="530.87" y1="560.67" x2="530.87" y2="564.67" class="axis"/>
+<line x1="568.40" y1="560.67" x2="568.40" y2="564.67" class="axis"/>
+<text x="568.40" y="578.67" text-anchor="middle" class="tick">2</text>
+<line x1="605.93" y1="560.67" x2="605.93" y2="564.67" class="axis"/>
+<line x1="643.47" y1="560.67" x2="643.47" y2="564.67" class="axis"/>
+<text x="643.47" y="578.67" text-anchor="middle" class="tick">4</text>
+<line x1="681.00" y1="560.67" x2="681.00" y2="564.67" class="axis"/>
+<line x1="718.53" y1="560.67" x2="718.53" y2="564.67" class="axis"/>
+<text x="718.53" y="578.67" text-anchor="middle" class="tick">6</text>
+<line x1="756.07" y1="560.67" x2="756.07" y2="564.67" class="axis"/>
+<line x1="793.60" y1="560.67" x2="793.60" y2="564.67" class="axis"/>
+<text x="793.60" y="578.67" text-anchor="middle" class="tick">8</text>
+<line x1="831.13" y1="560.67" x2="831.13" y2="564.67" class="axis"/>
+<line x1="868.67" y1="560.67" x2="868.67" y2="564.67" class="axis"/>
+<text x="868.67" y="578.67" text-anchor="middle" class="tick">10</text>
+<line x1="493.33" y1="560.67" x2="868.67" y2="560.67" class="grid"/>
+<text x="485.33" y="564.67" text-anchor="end" class="tick">112.9M</text>
+<line x1="493.33" y1="507.33" x2="868.67" y2="507.33" class="grid"/>
+<text x="485.33" y="511.33" text-anchor="end" class="tick">121.1M</text>
+<line x1="493.33" y1="454.00" x2="868.67" y2="454.00" class="grid"/>
+<text x="485.33" y="458.00" text-anchor="end" class="tick">129.8M</text>
+<line x1="493.33" y1="400.67" x2="868.67" y2="400.67" class="grid"/>
+<text x="485.33" y="404.67" text-anchor="end" class="tick">139.1M</text>
+<line x1="493.33" y1="347.33" x2="868.67" y2="347.33" class="grid"/>
+<text x="485.33" y="351.33" text-anchor="end" class="tick">149.1M</text>
+<line x1="493.33" y1="560.67" x2="868.67" y2="560.67" class="axis"/>
+<line x1="493.33" y1="347.33" x2="493.33" y2="560.67" class="axis"/>
+<polyline points="493.33,384.75 530.87,413.18 568.40,433.88 605.93,446.71 643.47,450.37 681.00,453.86 718.53,457.81 756.07,465.34 793.60,464.47 831.13,483.44 868.67,480.51" class="line" stroke="#1f77b4"/>
+<circle cx="493.33" cy="384.75" r="3.2" fill="#1f77b4"/>
+<circle cx="530.87" cy="413.18" r="3.2" fill="#1f77b4"/>
+<circle cx="568.40" cy="433.88" r="3.2" fill="#1f77b4"/>
+<circle cx="605.93" cy="446.71" r="3.2" fill="#1f77b4"/>
+<circle cx="643.47" cy="450.37" r="3.2" fill="#1f77b4"/>
+<circle cx="681.00" cy="453.86" r="3.2" fill="#1f77b4"/>
+<circle cx="718.53" cy="457.81" r="3.2" fill="#1f77b4"/>
+<circle cx="756.07" cy="465.34" r="3.2" fill="#1f77b4"/>
+<circle cx="793.60" cy="464.47" r="3.2" fill="#1f77b4"/>
+<circle cx="831.13" cy="483.44" r="3.2" fill="#1f77b4"/>
+<circle cx="868.67" cy="480.51" r="3.2" fill="#1f77b4"/>
+<polyline points="493.33,384.75 530.87,430.06 568.40,458.18 605.93,473.83 643.47,473.30 681.00,469.08 718.53,489.18 756.07,498.27 793.60,493.59 831.13,509.81 868.67,521.33" class="line" stroke="#d62728"/>
+<circle cx="493.33" cy="384.75" r="3.2" fill="#d62728"/>
+<circle cx="530.87" cy="430.06" r="3.2" fill="#d62728"/>
+<circle cx="568.40" cy="458.18" r="3.2" fill="#d62728"/>
+<circle cx="605.93" cy="473.83" r="3.2" fill="#d62728"/>
+<circle cx="643.47" cy="473.30" r="3.2" fill="#d62728"/>
+<circle cx="681.00" cy="469.08" r="3.2" fill="#d62728"/>
+<circle cx="718.53" cy="489.18" r="3.2" fill="#d62728"/>
+<circle cx="756.07" cy="498.27" r="3.2" fill="#d62728"/>
+<circle cx="793.60" cy="493.59" r="3.2" fill="#d62728"/>
+<circle cx="831.13" cy="509.81" r="3.2" fill="#d62728"/>
+<circle cx="868.67" cy="521.33" r="3.2" fill="#d62728"/>
+<rect x="914.67" y="347.33" width="375.33" height="213.33" fill="white" stroke="#aaa"/>
+<text x="1102.33" y="337.33" text-anchor="middle" class="title">Hop=20, Rep=4</text>
+<line x1="914.67" y1="560.67" x2="914.67" y2="564.67" class="axis"/>
+<text x="914.67" y="578.67" text-anchor="middle" class="tick">0</text>
+<line x1="952.20" y1="560.67" x2="952.20" y2="564.67" class="axis"/>
+<line x1="989.73" y1="560.67" x2="989.73" y2="564.67" class="axis"/>
+<text x="989.73" y="578.67" text-anchor="middle" class="tick">2</text>
+<line x1="1027.27" y1="560.67" x2="1027.27" y2="564.67" class="axis"/>
+<line x1="1064.80" y1="560.67" x2="1064.80" y2="564.67" class="axis"/>
+<text x="1064.80" y="578.67" text-anchor="middle" class="tick">4</text>
+<line x1="1102.33" y1="560.67" x2="1102.33" y2="564.67" class="axis"/>
+<line x1="1139.87" y1="560.67" x2="1139.87" y2="564.67" class="axis"/>
+<text x="1139.87" y="578.67" text-anchor="middle" class="tick">6</text>
+<line x1="1177.40" y1="560.67" x2="1177.40" y2="564.67" class="axis"/>
+<line x1="1214.93" y1="560.67" x2="1214.93" y2="564.67" class="axis"/>
+<text x="1214.93" y="578.67" text-anchor="middle" class="tick">8</text>
+<line x1="1252.47" y1="560.67" x2="1252.47" y2="564.67" class="axis"/>
+<line x1="1290.00" y1="560.67" x2="1290.00" y2="564.67" class="axis"/>
+<text x="1290.00" y="578.67" text-anchor="middle" class="tick">10</text>
+<line x1="914.67" y1="560.67" x2="1290.00" y2="560.67" class="grid"/>
+<text x="906.67" y="564.67" text-anchor="end" class="tick">278.0M</text>
+<line x1="914.67" y1="507.33" x2="1290.00" y2="507.33" class="grid"/>
+<text x="906.67" y="511.33" text-anchor="end" class="tick">291.9M</text>
+<line x1="914.67" y1="454.00" x2="1290.00" y2="454.00" class="grid"/>
+<text x="906.67" y="458.00" text-anchor="end" class="tick">306.5M</text>
+<line x1="914.67" y1="400.67" x2="1290.00" y2="400.67" class="grid"/>
+<text x="906.67" y="404.67" text-anchor="end" class="tick">321.8M</text>
+<line x1="914.67" y1="347.33" x2="1290.00" y2="347.33" class="grid"/>
+<text x="906.67" y="351.33" text-anchor="end" class="tick">337.9M</text>
+<line x1="914.67" y1="560.67" x2="1290.00" y2="560.67" class="axis"/>
+<line x1="914.67" y1="347.33" x2="914.67" y2="560.67" class="axis"/>
+<polyline points="914.67,466.79 952.20,483.77 989.73,496.01 1027.27,504.65 1064.80,494.04 1102.33,479.32 1139.87,447.46 1177.40,438.99 1214.93,446.60 1252.47,420.00 1290.00,400.62" class="line" stroke="#1f77b4"/>
+<circle cx="914.67" cy="466.79" r="3.2" fill="#1f77b4"/>
+<circle cx="952.20" cy="483.77" r="3.2" fill="#1f77b4"/>
+<circle cx="989.73" cy="496.01" r="3.2" fill="#1f77b4"/>
+<circle cx="1027.27" cy="504.65" r="3.2" fill="#1f77b4"/>
+<circle cx="1064.80" cy="494.04" r="3.2" fill="#1f77b4"/>
+<circle cx="1102.33" cy="479.32" r="3.2" fill="#1f77b4"/>
+<circle cx="1139.87" cy="447.46" r="3.2" fill="#1f77b4"/>
+<circle cx="1177.40" cy="438.99" r="3.2" fill="#1f77b4"/>
+<circle cx="1214.93" cy="446.60" r="3.2" fill="#1f77b4"/>
+<circle cx="1252.47" cy="420.00" r="3.2" fill="#1f77b4"/>
+<circle cx="1290.00" cy="400.62" r="3.2" fill="#1f77b4"/>
+<polyline points="914.67,466.79 952.20,449.53 989.73,417.95 1027.27,440.74 1064.80,449.56 1102.33,485.78 1139.87,447.04 1177.40,472.64 1214.93,460.80 1252.47,451.99 1290.00,489.83" class="line" stroke="#d62728"/>
+<circle cx="914.67" cy="466.79" r="3.2" fill="#d62728"/>
+<circle cx="952.20" cy="449.53" r="3.2" fill="#d62728"/>
+<circle cx="989.73" cy="417.95" r="3.2" fill="#d62728"/>
+<circle cx="1027.27" cy="440.74" r="3.2" fill="#d62728"/>
+<circle cx="1064.80" cy="449.56" r="3.2" fill="#d62728"/>
+<circle cx="1102.33" cy="485.78" r="3.2" fill="#d62728"/>
+<circle cx="1139.87" cy="447.04" r="3.2" fill="#d62728"/>
+<circle cx="1177.40" cy="472.64" r="3.2" fill="#d62728"/>
+<circle cx="1214.93" cy="460.80" r="3.2" fill="#d62728"/>
+<circle cx="1252.47" cy="451.99" r="3.2" fill="#d62728"/>
+<circle cx="1290.00" cy="489.83" r="3.2" fill="#d62728"/>
+<rect x="72.00" y="618.67" width="375.33" height="213.33" fill="white" stroke="#aaa"/>
+<text x="259.67" y="608.67" text-anchor="middle" class="title">Hop=40, Rep=1</text>
+<line x1="72.00" y1="832.00" x2="72.00" y2="836.00" class="axis"/>
+<text x="72.00" y="850.00" text-anchor="middle" class="tick">0</text>
+<line x1="109.53" y1="832.00" x2="109.53" y2="836.00" class="axis"/>
+<line x1="147.07" y1="832.00" x2="147.07" y2="836.00" class="axis"/>
+<text x="147.07" y="850.00" text-anchor="middle" class="tick">2</text>
+<line x1="184.60" y1="832.00" x2="184.60" y2="836.00" class="axis"/>
+<line x1="222.13" y1="832.00" x2="222.13" y2="836.00" class="axis"/>
+<text x="222.13" y="850.00" text-anchor="middle" class="tick">4</text>
+<line x1="259.67" y1="832.00" x2="259.67" y2="836.00" class="axis"/>
+<line x1="297.20" y1="832.00" x2="297.20" y2="836.00" class="axis"/>
+<text x="297.20" y="850.00" text-anchor="middle" class="tick">6</text>
+<line x1="334.73" y1="832.00" x2="334.73" y2="836.00" class="axis"/>
+<line x1="372.27" y1="832.00" x2="372.27" y2="836.00" class="axis"/>
+<text x="372.27" y="850.00" text-anchor="middle" class="tick">8</text>
+<line x1="409.80" y1="832.00" x2="409.80" y2="836.00" class="axis"/>
+<line x1="447.33" y1="832.00" x2="447.33" y2="836.00" class="axis"/>
+<text x="447.33" y="850.00" text-anchor="middle" class="tick">10</text>
+<line x1="72.00" y1="832.00" x2="447.33" y2="832.00" class="grid"/>
+<text x="64.00" y="836.00" text-anchor="end" class="tick">40.3M</text>
+<line x1="72.00" y1="778.67" x2="447.33" y2="778.67" class="grid"/>
+<text x="64.00" y="782.67" text-anchor="end" class="tick">45.5M</text>
+<line x1="72.00" y1="725.33" x2="447.33" y2="725.33" class="grid"/>
+<text x="64.00" y="729.33" text-anchor="end" class="tick">51.4M</text>
+<line x1="72.00" y1="672.00" x2="447.33" y2="672.00" class="grid"/>
+<text x="64.00" y="676.00" text-anchor="end" class="tick">58.0M</text>
+<line x1="72.00" y1="618.67" x2="447.33" y2="618.67" class="grid"/>
+<text x="64.00" y="622.67" text-anchor="end" class="tick">65.4M</text>
+<line x1="72.00" y1="832.00" x2="447.33" y2="832.00" class="axis"/>
+<line x1="72.00" y1="618.67" x2="72.00" y2="832.00" class="axis"/>
+<polyline points="72.00,640.20 109.53,674.41 147.07,701.23 184.60,738.68 222.13,773.48 259.67,791.50 297.20,796.08 334.73,798.09 372.27,796.08 409.80,789.82 447.33,786.12" class="line" stroke="#1f77b4"/>
+<circle cx="72.00" cy="640.20" r="3.2" fill="#1f77b4"/>
+<circle cx="109.53" cy="674.41" r="3.2" fill="#1f77b4"/>
+<circle cx="147.07" cy="701.23" r="3.2" fill="#1f77b4"/>
+<circle cx="184.60" cy="738.68" r="3.2" fill="#1f77b4"/>
+<circle cx="222.13" cy="773.48" r="3.2" fill="#1f77b4"/>
+<circle cx="259.67" cy="791.50" r="3.2" fill="#1f77b4"/>
+<circle cx="297.20" cy="796.08" r="3.2" fill="#1f77b4"/>
+<circle cx="334.73" cy="798.09" r="3.2" fill="#1f77b4"/>
+<circle cx="372.27" cy="796.08" r="3.2" fill="#1f77b4"/>
+<circle cx="409.80" cy="789.82" r="3.2" fill="#1f77b4"/>
+<circle cx="447.33" cy="786.12" r="3.2" fill="#1f77b4"/>
+<polyline points="72.00,640.20 109.53,717.63 147.07,755.81 184.60,768.25 222.13,771.50 259.67,776.37 297.20,784.32 334.73,806.42 372.27,809.36 409.80,799.28 447.33,792.26" class="line" stroke="#d62728"/>
+<circle cx="72.00" cy="640.20" r="3.2" fill="#d62728"/>
+<circle cx="109.53" cy="717.63" r="3.2" fill="#d62728"/>
+<circle cx="147.07" cy="755.81" r="3.2" fill="#d62728"/>
+<circle cx="184.60" cy="768.25" r="3.2" fill="#d62728"/>
+<circle cx="222.13" cy="771.50" r="3.2" fill="#d62728"/>
+<circle cx="259.67" cy="776.37" r="3.2" fill="#d62728"/>
+<circle cx="297.20" cy="784.32" r="3.2" fill="#d62728"/>
+<circle cx="334.73" cy="806.42" r="3.2" fill="#d62728"/>
+<circle cx="372.27" cy="809.36" r="3.2" fill="#d62728"/>
+<circle cx="409.80" cy="799.28" r="3.2" fill="#d62728"/>
+<circle cx="447.33" cy="792.26" r="3.2" fill="#d62728"/>
+<rect x="493.33" y="618.67" width="375.33" height="213.33" fill="white" stroke="#aaa"/>
+<text x="681.00" y="608.67" text-anchor="middle" class="title">Hop=40, Rep=2</text>
+<line x1="493.33" y1="832.00" x2="493.33" y2="836.00" class="axis"/>
+<text x="493.33" y="850.00" text-anchor="middle" class="tick">0</text>
+<line x1="530.87" y1="832.00" x2="530.87" y2="836.00" class="axis"/>
+<line x1="568.40" y1="832.00" x2="568.40" y2="836.00" class="axis"/>
+<text x="568.40" y="850.00" text-anchor="middle" class="tick">2</text>
+<line x1="605.93" y1="832.00" x2="605.93" y2="836.00" class="axis"/>
+<line x1="643.47" y1="832.00" x2="643.47" y2="836.00" class="axis"/>
+<text x="643.47" y="850.00" text-anchor="middle" class="tick">4</text>
+<line x1="681.00" y1="832.00" x2="681.00" y2="836.00" class="axis"/>
+<line x1="718.53" y1="832.00" x2="718.53" y2="836.00" class="axis"/>
+<text x="718.53" y="850.00" text-anchor="middle" class="tick">6</text>
+<line x1="756.07" y1="832.00" x2="756.07" y2="836.00" class="axis"/>
+<line x1="793.60" y1="832.00" x2="793.60" y2="836.00" class="axis"/>
+<text x="793.60" y="850.00" text-anchor="middle" class="tick">8</text>
+<line x1="831.13" y1="832.00" x2="831.13" y2="836.00" class="axis"/>
+<line x1="868.67" y1="832.00" x2="868.67" y2="836.00" class="axis"/>
+<text x="868.67" y="850.00" text-anchor="middle" class="tick">10</text>
+<line x1="493.33" y1="832.00" x2="868.67" y2="832.00" class="grid"/>
+<text x="485.33" y="836.00" text-anchor="end" class="tick">93.1M</text>
+<line x1="493.33" y1="778.67" x2="868.67" y2="778.67" class="grid"/>
+<text x="485.33" y="782.67" text-anchor="end" class="tick">111.6M</text>
+<line x1="493.33" y1="725.33" x2="868.67" y2="725.33" class="grid"/>
+<text x="485.33" y="729.33" text-anchor="end" class="tick">133.9M</text>
+<line x1="493.33" y1="672.00" x2="868.67" y2="672.00" class="grid"/>
+<text x="485.33" y="676.00" text-anchor="end" class="tick">160.5M</text>
+<line x1="493.33" y1="618.67" x2="868.67" y2="618.67" class="grid"/>
+<text x="485.33" y="622.67" text-anchor="end" class="tick">192.5M</text>
+<line x1="493.33" y1="832.00" x2="868.67" y2="832.00" class="axis"/>
+<line x1="493.33" y1="618.67" x2="493.33" y2="832.00" class="axis"/>
+<polyline points="493.33,632.99 530.87,654.09 568.40,658.86 605.93,664.99 643.47,700.26 681.00,728.77 718.53,770.20 756.07,789.63 793.60,809.35 831.13,814.75 868.67,816.94" class="line" stroke="#1f77b4"/>
+<circle cx="493.33" cy="632.99" r="3.2" fill="#1f77b4"/>
+<circle cx="530.87" cy="654.09" r="3.2" fill="#1f77b4"/>
+<circle cx="568.40" cy="658.86" r="3.2" fill="#1f77b4"/>
+<circle cx="605.93" cy="664.99" r="3.2" fill="#1f77b4"/>
+<circle cx="643.47" cy="700.26" r="3.2" fill="#1f77b4"/>
+<circle cx="681.00" cy="728.77" r="3.2" fill="#1f77b4"/>
+<circle cx="718.53" cy="770.20" r="3.2" fill="#1f77b4"/>
+<circle cx="756.07" cy="789.63" r="3.2" fill="#1f77b4"/>
+<circle cx="793.60" cy="809.35" r="3.2" fill="#1f77b4"/>
+<circle cx="831.13" cy="814.75" r="3.2" fill="#1f77b4"/>
+<circle cx="868.67" cy="816.94" r="3.2" fill="#1f77b4"/>
+<polyline points="493.33,632.99 530.87,717.55 568.40,763.15 605.93,782.63 643.47,781.85 681.00,794.63 718.53,795.71 756.07,811.38 793.60,804.78 831.13,800.68 868.67,800.35" class="line" stroke="#d62728"/>
+<circle cx="493.33" cy="632.99" r="3.2" fill="#d62728"/>
+<circle cx="530.87" cy="717.55" r="3.2" fill="#d62728"/>
+<circle cx="568.40" cy="763.15" r="3.2" fill="#d62728"/>
+<circle cx="605.93" cy="782.63" r="3.2" fill="#d62728"/>
+<circle cx="643.47" cy="781.85" r="3.2" fill="#d62728"/>
+<circle cx="681.00" cy="794.63" r="3.2" fill="#d62728"/>
+<circle cx="718.53" cy="795.71" r="3.2" fill="#d62728"/>
+<circle cx="756.07" cy="811.38" r="3.2" fill="#d62728"/>
+<circle cx="793.60" cy="804.78" r="3.2" fill="#d62728"/>
+<circle cx="831.13" cy="800.68" r="3.2" fill="#d62728"/>
+<circle cx="868.67" cy="800.35" r="3.2" fill="#d62728"/>
+<rect x="914.67" y="618.67" width="375.33" height="213.33" fill="white" stroke="#aaa"/>
+<text x="1102.33" y="608.67" text-anchor="middle" class="title">Hop=40, Rep=4</text>
+<line x1="914.67" y1="832.00" x2="914.67" y2="836.00" class="axis"/>
+<text x="914.67" y="850.00" text-anchor="middle" class="tick">0</text>
+<line x1="952.20" y1="832.00" x2="952.20" y2="836.00" class="axis"/>
+<line x1="989.73" y1="832.00" x2="989.73" y2="836.00" class="axis"/>
+<text x="989.73" y="850.00" text-anchor="middle" class="tick">2</text>
+<line x1="1027.27" y1="832.00" x2="1027.27" y2="836.00" class="axis"/>
+<line x1="1064.80" y1="832.00" x2="1064.80" y2="836.00" class="axis"/>
+<text x="1064.80" y="850.00" text-anchor="middle" class="tick">4</text>
+<line x1="1102.33" y1="832.00" x2="1102.33" y2="836.00" class="axis"/>
+<line x1="1139.87" y1="832.00" x2="1139.87" y2="836.00" class="axis"/>
+<text x="1139.87" y="850.00" text-anchor="middle" class="tick">6</text>
+<line x1="1177.40" y1="832.00" x2="1177.40" y2="836.00" class="axis"/>
+<line x1="1214.93" y1="832.00" x2="1214.93" y2="836.00" class="axis"/>
+<text x="1214.93" y="850.00" text-anchor="middle" class="tick">8</text>
+<line x1="1252.47" y1="832.00" x2="1252.47" y2="836.00" class="axis"/>
+<line x1="1290.00" y1="832.00" x2="1290.00" y2="836.00" class="axis"/>
+<text x="1290.00" y="850.00" text-anchor="middle" class="tick">10</text>
+<line x1="914.67" y1="832.00" x2="1290.00" y2="832.00" class="grid"/>
+<text x="906.67" y="836.00" text-anchor="end" class="tick">231.4M</text>
+<line x1="914.67" y1="778.67" x2="1290.00" y2="778.67" class="grid"/>
+<text x="906.67" y="782.67" text-anchor="end" class="tick">278.3M</text>
+<line x1="914.67" y1="725.33" x2="1290.00" y2="725.33" class="grid"/>
+<text x="906.67" y="729.33" text-anchor="end" class="tick">334.7M</text>
+<line x1="914.67" y1="672.00" x2="1290.00" y2="672.00" class="grid"/>
+<text x="906.67" y="676.00" text-anchor="end" class="tick">402.5M</text>
+<line x1="914.67" y1="618.67" x2="1290.00" y2="618.67" class="grid"/>
+<text x="906.67" y="622.67" text-anchor="end" class="tick">484.0M</text>
+<line x1="914.67" y1="832.00" x2="1290.00" y2="832.00" class="axis"/>
+<line x1="914.67" y1="618.67" x2="914.67" y2="832.00" class="axis"/>
+<polyline points="914.67,632.77 952.20,641.27 989.73,645.34 1027.27,655.86 1064.80,660.26 1102.33,666.84 1139.87,670.17 1177.40,672.36 1214.93,683.96 1252.47,698.24 1290.00,711.23" class="line" stroke="#1f77b4"/>
+<circle cx="914.67" cy="632.77" r="3.2" fill="#1f77b4"/>
+<circle cx="952.20" cy="641.27" r="3.2" fill="#1f77b4"/>
+<circle cx="989.73" cy="645.34" r="3.2" fill="#1f77b4"/>
+<circle cx="1027.27" cy="655.86" r="3.2" fill="#1f77b4"/>
+<circle cx="1064.80" cy="660.26" r="3.2" fill="#1f77b4"/>
+<circle cx="1102.33" cy="666.84" r="3.2" fill="#1f77b4"/>
+<circle cx="1139.87" cy="670.17" r="3.2" fill="#1f77b4"/>
+<circle cx="1177.40" cy="672.36" r="3.2" fill="#1f77b4"/>
+<circle cx="1214.93" cy="683.96" r="3.2" fill="#1f77b4"/>
+<circle cx="1252.47" cy="698.24" r="3.2" fill="#1f77b4"/>
+<circle cx="1290.00" cy="711.23" r="3.2" fill="#1f77b4"/>
+<polyline points="914.67,632.77 952.20,690.62 989.73,715.48 1027.27,758.46 1064.80,781.07 1102.33,791.74 1139.87,790.73 1177.40,803.20 1214.93,813.67 1252.47,817.17 1290.00,810.59" class="line" stroke="#d62728"/>
+<circle cx="914.67" cy="632.77" r="3.2" fill="#d62728"/>
+<circle cx="952.20" cy="690.62" r="3.2" fill="#d62728"/>
+<circle cx="989.73" cy="715.48" r="3.2" fill="#d62728"/>
+<circle cx="1027.27" cy="758.46" r="3.2" fill="#d62728"/>
+<circle cx="1064.80" cy="781.07" r="3.2" fill="#d62728"/>
+<circle cx="1102.33" cy="791.74" r="3.2" fill="#d62728"/>
+<circle cx="1139.87" cy="790.73" r="3.2" fill="#d62728"/>
+<circle cx="1177.40" cy="803.20" r="3.2" fill="#d62728"/>
+<circle cx="1214.93" cy="813.67" r="3.2" fill="#d62728"/>
+<circle cx="1252.47" cy="817.17" r="3.2" fill="#d62728"/>
+<circle cx="1290.00" cy="810.59" r="3.2" fill="#d62728"/>
+<text x="660.0" y="880" text-anchor="middle" class="label">Iteration</text>
+<text x="20" y="450.0" transform="rotate(-90 20 450.0)" text-anchor="middle" class="label">Total travel time, log scale</text>
+</svg>

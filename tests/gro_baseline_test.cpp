@@ -32,12 +32,26 @@ int main(int argc, char** argv) {
     require(!queries.empty(), "queries should not be empty");
 
     gro::GROAlgorithm algorithm(graph, algorithm_options, traffic_options);
-    gro::AlgorithmResult result = algorithm.run_baseline_gro(queries);
-    require(result.final_routes.size() == queries.size(),
+    gro::AlgorithmResult random_result = algorithm.run_baseline_gro(queries);
+    require(random_result.final_routes.size() == queries.size(),
             "GRO baseline should return one route per query");
-    require(result.final_total_travel_time >= 0,
+    require(random_result.final_total_travel_time >= 0,
             "GRO baseline final total travel time should be non-negative");
 
-    std::cout << "GRO Baseline Done!" << std::endl;
+    gro::AlgorithmResult selection_td_result =
+        algorithm.run_selection_td_baseline(queries);
+    require(selection_td_result.final_routes.size() == queries.size(),
+            "GRO selection TD baseline should return one route per query");
+    require(selection_td_result.final_total_travel_time >= 0,
+            "GRO selection TD baseline final total travel time should be non-negative");
+
+    gro::AlgorithmResult normal_selection_gro_result =
+        algorithm.run_normal_selection_gro_reroute_baseline(queries);
+    require(normal_selection_gro_result.final_routes.size() == queries.size(),
+            "GRO normal selection + GRO reroute baseline should return one route per query");
+    require(normal_selection_gro_result.final_total_travel_time >= 0,
+            "GRO normal selection + GRO reroute baseline final total travel time should be non-negative");
+
+    std::cout << "GRO Baselines Done!" << std::endl;
     return 0;
 }

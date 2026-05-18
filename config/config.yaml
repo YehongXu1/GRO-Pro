@@ -3,7 +3,7 @@
 
 graph_path: ../data/MH.txt
 coordinates_path:../data/MH_NodeIDLonLat.txt
-queries_path: ../data/MH_Hop40Rep4-16.txt
+queries_path: ../data/MH_20hops1000.txt
 
 alpha: 0.15
 beta: 4.0

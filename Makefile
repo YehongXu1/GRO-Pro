@@ -7,16 +7,17 @@ LIBS = /opt/homebrew/opt/libomp/lib/libomp.a
 TEST_CONFIG ?= config/test_config.yaml
 
 # 源文件和目标
-SOURCES_LIB = src/core.cpp src/gro.cpp src/svp.cpp src/gor.cpp src/sor.cpp src/fahl.cpp
+SOURCES_LIB = src/core.cpp src/gro.cpp src/gro_baseline.cpp src/svp.cpp src/gor.cpp src/sor.cpp src/fahl.cpp
 OBJECTS_LIB = $(SOURCES_LIB:.cpp=.o)
 GRO_TEST_OBJECTS = tests/gro_test.o
 GRO_BASELINE_TEST_OBJECTS = tests/gro_baseline_test.o
+MH_SYNTHETIC_EXPERIMENT_OBJECTS = tests/mh_synthetic_experiment.o
 SVP_TEST_OBJECTS = tests/svp_test.o
 GOR_TEST_OBJECTS = tests/gor_test.o
 SOR_TEST_OBJECTS = tests/sor_test.o
 FAHL_TEST_OBJECTS = tests/fahl_test.o
 
-TARGETS = gro_test gro_baseline_test svp_test gor_test sor_test fahl_test
+TARGETS = gro_test gro_baseline_test mh_synthetic_experiment svp_test gor_test sor_test fahl_test
 
 .PHONY: all build clean test run-gro run-gro-baseline run-svp run-gor run-sor run-fahl help
 
@@ -32,6 +33,9 @@ gro_test: $(OBJECTS_LIB) $(GRO_TEST_OBJECTS)
 	$(CXX) $(CXXFLAGS) $(OPENMP_FLAGS) -o $@ $^ $(LIB_DIRS) $(LIBS)
 
 gro_baseline_test: $(OBJECTS_LIB) $(GRO_BASELINE_TEST_OBJECTS)
+	$(CXX) $(CXXFLAGS) $(OPENMP_FLAGS) -o $@ $^ $(LIB_DIRS) $(LIBS)
+
+mh_synthetic_experiment: $(OBJECTS_LIB) $(MH_SYNTHETIC_EXPERIMENT_OBJECTS)
 	$(CXX) $(CXXFLAGS) $(OPENMP_FLAGS) -o $@ $^ $(LIB_DIRS) $(LIBS)
 
 svp_test: $(OBJECTS_LIB) $(SVP_TEST_OBJECTS)
@@ -81,7 +85,7 @@ run-fahl: fahl_test
 
 # 清理构建输出
 clean:
-	@rm -f $(OBJECTS_LIB) $(GRO_TEST_OBJECTS) $(GRO_BASELINE_TEST_OBJECTS) $(SVP_TEST_OBJECTS) $(GOR_TEST_OBJECTS) $(SOR_TEST_OBJECTS) $(FAHL_TEST_OBJECTS) $(TARGETS)
+	@rm -f $(OBJECTS_LIB) $(GRO_TEST_OBJECTS) $(GRO_BASELINE_TEST_OBJECTS) $(MH_SYNTHETIC_EXPERIMENT_OBJECTS) $(SVP_TEST_OBJECTS) $(GOR_TEST_OBJECTS) $(SOR_TEST_OBJECTS) $(FAHL_TEST_OBJECTS) $(TARGETS)
 	@echo "✓ 清理完成"
 
 # 重新构建

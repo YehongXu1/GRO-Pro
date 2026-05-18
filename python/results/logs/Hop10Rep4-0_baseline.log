@@ -1,0 +1,14 @@
+Graph loaded: 11369 vertices, 36792 edges.
+BASELINE_INITIAL,initial_routes_sec=0.453258
+BASELINE,iteration=0,selected_count=1228,reroute_count=1228,total_travel_time=162588845,evaluate_sec=3.614257,reroute_sec=0.226946,iteration_sec=3.842095
+BASELINE,iteration=1,selected_count=1228,reroute_count=1228,total_travel_time=153464421,evaluate_sec=4.130533,reroute_sec=0.236488,iteration_sec=4.367945
+BASELINE,iteration=2,selected_count=1228,reroute_count=1228,total_travel_time=149957997,evaluate_sec=4.268809,reroute_sec=0.246072,iteration_sec=4.515759
+BASELINE,iteration=3,selected_count=1228,reroute_count=1228,total_travel_time=143850110,evaluate_sec=4.022635,reroute_sec=0.389862,iteration_sec=4.413401
+BASELINE,iteration=4,selected_count=1228,reroute_count=1228,total_travel_time=148807026,evaluate_sec=4.065516,reroute_sec=0.262408,iteration_sec=4.328779
+BASELINE,iteration=5,selected_count=1228,reroute_count=1228,total_travel_time=144748559,evaluate_sec=3.976612,reroute_sec=0.259764,iteration_sec=4.237266
+BASELINE,iteration=6,selected_count=1228,reroute_count=1228,total_travel_time=140966986,evaluate_sec=3.959927,reroute_sec=0.299347,iteration_sec=4.260102
+BASELINE,iteration=7,selected_count=1228,reroute_count=1228,total_travel_time=140216575,evaluate_sec=3.790838,reroute_sec=0.251648,iteration_sec=4.043349
+BASELINE,iteration=8,selected_count=1228,reroute_count=1228,total_travel_time=138933687,evaluate_sec=3.872939,reroute_sec=0.254203,iteration_sec=4.127935
+BASELINE,iteration=9,selected_count=1228,reroute_count=1228,total_travel_time=139630871,evaluate_sec=3.913788,reroute_sec=0.258145,iteration_sec=4.172807
+BASELINE_FINAL,total_travel_time=143320677,evaluate_sec=3.972044,run_sec=46.740249
+GRO Baseline Done!

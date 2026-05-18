@@ -2,13 +2,11 @@
 
 #include <algorithm>
 #include <cmath>
-#include <numeric>
 #include <stack>
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
 #include <omp.h>
-#include <random>
 #include <iostream>
 #include <iomanip>
 #include <sstream>
@@ -65,11 +63,7 @@ Cost congestion_ratio_key(Flow flow, Flow capacity) {
 }
 
 size_t integer_sqrt(size_t value) {
-    size_t root = 0;
-    while ((root + 1) * (root + 1) <= value) {
-        ++root;
-    }
-    return root;
+    return static_cast<size_t>(std::sqrt(static_cast<long double>(value)));
 }
 
 bool parse_bool(const std::string& value) {
@@ -92,7 +86,6 @@ void log_select_summary(
     int iteration,
     long long candidate_count,
     long long selected_count,
-    long long select_candidates_us,
     long long select_impact_us,
     long long select_rank_us,
     long long select_scan_us,
@@ -106,12 +99,26 @@ void log_select_summary(
               << "iteration=" << iteration << ','
               << "candidate_count=" << candidate_count << ','
               << "selected_count=" << selected_count << ','
-              << "select_candidates_sec=" << seconds_text(select_candidates_us) << ','
               << "select_impact_sec=" << seconds_text(select_impact_us) << ','
               << "select_rank_sec=" << seconds_text(select_rank_us) << ','
               << "select_scan_sec=" << seconds_text(select_scan_us) << ','
               << "select_remove_sec=" << seconds_text(select_remove_us) << ','
               << "select_total_sec=" << seconds_text(select_total_us) << '\n';
+}
+
+void log_candidate_summary(
+    bool enabled,
+    int iteration,
+    long long candidate_count,
+    long long candidate_us) {
+    if (!enabled) {
+        return;
+    }
+
+    std::cerr << "CANDIDATE,"
+              << "iteration=" << iteration << ','
+              << "candidate_count=" << candidate_count << ','
+              << "candidate_sec=" << seconds_text(candidate_us) << '\n';
 }
 
 void log_reroute_summary(
@@ -944,23 +951,21 @@ std::unordered_set<QueryId> GROAlgorithm::select_candidates(
 }
 
 std::vector<QueryId> GROAlgorithm::select_queries(
+    const std::unordered_set<QueryId>& candidate_set,
     const std::vector<Query>& queries,
     const TrafficResult& result,
     const TrafficDependencyGraph& tdg,
     const std::vector<Cost>& node_impacts,
     int iteration) const {
+    (void)queries;
+    (void)node_impacts;
     auto total_start = Clock::now();
-    auto candidate_start = Clock::now();
-    std::unordered_set<QueryId> candidate_set =
-        select_candidates(queries, result, tdg, node_impacts);
-    long long select_candidates_us = elapsed_us(candidate_start);
     if (candidate_set.empty()) {
         log_select_summary(
             options_.enable_timing_log,
             iteration,
             0,
             0,
-            select_candidates_us,
             0,
             0,
             0,
@@ -1069,13 +1074,30 @@ std::vector<QueryId> GROAlgorithm::select_queries(
         iteration,
         static_cast<long long>(candidate_set.size()),
         static_cast<long long>(selected_queries.size()),
-        select_candidates_us,
         refresh_impact_us,
         rank_us,
         scan_us,
         remove_us,
         elapsed_us(total_start));
     return selected_queries;
+}
+
+std::vector<QueryId> GROAlgorithm::select_queries(
+    const std::vector<Query>& queries,
+    const TrafficResult& result,
+    const TrafficDependencyGraph& tdg,
+    const std::vector<Cost>& node_impacts,
+    int iteration) const {
+    auto candidate_start = Clock::now();
+    std::unordered_set<QueryId> candidate_set =
+        select_candidates(queries, result, tdg, node_impacts);
+    long long candidate_us = elapsed_us(candidate_start);
+    log_candidate_summary(
+        options_.enable_timing_log,
+        iteration,
+        static_cast<long long>(candidate_set.size()),
+        candidate_us);
+    return select_queries(candidate_set, queries, result, tdg, node_impacts, iteration);
 }
 
 std::vector<std::vector<QueryId>> GROAlgorithm::batch_queries(
@@ -1490,6 +1512,8 @@ AlgorithmResult GROAlgorithm::run(const std::vector<Query>& queries) const {
         log_metric(options_.enable_timing_log, i, "total_travel_time",
                    static_cast<long long>(routes.size()),
                    traffic_result.total_travel_time);
+        algResult.total_travel_time_by_iteration.push_back(
+            traffic_result.total_travel_time);
         if (i == 0) {
             algResult.initial_total_travel_time = traffic_result.total_travel_time;
         }
@@ -1505,8 +1529,18 @@ AlgorithmResult GROAlgorithm::run(const std::vector<Query>& queries) const {
         log_timing(options_.enable_timing_log, i, "compute_impact",
                    static_cast<long long>(tdg.nodes.size()), phase_start);
 
+        phase_start = Clock::now();
+        std::unordered_set<QueryId> candidate_query_ids =
+            select_candidates(queries, traffic_result, tdg, node_impacts);
+        long long candidate_us = elapsed_us(phase_start);
+        log_candidate_summary(
+            options_.enable_timing_log,
+            i,
+            static_cast<long long>(candidate_query_ids.size()),
+            candidate_us);
+
         std::vector<QueryId> selected_query_ids =
-            select_queries(queries, traffic_result, tdg, node_impacts, i);
+            select_queries(candidate_query_ids, queries, traffic_result, tdg, node_impacts, i);
         if (selected_query_ids.empty()) {
             log_timing(options_.enable_timing_log, i, "iteration_total", 0, iteration_start);
             break;
@@ -1548,72 +1582,12 @@ AlgorithmResult GROAlgorithm::run(const std::vector<Query>& queries) const {
 
     algResult.final_routes = routes;
     algResult.final_total_travel_time = traffic_result.total_travel_time;
+    algResult.total_travel_time_by_iteration.push_back(
+        traffic_result.total_travel_time);
     log_timing(options_.enable_timing_log, "run_total",
                static_cast<long long>(queries.size()), total_start);
     return algResult;
 }
 
-
-AlgorithmResult GROAlgorithm::run_baseline_gro(const std::vector<Query> &queries) const {
-
-    auto total_start = Clock::now();
-    auto phase_start = Clock::now();
-    AlgorithmResult algResult;
-    std::vector<Route> routes = compute_initial_routes(queries);
-    log_timing(options_.enable_timing_log, "baseline_initial_routes",
-               static_cast<long long>(queries.size()), phase_start);
-    algResult.initial_routes = routes;
-    TrafficResult traffic_result;
-
-    for (int i = 0; i < options_.max_iterations; ++i) {
-
-        auto iteration_start = Clock::now();
-        phase_start = Clock::now();
-
-        traffic_result = evaluate_traffic(graph_, queries, routes, traffic_options_);
-        log_timing(options_.enable_timing_log, i, "baseline_evaluate_traffic",
-                   static_cast<long long>(routes.size()), phase_start);
-        log_metric(options_.enable_timing_log, i, "baseline_total_travel_time",
-                   static_cast<long long>(routes.size()),
-                   traffic_result.total_travel_time);
-        if (i == 0) {
-            algResult.initial_total_travel_time = traffic_result.total_travel_time;
-        }
-
-        // randomly select a fraction of the queries to reroute
-        std::vector<QueryId> query_ids(queries.size());
-        std::iota(query_ids.begin(), query_ids.end(), 0);
-        std::shuffle(query_ids.begin(), query_ids.end(), std::mt19937{std::random_device{}()});
-        size_t reroute_count =
-            static_cast<size_t>(options_.baseline_fraction_to_reroute) *
-            queries.size() / 100;
-        query_ids.resize(reroute_count);    
-
-        phase_start = Clock::now();
-
-        std::vector<Route> new_routes = baseline_reroute_queries(query_ids, queries, traffic_result);
-        log_timing(options_.enable_timing_log, i, "baseline_reroute_queries",
-                   static_cast<long long>(new_routes.size()), phase_start);
-        
-        for (const Route &route : new_routes) {
-            routes[route.query_id] = route;
-        }
-        log_timing(options_.enable_timing_log, i, "baseline_iteration_total",
-                   static_cast<long long>(new_routes.size()), iteration_start);
-    }
-    
-    phase_start = Clock::now();
-    traffic_result = evaluate_traffic(graph_, queries, routes, traffic_options_);
-    log_timing(options_.enable_timing_log, "baseline_final_evaluate_traffic",
-               static_cast<long long>(routes.size()), phase_start);
-    log_metric(options_.enable_timing_log, "baseline_final_total_travel_time",
-               static_cast<long long>(routes.size()),
-               traffic_result.total_travel_time);
-    algResult.final_routes = routes;
-    algResult.final_total_travel_time = traffic_result.total_travel_time;
-    log_timing(options_.enable_timing_log, "baseline_run_total",
-               static_cast<long long>(queries.size()), total_start);
-    return algResult;
-}
 
 }  // namespace gro
