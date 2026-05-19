@@ -74,10 +74,21 @@ Run the no-candidate-filter selection diagnostic:
   --query-file data/MH_Synthetic_query_sets/Hop10Rep1-0.txt \
   --output python/results/gro_selection_debug_iterations.csv \
   --gamma-values 0,25,50,75,100 \
+  --removal-modes all_nodes,congestion_important,anchor_important \
   --random-seed 0
 ```
 
-This also writes `python/results/gro_selection_debug_iterations_runs.csv`.
+Run the same diagnostic on the full MH synthetic query directory:
+
+```bash
+nohup ./gro_selection_debug_test config/config.yaml \
+  --query-dir data/MH_Synthetic_query_sets \
+  --output python/results/gro_selection_debug_removal_modes.csv \
+  --gamma-values 25,50,75 \
+  --removal-modes all_nodes,congestion_important,anchor_important \
+  --random-seed 0 \
+  > gro_selection_debug_removal_modes.log 2>&1 &
+```
 
 Run GRO unit test:
 

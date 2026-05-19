@@ -1,9 +1,41 @@
-CXX = clang++
-CXXFLAGS = -std=c++17 -Wall -Wextra -pedantic -fcolor-diagnostics -fansi-escape-codes -g
-OPENMP_FLAGS = -Xclang -fopenmp
-INCLUDE_DIRS = -Iinclude -I/usr/local/include -I/opt/homebrew/opt/libomp/include
-LIB_DIRS = -L/usr/local/lib
-LIBS = /opt/homebrew/opt/libomp/lib/libomp.a
+UNAME_S := $(shell uname -s)
+GNU_GXX_CANDIDATES := g++-15 g++-14 g++-13 g++-12 g++-11 g++-10
+FOUND_GXX := $(firstword $(foreach c,$(GNU_GXX_CANDIDATES),$(shell command -v $(c) 2>/dev/null)))
+
+ifeq ($(origin CXX),default)
+  ifeq ($(UNAME_S),Darwin)
+    ifneq ($(FOUND_GXX),)
+      CXX = $(FOUND_GXX)
+      DEFAULT_OPENMP_FLAGS = -fopenmp
+      DEFAULT_INCLUDE_DIRS = -Iinclude
+      DEFAULT_LIB_DIRS =
+      DEFAULT_LIBS =
+    else
+      CXX = clang++
+      DEFAULT_OPENMP_FLAGS = -Xclang -fopenmp
+      DEFAULT_INCLUDE_DIRS = -Iinclude -I/usr/local/include -I/opt/homebrew/opt/libomp/include
+      DEFAULT_LIB_DIRS = -L/usr/local/lib
+      DEFAULT_LIBS = /opt/homebrew/opt/libomp/lib/libomp.a
+    endif
+  else
+    CXX = g++
+    DEFAULT_OPENMP_FLAGS = -fopenmp
+    DEFAULT_INCLUDE_DIRS = -Iinclude
+    DEFAULT_LIB_DIRS =
+    DEFAULT_LIBS =
+  endif
+else
+  DEFAULT_OPENMP_FLAGS = -fopenmp
+  DEFAULT_INCLUDE_DIRS = -Iinclude
+  DEFAULT_LIB_DIRS =
+  DEFAULT_LIBS =
+endif
+
+CXXFLAGS ?= -std=c++17 -Wall -Wextra -pedantic -g
+OPENMP_FLAGS ?= $(DEFAULT_OPENMP_FLAGS)
+INCLUDE_DIRS ?= $(DEFAULT_INCLUDE_DIRS)
+LIB_DIRS ?= $(DEFAULT_LIB_DIRS)
+LIBS ?= $(DEFAULT_LIBS)
 TEST_CONFIG ?= config/test_config.yaml
 
 # 源文件和目标
@@ -30,32 +62,32 @@ build: $(TARGETS)
 	@echo "✓ 构建完成"
 
 # 链接可执行文件
-gro_test: $(OBJECTS_LIB) $(GRO_TEST_OBJECTS)
-	$(CXX) $(CXXFLAGS) $(OPENMP_FLAGS) -o $@ $^ $(LIB_DIRS) $(LIBS)
+gro_test: $(OBJECTS_LIB) $(GRO_TEST_OBJECTS) Makefile
+	$(CXX) $(CXXFLAGS) $(OPENMP_FLAGS) -o $@ $(filter-out Makefile,$^) $(LIB_DIRS) $(LIBS)
 
-gro_baseline_test: $(OBJECTS_LIB) $(GRO_BASELINE_TEST_OBJECTS)
-	$(CXX) $(CXXFLAGS) $(OPENMP_FLAGS) -o $@ $^ $(LIB_DIRS) $(LIBS)
+gro_baseline_test: $(OBJECTS_LIB) $(GRO_BASELINE_TEST_OBJECTS) Makefile
+	$(CXX) $(CXXFLAGS) $(OPENMP_FLAGS) -o $@ $(filter-out Makefile,$^) $(LIB_DIRS) $(LIBS)
 
-gro_selection_debug_test: $(OBJECTS_LIB) $(GRO_SELECTION_DEBUG_TEST_OBJECTS)
-	$(CXX) $(CXXFLAGS) $(OPENMP_FLAGS) -o $@ $^ $(LIB_DIRS) $(LIBS)
+gro_selection_debug_test: $(OBJECTS_LIB) $(GRO_SELECTION_DEBUG_TEST_OBJECTS) Makefile
+	$(CXX) $(CXXFLAGS) $(OPENMP_FLAGS) -o $@ $(filter-out Makefile,$^) $(LIB_DIRS) $(LIBS)
 
-mh_synthetic_experiment: $(OBJECTS_LIB) $(MH_SYNTHETIC_EXPERIMENT_OBJECTS)
-	$(CXX) $(CXXFLAGS) $(OPENMP_FLAGS) -o $@ $^ $(LIB_DIRS) $(LIBS)
+mh_synthetic_experiment: $(OBJECTS_LIB) $(MH_SYNTHETIC_EXPERIMENT_OBJECTS) Makefile
+	$(CXX) $(CXXFLAGS) $(OPENMP_FLAGS) -o $@ $(filter-out Makefile,$^) $(LIB_DIRS) $(LIBS)
 
-svp_test: $(OBJECTS_LIB) $(SVP_TEST_OBJECTS)
-	$(CXX) $(CXXFLAGS) $(OPENMP_FLAGS) -o $@ $^ $(LIB_DIRS) $(LIBS)
+svp_test: $(OBJECTS_LIB) $(SVP_TEST_OBJECTS) Makefile
+	$(CXX) $(CXXFLAGS) $(OPENMP_FLAGS) -o $@ $(filter-out Makefile,$^) $(LIB_DIRS) $(LIBS)
 
-gor_test: $(OBJECTS_LIB) $(GOR_TEST_OBJECTS)
-	$(CXX) $(CXXFLAGS) $(OPENMP_FLAGS) -o $@ $^ $(LIB_DIRS) $(LIBS)
+gor_test: $(OBJECTS_LIB) $(GOR_TEST_OBJECTS) Makefile
+	$(CXX) $(CXXFLAGS) $(OPENMP_FLAGS) -o $@ $(filter-out Makefile,$^) $(LIB_DIRS) $(LIBS)
 
-sor_test: $(OBJECTS_LIB) $(SOR_TEST_OBJECTS)
-	$(CXX) $(CXXFLAGS) $(OPENMP_FLAGS) -o $@ $^ $(LIB_DIRS) $(LIBS)
+sor_test: $(OBJECTS_LIB) $(SOR_TEST_OBJECTS) Makefile
+	$(CXX) $(CXXFLAGS) $(OPENMP_FLAGS) -o $@ $(filter-out Makefile,$^) $(LIB_DIRS) $(LIBS)
 
-fahl_test: $(OBJECTS_LIB) $(FAHL_TEST_OBJECTS)
-	$(CXX) $(CXXFLAGS) $(OPENMP_FLAGS) -o $@ $^ $(LIB_DIRS) $(LIBS)
+fahl_test: $(OBJECTS_LIB) $(FAHL_TEST_OBJECTS) Makefile
+	$(CXX) $(CXXFLAGS) $(OPENMP_FLAGS) -o $@ $(filter-out Makefile,$^) $(LIB_DIRS) $(LIBS)
 
 # 编译 .cpp 文件为 .o 文件
-%.o: %.cpp
+%.o: %.cpp Makefile
 	$(CXX) $(CXXFLAGS) $(OPENMP_FLAGS) $(INCLUDE_DIRS) -c $< -o $@
 
 # 运行测试
@@ -111,6 +143,8 @@ help:
 	@echo "  make run-sor  - 只运行 sor_test"
 	@echo "  make run-fahl - 只运行 fahl_test"
 	@echo "  make run-gro TEST_CONFIG=config/config.yaml - 指定配置文件运行"
+	@echo "  Linux/server: make"
+	@echo "  macOS Homebrew GCC: make CXX=g++-14 （如果自动检测不到）"
 	@echo "  make clean    - 清理编译文件"
 	@echo "  make rebuild  - 清理并重新构建"
 	@echo "  make help     - 显示此帮助信息"

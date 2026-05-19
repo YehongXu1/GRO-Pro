@@ -68,9 +68,8 @@ initial_total_travel_time
 final_total_travel_time
 ```
 
-Parameters should be recorded once per run, not repeated on every iteration
-row. Use a separate run-level metadata CSV, for example
-`*_runs.csv`, with these columns:
+For the selection diagnostic, parameters are recorded directly in each method
+row so the result stays in one CSV file:
 
 ```text
 run_id
@@ -83,10 +82,7 @@ query_count
 lambda
 gamma
 theta_percentile
-impact_weight
-conflict_threshold
 random_seed
-max_iterations
 ```
 
 Core TDG structure columns:
@@ -220,42 +216,43 @@ For one small dataset and one iteration:
 Definition:
 
 ```text
-remaining_before(S) = total travel time of queries not in S under original
-                      all-query traffic evaluation
-
-remaining_after_remove(S) = total travel time after evaluating only queries
-                            not in S with their current routes
-
-selection_gain(S) = remaining_before(S) - remaining_after_remove(S)
+unselected_after_remove(S) = total travel time after evaluating only queries
+                             not in S with their current routes
 ```
 
 Use the same definition for the random set `R`. Since `S` and `R` have the same
-size, compare `selection_gain(S)` and `selection_gain(R)` directly.
+size and share the same `total_before`, compare
+`tdg_unselected_after_remove` and `random_unselected_after_remove` directly.
+A smaller value means the selected set relieved more congestion from the
+remaining current routes.
 
 Core metrics:
 
 ```text
+removal_mode
 selected_count
-tdg_remaining_before
-tdg_remaining_after_remove
-random_remaining_before
-random_remaining_after_remove
+important_node_count
+total_before
+tdg_unselected_after_remove
+random_unselected_after_remove
+tdg_prepare_sec
+tdg_select_sec
+random_select_sec
 ```
 
-TDG score sanity metrics:
+TDG impact-score sanity metrics:
 
 ```text
-mean_selected_tdg_score
-mean_unselected_tdg_score
-mean_all_query_tdg_score
-max_selected_tdg_score
-max_all_query_tdg_score
+mean_tdg_selected_impact_score
+mean_random_selected_impact_score
+mean_all_query_impact_score
 ```
 
 Parameter experiments after the basic comparison:
 
 ```text
 gamma = 0.0, 0.25, 0.5, 0.75, 1.0
+removal_mode = all_nodes, congestion_important, anchor_important
 ```
 
 Fairness controls:
@@ -266,23 +263,39 @@ Fairness controls:
   queries.
 - Do not reroute selected queries. Removing selected queries and re-evaluating
   the remaining current routes isolates selection quality from reroute quality.
+- In `congestion_important`, the removal constraint checks only TDG nodes whose
+  congestion ratio is at or above `theta_percentile`.
+- In `anchor_important`, the removal constraint checks only anchor TDG nodes
+  with positive anchor score from the TDG compression anchor detector.
 
 Metrics:
 
 - `selected_count`
-- `mean_selected_score`
-- `mean_all_query_score`
-- `rejected_count`
-- `tdg_remaining_before`
-- `tdg_remaining_after_remove`
-- `random_remaining_before`
-- `random_remaining_after_remove`
+- `important_node_count`
+- `total_before`
+- `tdg_unselected_after_remove`
+- `random_unselected_after_remove`
+- `tdg_prepare_sec`
+- `tdg_select_sec`
+- `random_select_sec`
+
+Impact-score diagnostics:
+
+```text
+mean_tdg_selected_impact_score
+mean_random_selected_impact_score
+mean_all_query_impact_score
+```
+
+These columns let us check whether lower
+`tdg_unselected_after_remove` is correlated with selecting routes that have
+larger TDG impact scores.
 
 Interpretation:
 
-- If `selection_gain(S)` is not larger than `selection_gain(R)`, the TDG
-  selection method is not selecting queries that better relieve the remaining
-  traffic than random selection.
+- If `tdg_unselected_after_remove` is not smaller than
+  `random_unselected_after_remove`, the TDG selection method is not selecting
+  queries that better relieve the remaining traffic than random selection.
 - Very low selected counts mean `gamma` or candidate filtering may be too
   restrictive. In this no-filter step, that points to `gamma` or the
   removability logic, not candidate filtering.
@@ -293,10 +306,9 @@ Result log:
 Date:
 Command:
 Dataset/filter:
-Iteration:
 Selected count:
 Random selection same count:
-Remaining-before/after values:
+After-remove values:
 Observation:
 Conclusion:
 Next action:
@@ -326,7 +338,7 @@ For one small dataset and one iteration:
 4. For both `S_all` and `S_filter`, remove selected queries and re-evaluate
    only the remaining current routes.
 5. Compare candidate-filtered selection against no-filter selection using the
-   same remaining-query total-travel-time reduction metric from Step 2.
+   same after-remove remaining-query total-travel-time metric from Step 2.
 
 Core metrics:
 
@@ -335,10 +347,8 @@ candidate_count
 selected_count_no_filter
 selected_count_with_filter
 candidate_selected_overlap_count
-remaining_before_no_filter_selection
-remaining_after_no_filter_selection
-remaining_before_candidate_filter_selection
-remaining_after_candidate_filter_selection
+unselected_after_no_filter_selection
+unselected_after_candidate_filter_selection
 ```
 
 Structural diagnostics:
@@ -599,7 +609,7 @@ Command:
   --gamma-values 0,25,50,75,100 \
   --random-seed 0
 Datasets: Hop10Rep1-0
-Parameters: recorded in python/results/gro_selection_debug_hop10rep1_seed0_gamma_iterations_runs.csv
+Parameters: recorded directly in each CSV row
 Main numbers:
 gamma0:   selected_count=0,    TDG gain=0,       random gain=0
 gamma25:  selected_count=14,   TDG gain=84430,   random gain=54401

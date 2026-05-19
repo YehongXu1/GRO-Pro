@@ -30,17 +30,23 @@ struct DatasetInput {
     std::filesystem::path path;
 };
 
+enum class RemovalMode {
+    AllNodes,
+    CongestionImportant,
+    AnchorImportant
+};
+
 struct Options {
     std::string config_path = "config/config.yaml";
     std::filesystem::path query_file;
     std::filesystem::path query_dir;
     std::filesystem::path output_path =
         "python/results/gro_selection_debug_iterations.csv";
-    std::filesystem::path runs_output_path;
     unsigned int random_seed = 0;
     bool random_seed_set = false;
     int max_files = 0;
     std::vector<int> gamma_values;
+    std::vector<RemovalMode> removal_modes;
 };
 
 struct TdgStats {
@@ -59,6 +65,12 @@ struct ScoreStats {
     gro::Cost sum = 0;
     long double mean = 0.0;
     gro::Cost max = 0;
+};
+
+struct SelectionResult {
+    std::vector<gro::QueryId> query_ids;
+    long long select_us = 0;
+    long long important_node_count = 0;
 };
 
 void require(bool condition, const std::string& message) {
@@ -87,6 +99,43 @@ std::vector<int> parse_percent_list(const std::string& text) {
     return values;
 }
 
+std::string removal_mode_name(RemovalMode mode) {
+    switch (mode) {
+    case RemovalMode::AllNodes:
+        return "all_nodes";
+    case RemovalMode::CongestionImportant:
+        return "congestion_important";
+    case RemovalMode::AnchorImportant:
+        return "anchor_important";
+    }
+    return "unknown";
+}
+
+RemovalMode parse_removal_mode(const std::string& text) {
+    if (text == "all_nodes" || text == "all") {
+        return RemovalMode::AllNodes;
+    }
+    if (text == "congestion_important" || text == "congestion") {
+        return RemovalMode::CongestionImportant;
+    }
+    if (text == "anchor_important" || text == "anchor") {
+        return RemovalMode::AnchorImportant;
+    }
+    throw std::runtime_error("Unknown removal mode: " + text);
+}
+
+std::vector<RemovalMode> parse_removal_mode_list(const std::string& text) {
+    std::vector<RemovalMode> modes;
+    std::stringstream stream(text);
+    std::string value;
+    while (std::getline(stream, value, ',')) {
+        if (!value.empty()) {
+            modes.push_back(parse_removal_mode(value));
+        }
+    }
+    return modes;
+}
+
 Options parse_args(int argc, char** argv) {
     Options options;
     int index = 1;
@@ -110,21 +159,24 @@ Options parse_args(int argc, char** argv) {
         } else if (arg == "--output") {
             options.output_path = require_value(arg);
         } else if (arg == "--runs-output") {
-            options.runs_output_path = require_value(arg);
+            (void)require_value(arg);
         } else if (arg == "--random-seed") {
             options.random_seed =
                 static_cast<unsigned int>(std::stoul(require_value(arg)));
             options.random_seed_set = true;
         } else if (arg == "--gamma-values") {
             options.gamma_values = parse_percent_list(require_value(arg));
+        } else if (arg == "--removal-modes") {
+            options.removal_modes = parse_removal_mode_list(require_value(arg));
         } else if (arg == "--max-files") {
             options.max_files = std::stoi(require_value(arg));
         } else if (arg == "--help") {
             std::cout
                 << "Usage: ./gro_selection_debug_test [config] "
                 << "[--query-file path | --query-dir path] [--output path] "
-                << "[--runs-output path] [--random-seed n] "
+                << "[--random-seed n] "
                 << "[--gamma-values 0,25,50,75,100] "
+                << "[--removal-modes all_nodes,congestion_important,anchor_important] "
                 << "[--max-files n]\n";
             std::exit(0);
         } else {
@@ -132,11 +184,11 @@ Options parse_args(int argc, char** argv) {
         }
     }
 
-    if (options.runs_output_path.empty()) {
-        std::filesystem::path runs_path = options.output_path;
-        runs_path.replace_filename(
-            options.output_path.stem().string() + "_runs.csv");
-        options.runs_output_path = runs_path;
+    if (options.removal_modes.empty()) {
+        options.removal_modes = {
+            RemovalMode::AllNodes,
+            RemovalMode::CongestionImportant,
+            RemovalMode::AnchorImportant};
     }
 
     return options;
@@ -229,6 +281,26 @@ std::unordered_set<gro::QueryId> make_query_set(
     return std::unordered_set<gro::QueryId>(ids.begin(), ids.end());
 }
 
+std::size_t percentile_index(std::size_t size, int percentile) {
+    if (size == 0) {
+        return 0;
+    }
+    int clamped_percentile = std::clamp(percentile, 0, 100);
+    return static_cast<std::size_t>(
+        static_cast<long long>(clamped_percentile) *
+        static_cast<long long>(size - 1) / 100);
+}
+
+std::size_t integer_sqrt(std::size_t value) {
+    return static_cast<std::size_t>(
+        std::sqrt(static_cast<long double>(value)));
+}
+
+gro::Cost congestion_ratio_key(gro::Flow flow, gro::Flow capacity) {
+    gro::Flow safe_capacity = capacity > 0 ? capacity : 1;
+    return static_cast<gro::Cost>(flow) * 1000000 / safe_capacity;
+}
+
 std::vector<gro::QueryId> random_query_ids(
     std::size_t query_count,
     std::size_t selected_count,
@@ -276,20 +348,184 @@ ScoreStats score_stats(
     return stats;
 }
 
-gro::Cost remaining_before_total(
-    const gro::TrafficResult& traffic_result,
-    const std::unordered_set<gro::QueryId>& selected) {
-    gro::Cost total = 0;
-    for (std::size_t i = 0; i < traffic_result.trajectories.size(); ++i) {
-        gro::QueryId query_id = static_cast<gro::QueryId>(i);
-        if (selected.find(query_id) == selected.end()) {
-            total += traffic_result.trajectories[i].travel_time;
-        }
-    }
-    return total;
+std::vector<char> all_tdg_nodes_important(
+    const gro::TrafficDependencyGraph& tdg) {
+    return std::vector<char>(tdg.nodes.size(), 1);
 }
 
-gro::Cost remaining_after_remove_total(
+std::vector<char> congestion_important_tdg_nodes(
+    const gro::Graph& graph,
+    const gro::TrafficDependencyGraph& tdg,
+    int theta_percentile) {
+    std::vector<char> important(tdg.nodes.size(), 0);
+    if (tdg.nodes.empty()) {
+        return important;
+    }
+
+    std::vector<gro::Cost> ratios;
+    ratios.reserve(tdg.nodes.size());
+    for (const gro::TDGNode& node : tdg.nodes) {
+        ratios.push_back(
+            congestion_ratio_key(
+                node.flow,
+                graph.edges[node.edge_id].capacity));
+    }
+
+    std::sort(ratios.begin(), ratios.end());
+    gro::Cost theta = ratios[percentile_index(ratios.size(), theta_percentile)];
+
+    for (const gro::TDGNode& node : tdg.nodes) {
+        gro::Cost ratio =
+            congestion_ratio_key(
+                node.flow,
+                graph.edges[node.edge_id].capacity);
+        if (ratio >= theta) {
+            important[node.id] = 1;
+        }
+    }
+    return important;
+}
+
+std::vector<char> important_tdg_nodes(
+    RemovalMode mode,
+    const gro::GROAlgorithm& algorithm,
+    const gro::Graph& graph,
+    const gro::TrafficResult& traffic_result,
+    const gro::TrafficDependencyGraph& tdg,
+    int theta_percentile) {
+    switch (mode) {
+    case RemovalMode::AllNodes:
+        return all_tdg_nodes_important(tdg);
+    case RemovalMode::CongestionImportant:
+        return congestion_important_tdg_nodes(graph, tdg, theta_percentile);
+    case RemovalMode::AnchorImportant: {
+        std::vector<std::map<gro::Time, gro::Cost>> anchor_scores =
+            algorithm.compute_anchor_scores(traffic_result);
+        return algorithm.mark_anchor_tdg_nodes(tdg, anchor_scores);
+    }
+    }
+    return all_tdg_nodes_important(tdg);
+}
+
+SelectionResult select_queries_with_removal_mode(
+    const gro::GROAlgorithm& algorithm,
+    const std::unordered_set<gro::QueryId>& candidate_set,
+    const gro::TrafficResult& result,
+    const gro::TrafficDependencyGraph& tdg,
+    const std::vector<char>& important_nodes,
+    int gamma) {
+    SelectionResult selection;
+    selection.important_node_count =
+        static_cast<long long>(
+            std::count(important_nodes.begin(), important_nodes.end(), 1));
+
+    auto total_start = gro::Clock::now();
+    if (candidate_set.empty()) {
+        selection.select_us = gro::elapsed_us(total_start);
+        return selection;
+    }
+
+    gro::TrafficDependencyGraph working_tdg = tdg;
+    std::unordered_set<gro::QueryId> selected;
+    std::vector<gro::QueryId> candidate_ids(
+        candidate_set.begin(),
+        candidate_set.end());
+    std::sort(candidate_ids.begin(), candidate_ids.end());
+
+    auto route_score = [&](const gro::Trajectory& trajectory,
+                           const std::vector<gro::Cost>& impacts) {
+        gro::Cost score = 0;
+        for (gro::TDGNodeId node_id : trajectory.tdg_node_ids) {
+            if (node_id >= 0 &&
+                node_id < static_cast<gro::TDGNodeId>(impacts.size())) {
+                score += impacts[node_id];
+            }
+        }
+        return score;
+    };
+
+    auto is_removable = [&](const gro::Trajectory& trajectory) {
+        for (gro::TDGNodeId node_id : trajectory.tdg_node_ids) {
+            if (node_id < 0 ||
+                node_id >= static_cast<gro::TDGNodeId>(working_tdg.nodes.size())) {
+                continue;
+            }
+            if (node_id >= static_cast<gro::TDGNodeId>(important_nodes.size()) ||
+                !important_nodes[node_id]) {
+                continue;
+            }
+
+            const gro::TDGNode& node = working_tdg.nodes[node_id];
+            int min_flow = (100 - gamma) * node.original_flow / 100;
+            if (node.flow - 1 < min_flow) {
+                return false;
+            }
+        }
+        return true;
+    };
+
+    while (selected.size() < candidate_ids.size()) {
+        std::vector<gro::Cost> impacts =
+            algorithm.compute_tdg_impact(working_tdg);
+
+        std::vector<std::pair<gro::Cost, gro::QueryId>> ranking;
+        ranking.reserve(candidate_ids.size() - selected.size());
+        for (gro::QueryId query_id : candidate_ids) {
+            if (selected.find(query_id) != selected.end()) {
+                continue;
+            }
+            ranking.push_back({
+                route_score(result.trajectories[query_id], impacts),
+                query_id});
+        }
+
+        if (ranking.empty()) {
+            break;
+        }
+
+        std::sort(
+            ranking.begin(),
+            ranking.end(),
+            [](const auto& lhs, const auto& rhs) {
+                if (lhs.first != rhs.first) {
+                    return lhs.first > rhs.first;
+                }
+                return lhs.second < rhs.second;
+            });
+
+        std::size_t reject = 0;
+        std::size_t selected_this_round = 0;
+        std::size_t stale_threshold = integer_sqrt(ranking.size());
+        for (const auto& [_, query_id] : ranking) {
+            const gro::Trajectory& trajectory = result.trajectories[query_id];
+            if (is_removable(trajectory)) {
+                selected.insert(query_id);
+                ++selected_this_round;
+                reject = 0;
+                algorithm.remove_trajectory_from_tdg(
+                    working_tdg,
+                    trajectory,
+                    result);
+            } else {
+                ++reject;
+                if (reject > stale_threshold) {
+                    break;
+                }
+            }
+        }
+
+        if (selected_this_round == 0) {
+            break;
+        }
+    }
+
+    selection.query_ids.assign(selected.begin(), selected.end());
+    std::sort(selection.query_ids.begin(), selection.query_ids.end());
+    selection.select_us = gro::elapsed_us(total_start);
+    return selection;
+}
+
+gro::Cost unselected_after_remove_total(
     const gro::Graph& graph,
     const std::vector<gro::Query>& queries,
     const std::vector<gro::Route>& routes,
@@ -391,61 +627,41 @@ void ensure_parent_dir(const std::filesystem::path& path) {
     }
 }
 
-void write_runs_header(std::ofstream& out) {
-    out << "run_id,dataset,hop,rep,seed,algorithm,query_count,"
-        << "lambda,gamma,theta_percentile,impact_weight,"
-        << "conflict_threshold,random_seed,max_iterations\n";
-}
-
-void write_run_row(
-    std::ofstream& out,
-    const std::string& run_id,
-    unsigned int random_seed,
-    const DatasetInfo& dataset,
-    const gro::AlgorithmOptions& algorithm_options,
-    std::size_t query_count) {
-    out << run_id << ','
-        << dataset.dataset << ','
-        << dataset.hop << ','
-        << dataset.rep << ','
-        << dataset.seed << ','
-        << "tdg_selection_no_candidate_vs_random" << ','
-        << query_count << ','
-        << algorithm_options.lambda << ','
-        << algorithm_options.gamma << ','
-        << algorithm_options.theta_percentile << ','
-        << algorithm_options.impact_weight << ','
-        << algorithm_options.conflict_threshold << ','
-        << random_seed << ','
-        << algorithm_options.max_iterations << '\n';
-}
-
 void write_iterations_header(std::ofstream& out) {
-    out << "run_id,dataset,hop,rep,seed,algorithm,query_count,iteration,"
-        << "selected_count,total_before,"
-        << "tdg_remaining_before,tdg_remaining_after_remove,"
-        << "random_remaining_before,random_remaining_after_remove,"
-        << "tdg_selected_score_sum,random_selected_score_sum,"
-        << "mean_selected_tdg_score,mean_random_tdg_score,"
-        << "mean_all_query_tdg_score,max_selected_tdg_score,"
-        << "max_random_tdg_score,max_all_query_tdg_score,"
-        << "tdg_node_count,tdg_route_arc_count,tdg_same_edge_arc_count,"
-        << "tdg_edge_timeline_count,tdg_max_out_degree,tdg_max_flow,"
-        << "tdg_mean_flow,tdg_max_congestion_ratio,"
+    out << "run_id,dataset,hop,rep,seed,algorithm,removal_mode,"
+        << "query_count,lambda,gamma,theta_percentile,anchor_window,"
+        << "anchor_threshold,random_seed,"
+        << "selected_count,important_node_count,"
+        << "total_before,"
+        << "tdg_unselected_after_remove,random_unselected_after_remove,"
+        << "tdg_prepare_sec,"
+        << "tdg_select_sec,random_select_sec,"
+        << "mean_tdg_selected_impact_score,"
+        << "mean_random_selected_impact_score,"
+        << "mean_all_query_impact_score,"
+        << "tdg_node_count,tdg_edge_timeline_count,tdg_max_flow,"
+        << "tdg_max_congestion_ratio,"
         << "tdg_mean_congestion_ratio\n";
 }
 
 void write_iteration_row(
     std::ofstream& out,
     const std::string& run_id,
+    RemovalMode removal_mode,
+    unsigned int random_seed,
     const DatasetInfo& dataset,
+    const gro::AlgorithmOptions& algorithm_options,
     std::size_t query_count,
     std::size_t selected_count,
+    long long important_node_count,
     gro::Cost total_before,
-    gro::Cost tdg_remaining_before,
-    gro::Cost tdg_remaining_after_remove,
-    gro::Cost random_remaining_before,
-    gro::Cost random_remaining_after_remove,
+    gro::Cost tdg_unselected_after_remove,
+    gro::Cost random_unselected_after_remove,
+    long long build_tdg_us,
+    long long compute_impact_us,
+    long long important_nodes_us,
+    long long tdg_select_us,
+    long long random_select_us,
     const ScoreStats& selected_scores,
     const ScoreStats& random_scores,
     const ScoreStats& all_scores,
@@ -457,29 +673,31 @@ void write_iteration_row(
         << dataset.rep << ','
         << dataset.seed << ','
         << "tdg_selection_no_candidate_vs_random" << ','
+        << removal_mode_name(removal_mode) << ','
         << query_count << ','
-        << 0 << ','
+        << algorithm_options.lambda << ','
+        << algorithm_options.gamma << ','
+        << algorithm_options.theta_percentile << ','
+        << algorithm_options.anchor_window << ','
+        << algorithm_options.anchor_threshold << ','
+        << random_seed << ','
         << selected_count << ','
+        << important_node_count << ','
         << total_before << ','
-        << tdg_remaining_before << ','
-        << tdg_remaining_after_remove << ','
-        << random_remaining_before << ','
-        << random_remaining_after_remove << ','
-        << selected_scores.sum << ','
-        << random_scores.sum << ','
+        << tdg_unselected_after_remove << ','
+        << random_unselected_after_remove << ','
+        << static_cast<double>(
+               build_tdg_us + compute_impact_us + important_nodes_us) /
+               1000000.0
+        << ','
+        << static_cast<double>(tdg_select_us) / 1000000.0 << ','
+        << static_cast<double>(random_select_us) / 1000000.0 << ','
         << static_cast<double>(selected_scores.mean) << ','
         << static_cast<double>(random_scores.mean) << ','
         << static_cast<double>(all_scores.mean) << ','
-        << selected_scores.max << ','
-        << random_scores.max << ','
-        << all_scores.max << ','
         << tdg_stats.node_count << ','
-        << tdg_stats.route_arc_count << ','
-        << tdg_stats.same_edge_arc_count << ','
         << tdg_stats.edge_timeline_count << ','
-        << tdg_stats.max_out_degree << ','
         << tdg_stats.max_flow << ','
-        << static_cast<double>(tdg_stats.mean_flow) << ','
         << static_cast<double>(tdg_stats.max_congestion_ratio) << ','
         << static_cast<double>(tdg_stats.mean_congestion_ratio) << '\n';
 }
@@ -514,17 +732,8 @@ int main(int argc, char** argv) {
             "Cannot open output: " + options.output_path.string());
         write_iterations_header(iterations_out);
 
-        ensure_parent_dir(options.runs_output_path);
-        std::ofstream runs_out(options.runs_output_path);
-        require(
-            static_cast<bool>(runs_out),
-            "Cannot open runs output: " +
-                options.runs_output_path.string());
-        write_runs_header(runs_out);
-
         std::cout << "Selection diagnostic written:\n"
                   << "  " << options.output_path << "\n"
-                  << "  " << options.runs_output_path << "\n"
                   << "datasets=" << datasets.size() << "\n";
 
         for (const DatasetInput& dataset : datasets) {
@@ -541,14 +750,21 @@ int main(int argc, char** argv) {
 
             std::vector<gro::Route> routes =
                 base_algorithm.compute_initial_routes(queries);
+
             gro::TrafficResult traffic_result =
                 gro::evaluate_traffic(graph, queries, routes, traffic_options);
             gro::Cost total_before = traffic_result.total_travel_time;
 
+            auto build_tdg_start = gro::Clock::now();
             gro::TrafficDependencyGraph tdg =
                 base_algorithm.build_tdg(traffic_result);
+            long long build_tdg_us = gro::elapsed_us(build_tdg_start);
+
+            auto compute_impact_start = gro::Clock::now();
             std::vector<gro::Cost> impacts =
                 base_algorithm.compute_tdg_impact(tdg);
+            long long compute_impact_us =
+                gro::elapsed_us(compute_impact_start);
 
             std::unordered_set<gro::QueryId> all_query_set;
             std::vector<gro::QueryId> all_query_ids;
@@ -572,89 +788,116 @@ int main(int argc, char** argv) {
                     graph,
                     run_options,
                     traffic_options);
-                std::string run_id =
-                    dataset.info.dataset +
-                    "_gamma" +
-                    std::to_string(run_options.gamma);
 
-                std::vector<gro::QueryId> selected_ids =
-                    selector.select_queries(
-                        all_query_set,
-                        queries,
-                        traffic_result,
-                        tdg,
-                        impacts,
-                        0);
-                std::unordered_set<gro::QueryId> selected_set =
-                    make_query_set(selected_ids);
+                for (RemovalMode removal_mode : options.removal_modes) {
+                    std::string mode_name = removal_mode_name(removal_mode);
+                    std::string run_id =
+                        dataset.info.dataset +
+                        "_gamma" +
+                        std::to_string(run_options.gamma) +
+                        "_" +
+                        mode_name;
 
-                std::vector<gro::QueryId> random_ids =
-                    random_query_ids(
+                    auto important_nodes_start = gro::Clock::now();
+                    std::vector<char> important_nodes =
+                        important_tdg_nodes(
+                            removal_mode,
+                            selector,
+                            graph,
+                            traffic_result,
+                            tdg,
+                            run_options.theta_percentile);
+                    long long important_nodes_us =
+                        gro::elapsed_us(important_nodes_start);
+
+                    SelectionResult selection =
+                        select_queries_with_removal_mode(
+                            selector,
+                            all_query_set,
+                            traffic_result,
+                            tdg,
+                            important_nodes,
+                            run_options.gamma);
+                    std::vector<gro::QueryId>& selected_ids =
+                        selection.query_ids;
+                    std::unordered_set<gro::QueryId> selected_set =
+                        make_query_set(selected_ids);
+
+                    auto random_select_start = gro::Clock::now();
+                    std::vector<gro::QueryId> random_ids =
+                        random_query_ids(
+                            queries.size(),
+                            selected_ids.size(),
+                            options.random_seed);
+                    long long random_select_us =
+                        gro::elapsed_us(random_select_start);
+                    std::unordered_set<gro::QueryId> random_set =
+                        make_query_set(random_ids);
+
+                    gro::Cost tdg_unselected_after_remove =
+                        unselected_after_remove_total(
+                            graph,
+                            queries,
+                            routes,
+                            selected_set,
+                            traffic_options);
+                    gro::Cost random_unselected_after_remove =
+                        unselected_after_remove_total(
+                            graph,
+                            queries,
+                            routes,
+                            random_set,
+                            traffic_options);
+
+                    ScoreStats selected_scores =
+                        score_stats(selected_ids, traffic_result, impacts);
+                    ScoreStats random_scores =
+                        score_stats(random_ids, traffic_result, impacts);
+
+                    write_iteration_row(
+                        iterations_out,
+                        run_id,
+                        removal_mode,
+                        options.random_seed,
+                        dataset.info,
+                        run_options,
                         queries.size(),
                         selected_ids.size(),
-                        options.random_seed);
-                std::unordered_set<gro::QueryId> random_set =
-                    make_query_set(random_ids);
+                        selection.important_node_count,
+                        total_before,
+                        tdg_unselected_after_remove,
+                        random_unselected_after_remove,
+                        build_tdg_us,
+                        compute_impact_us,
+                        important_nodes_us,
+                        selection.select_us,
+                        random_select_us,
+                        selected_scores,
+                        random_scores,
+                        all_scores,
+                        tdg_stats);
 
-                gro::Cost tdg_remaining_before =
-                    remaining_before_total(traffic_result, selected_set);
-                gro::Cost tdg_remaining_after_remove =
-                    remaining_after_remove_total(
-                        graph,
-                        queries,
-                        routes,
-                        selected_set,
-                        traffic_options);
-                gro::Cost random_remaining_before =
-                    remaining_before_total(traffic_result, random_set);
-                gro::Cost random_remaining_after_remove =
-                    remaining_after_remove_total(
-                        graph,
-                        queries,
-                        routes,
-                        random_set,
-                        traffic_options);
-
-                ScoreStats selected_scores =
-                    score_stats(selected_ids, traffic_result, impacts);
-                ScoreStats random_scores =
-                    score_stats(random_ids, traffic_result, impacts);
-
-                write_run_row(
-                    runs_out,
-                    run_id,
-                    options.random_seed,
-                    dataset.info,
-                    run_options,
-                    queries.size());
-                write_iteration_row(
-                    iterations_out,
-                    run_id,
-                    dataset.info,
-                    queries.size(),
-                    selected_ids.size(),
-                    total_before,
-                    tdg_remaining_before,
-                    tdg_remaining_after_remove,
-                    random_remaining_before,
-                    random_remaining_after_remove,
-                    selected_scores,
-                    random_scores,
-                    all_scores,
-                    tdg_stats);
-
-                std::cout << "run_id=" << run_id
-                          << " selected_count=" << selected_ids.size()
-                          << " total_before=" << total_before
-                          << " tdg_remaining_before="
-                          << tdg_remaining_before
-                          << " tdg_remaining_after_remove="
-                          << tdg_remaining_after_remove
-                          << " random_remaining_before="
-                          << random_remaining_before
-                          << " random_remaining_after_remove="
-                          << random_remaining_after_remove
-                          << "\n";
+                    std::cout << "run_id=" << run_id
+                              << " selected_count=" << selected_ids.size()
+                              << " important_node_count="
+                              << selection.important_node_count
+                              << " total_before=" << total_before
+                              << " tdg_unselected_after_remove="
+                              << tdg_unselected_after_remove
+                              << " random_unselected_after_remove="
+                              << random_unselected_after_remove
+                              << " tdg_prepare_sec="
+                              << static_cast<double>(
+                                     build_tdg_us +
+                                     compute_impact_us +
+                                     important_nodes_us) /
+                                     1000000.0
+                              << " tdg_select_sec="
+                              << static_cast<double>(selection.select_us) / 1000000.0
+                              << " random_select_sec="
+                              << static_cast<double>(random_select_us) / 1000000.0
+                              << "\n";
+                }
             }
         }
         return 0;

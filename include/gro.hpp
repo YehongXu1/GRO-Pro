@@ -101,6 +101,13 @@ public:
     TrafficDependencyGraph compress_tdg(
         TrafficResult& result) const;
 
+    std::vector<std::map<Time, Cost>> compute_anchor_scores(
+        const TrafficResult& result) const;
+
+    std::vector<char> mark_anchor_tdg_nodes(
+        const TrafficDependencyGraph& tdg,
+        const std::vector<std::map<Time, Cost>>& anchor_scores) const;
+
     std::vector<Cost> compute_tdg_impact(
         const TrafficDependencyGraph& tdg) const;
 

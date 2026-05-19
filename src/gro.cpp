@@ -372,11 +372,8 @@ TrafficDependencyGraph GROAlgorithm::build_tdg(
 }
 
 
-TrafficDependencyGraph GROAlgorithm::compress_tdg(
-    TrafficResult& result) const {
-    TrafficDependencyGraph tdg;
-    tdg.edge_timelines.assign(graph_.edges.size(), std::map<Time, TimeLineEvent>());
-
+std::vector<std::map<Time, Cost>> GROAlgorithm::compute_anchor_scores(
+    const TrafficResult& result) const {
     int delta_compress = options_.delta_compress > 0
         ? options_.delta_compress
         : options_.delta_initial;
@@ -388,15 +385,6 @@ TrafficDependencyGraph GROAlgorithm::compress_tdg(
         ? options_.anchor_window
         : delta_compress;
     int anchor_threshold = std::max(0, options_.anchor_threshold);
-
-    std::vector<std::vector<Time>> entry_times_by_edge(graph_.edges.size());
-    for (EdgeId edge_id = 0; edge_id < static_cast<EdgeId>(result.edge_profiles.size()); ++edge_id) {
-        for (const Event& event : result.edge_profiles[edge_id]) {
-            if (event.type) {
-                entry_times_by_edge[edge_id].push_back(event.time);
-            }
-        }
-    }
 
     std::vector<std::map<Time, Cost>> anchor_scores(graph_.edges.size());
     for (EdgeId edge_id = 0; edge_id < static_cast<EdgeId>(result.edge_profiles.size()); ++edge_id) {
@@ -430,7 +418,7 @@ TrafficDependencyGraph GROAlgorithm::compress_tdg(
         };
 
         bool marked_first_entry = false;
-        size_t window_index = 0; 
+        size_t window_index = 0;
         for (size_t i = 0; i < profile.size(); ++i) {
             if (!profile[i].type) {
                 continue;
@@ -445,7 +433,7 @@ TrafficDependencyGraph GROAlgorithm::compress_tdg(
             Time time = profile[i].time;
             Time window_start = std::max<Time>(
                 profile.front().time,
-                time - anchor_window); 
+                time - anchor_window);
             Time duration = time - window_start;
             if (duration <= 0) {
                 continue;
@@ -456,8 +444,10 @@ TrafficDependencyGraph GROAlgorithm::compress_tdg(
                 ++window_index;
             }
 
-            __int128 window_area = cumulative_flow[i] - area_at(window_index, window_start);
-            __int128 current_area = static_cast<__int128>(profile[i].flow) * duration;
+            __int128 window_area =
+                cumulative_flow[i] - area_at(window_index, window_start);
+            __int128 current_area =
+                static_cast<__int128>(profile[i].flow) * duration;
             __int128 deviation = current_area >= window_area
                 ? current_area - window_area
                 : window_area - current_area;
@@ -465,7 +455,8 @@ TrafficDependencyGraph GROAlgorithm::compress_tdg(
                 static_cast<__int128>(anchor_threshold) * capacity * duration;
 
             if (deviation * 100 >= threshold) {
-                __int128 denominator = static_cast<__int128>(capacity) * duration;
+                __int128 denominator =
+                    static_cast<__int128>(capacity) * duration;
                 Cost score = denominator > 0
                     ? static_cast<Cost>(deviation * 1000000 / denominator)
                     : 0;
@@ -473,6 +464,51 @@ TrafficDependencyGraph GROAlgorithm::compress_tdg(
             }
         }
     }
+    return anchor_scores;
+}
+
+std::vector<char> GROAlgorithm::mark_anchor_tdg_nodes(
+    const TrafficDependencyGraph& tdg,
+    const std::vector<std::map<Time, Cost>>& anchor_scores) const {
+    std::vector<char> important(tdg.nodes.size(), 0);
+    for (const TDGNode& node : tdg.nodes) {
+        if (node.edge_id < 0 ||
+            node.edge_id >= static_cast<EdgeId>(anchor_scores.size())) {
+            continue;
+        }
+
+        const auto& edge_scores = anchor_scores[node.edge_id];
+        auto score_it = edge_scores.find(node.time);
+        if (score_it != edge_scores.end() && score_it->second > 0) {
+            important[node.id] = 1;
+        }
+    }
+    return important;
+}
+
+TrafficDependencyGraph GROAlgorithm::compress_tdg(
+    TrafficResult& result) const {
+    TrafficDependencyGraph tdg;
+    tdg.edge_timelines.assign(graph_.edges.size(), std::map<Time, TimeLineEvent>());
+
+    int delta_compress = options_.delta_compress > 0
+        ? options_.delta_compress
+        : options_.delta_initial;
+    if (delta_compress <= 0) {
+        delta_compress = options_.delta_min > 0 ? options_.delta_min : 1;
+    }
+
+    std::vector<std::vector<Time>> entry_times_by_edge(graph_.edges.size());
+    for (EdgeId edge_id = 0; edge_id < static_cast<EdgeId>(result.edge_profiles.size()); ++edge_id) {
+        for (const Event& event : result.edge_profiles[edge_id]) {
+            if (event.type) {
+                entry_times_by_edge[edge_id].push_back(event.time);
+            }
+        }
+    }
+
+    std::vector<std::map<Time, Cost>> anchor_scores =
+        compute_anchor_scores(result);
 
     auto add_node = [&](EdgeId edge_id, Time time) {
         Key key = {edge_id, time};
