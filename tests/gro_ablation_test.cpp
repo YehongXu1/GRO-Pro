@@ -47,7 +47,7 @@ struct Options {
     unsigned int random_seed = 0;
     bool random_seed_set = false;
     int max_files = 0;
-    int fixed_fraction = 30;
+    std::vector<int> fixed_fractions = {10, 30};
     std::vector<std::string> selection_methods = {
         "random",
         "most_delayed",
@@ -55,7 +55,7 @@ struct Options {
     };
     std::vector<std::string> reroute_methods = {"normal", "tdg"};
     std::vector<int> tdg_gammas = {50};
-    std::vector<int> impact_weights = {15, 30, 50};
+    std::vector<int> impact_weights = {30};
 };
 
 struct SelectionRun {
@@ -183,7 +183,9 @@ Options parse_args(int argc, char** argv) {
                 static_cast<unsigned int>(std::stoul(require_value(arg)));
             options.random_seed_set = true;
         } else if (arg == "--fixed-fraction") {
-            options.fixed_fraction = parse_percent_value(require_value(arg));
+            options.fixed_fractions = {parse_percent_value(require_value(arg))};
+        } else if (arg == "--fixed-fractions") {
+            options.fixed_fractions = parse_percent_list(require_value(arg));
         } else if (arg == "--selection-methods") {
             options.selection_methods = parse_string_list(require_value(arg));
         } else if (arg == "--reroute-methods") {
@@ -200,8 +202,8 @@ Options parse_args(int argc, char** argv) {
                 << "[--query-file path | --query-dir path] [--output path] "
                 << "[--selection-methods random,most_delayed,tdg_anchor] "
                 << "[--reroute-methods normal,tdg] "
-                << "[--fixed-fraction 30] [--tdg-gammas 50] "
-                << "[--impact-weights 15,30,50] "
+                << "[--fixed-fractions 10,30] [--tdg-gammas 50] "
+                << "[--impact-weights 30] "
                 << "[--datasets Hop10Rep1-0,Hop10Rep1-1] "
                 << "[--dataset-list path] [--random-seed n] [--max-files n]\n";
             std::exit(0);
@@ -212,6 +214,7 @@ Options parse_args(int argc, char** argv) {
 
     require(!options.selection_methods.empty(), "At least one selection method is required");
     require(!options.reroute_methods.empty(), "At least one reroute method is required");
+    require(!options.fixed_fractions.empty(), "At least one fixed selection fraction is required");
     require(!options.tdg_gammas.empty(), "At least one TDG gamma is required");
     require(!options.impact_weights.empty(), "At least one impact weight is required");
     return options;
@@ -624,30 +627,34 @@ std::vector<SelectionRun> build_selection_runs(
 
     for (const std::string& method : options.selection_methods) {
         if (method == "random") {
-            SelectionRun run;
-            run.method = "random";
-            run.selection_fraction = options.fixed_fraction;
-            auto start = gro::Clock::now();
-            run.selected_ids =
-                random_query_ids(
-                    queries.size(),
-                    options.fixed_fraction,
-                    options.random_seed);
-            run.select_us = gro::elapsed_us(start);
-            runs.push_back(std::move(run));
+            for (int fixed_fraction : options.fixed_fractions) {
+                SelectionRun run;
+                run.method = "random";
+                run.selection_fraction = fixed_fraction;
+                auto start = gro::Clock::now();
+                run.selected_ids =
+                    random_query_ids(
+                        queries.size(),
+                        fixed_fraction,
+                        options.random_seed);
+                run.select_us = gro::elapsed_us(start);
+                runs.push_back(std::move(run));
+            }
         } else if (method == "most_delayed") {
-            SelectionRun run;
-            run.method = "most_delayed";
-            run.selection_fraction = options.fixed_fraction;
-            auto start = gro::Clock::now();
-            run.selected_ids =
-                most_delayed_query_ids(
-                    queries.size(),
-                    options.fixed_fraction,
-                    initial_routes,
-                    initial_traffic);
-            run.select_us = gro::elapsed_us(start);
-            runs.push_back(std::move(run));
+            for (int fixed_fraction : options.fixed_fractions) {
+                SelectionRun run;
+                run.method = "most_delayed";
+                run.selection_fraction = fixed_fraction;
+                auto start = gro::Clock::now();
+                run.selected_ids =
+                    most_delayed_query_ids(
+                        queries.size(),
+                        fixed_fraction,
+                        initial_routes,
+                        initial_traffic);
+                run.select_us = gro::elapsed_us(start);
+                runs.push_back(std::move(run));
+            }
         } else if (is_tdg_selection_method(method)) {
             RemovalMode mode = tdg_selection_mode_from_name(method);
             for (int gamma : options.tdg_gammas) {
@@ -911,25 +918,30 @@ int main(int argc, char** argv) {
                     is_tdg_selection_method(selection_method)
                         ? options.tdg_gammas
                         : std::vector<int>{-1};
+                std::vector<int> selection_fractions =
+                    is_tdg_selection_method(selection_method)
+                        ? std::vector<int>{-1}
+                        : options.fixed_fractions;
 
                 for (int gamma : selection_gammas) {
-                    for (const std::string& reroute_method_option :
-                         options.reroute_methods) {
-                        std::vector<int> weights =
-                            reroute_method_option == "tdg"
-                                ? options.impact_weights
-                                : std::vector<int>{-1};
+                    for (int fixed_fraction : selection_fractions) {
+                        for (const std::string& reroute_method_option :
+                             options.reroute_methods) {
+                            std::vector<int> weights =
+                                reroute_method_option == "tdg"
+                                    ? options.impact_weights
+                                    : std::vector<int>{-1};
 
-                        for (int impact_weight : weights) {
-                            std::vector<gro::Route> routes = initial_routes;
-                            long long cumulative_us = 0;
+                            for (int impact_weight : weights) {
+                                std::vector<gro::Route> routes = initial_routes;
+                                long long cumulative_us = 0;
 
-                            for (int iteration = 0;
-                                 iteration < algorithm_options.max_iterations;
-                                 ++iteration) {
-                                unsigned int iteration_seed =
-                                    options.random_seed +
-                                    static_cast<unsigned int>(iteration);
+                                for (int iteration = 0;
+                                     iteration < algorithm_options.max_iterations;
+                                     ++iteration) {
+                                    unsigned int iteration_seed =
+                                        options.random_seed +
+                                        static_cast<unsigned int>(iteration);
 
                                 auto evaluate_before_start = gro::Clock::now();
                                 gro::TrafficResult traffic_result =
@@ -976,6 +988,10 @@ int main(int argc, char** argv) {
                                 selection_options.selection_methods = {
                                     selection_method};
                                 selection_options.random_seed = iteration_seed;
+                                if (!is_tdg_selection_method(selection_method)) {
+                                    selection_options.fixed_fractions = {
+                                        fixed_fraction};
+                                }
                                 if (is_tdg_selection_method(selection_method)) {
                                     selection_options.tdg_gammas = {gamma};
                                 }
@@ -1007,7 +1023,7 @@ int main(int argc, char** argv) {
                                 long long batch_us = 0;
                                 long long reroute_us = 0;
                                 std::string reroute_method_name;
-                                int logged_impact_weight = -1;
+                                int logged_impact_weight = 0;
 
                                 if (reroute_method_option == "normal") {
                                     reroute_method_name =
@@ -1137,6 +1153,7 @@ int main(int argc, char** argv) {
                             }
                         }
                     }
+                }
                 }
             }
             std::cout << "dataset=" << dataset.info.dataset

@@ -133,15 +133,15 @@ runs the full `max_iterations` loop from `config/config.yaml`.
   --output python/results/gro_ablation_smoke.csv \
   --selection-methods random,most_delayed,tdg_anchor \
   --reroute-methods normal,tdg \
-  --fixed-fraction 30 \
+  --fixed-fractions 10,30 \
   --tdg-gammas 50 \
-  --impact-weights 15,30,50 \
+  --impact-weights 30 \
   --random-seed 0
 ```
 
 Run the iterative end-to-end GRO component ablation on the full MH synthetic
 query directory. With the default `max_iterations=5`, this writes
-`180 datasets x 12 method combinations x 5 iterations = 10800` rows.
+`180 datasets x 10 method combinations x 5 iterations = 9000` rows.
 
 ```bash
 nohup ./gro_ablation_test config/config.yaml \
@@ -149,9 +149,9 @@ nohup ./gro_ablation_test config/config.yaml \
   --output python/results/gro_ablation.csv \
   --selection-methods random,most_delayed,tdg_anchor \
   --reroute-methods normal,tdg \
-  --fixed-fraction 30 \
+  --fixed-fractions 10,30 \
   --tdg-gammas 50 \
-  --impact-weights 15,30,50 \
+  --impact-weights 30 \
   --random-seed 0 \
   > gro_ablation.log 2>&1 &
 ```
