@@ -440,13 +440,19 @@ AlgorithmResult GROAlgorithm::run_tdg_reroute_baseline(
         long long batch_us = elapsed_us(phase_start);
 
         phase_start = Clock::now();
+        std::vector<Cost> reroute_impacts =
+            normalize_tdg_impacts_for_reroute(tdg, node_impacts);
+        long long normalize_us = elapsed_us(phase_start);
+        (void)normalize_us;
+
+        phase_start = Clock::now();
         std::vector<Route> new_routes =
             reroute_queries(
                 query_batches,
                 queries,
                 traffic_result,
                 tdg,
-                node_impacts,
+                reroute_impacts,
                 iteration);
         long long reroute_us = elapsed_us(phase_start);
 

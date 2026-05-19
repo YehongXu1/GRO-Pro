@@ -422,8 +422,11 @@ Next action:
 Hypothesis: `impact_weight` may be too weak or too strong. The reroute score is:
 
 ```text
-score = travel_time + impact_weight * impact / 100
+score = travel_time + impact_weight * normalized_impact / 100
 ```
+
+`normalized_impact` is precomputed with the log-P99 method documented in
+`notes/tdg_impact_normalization.md`.
 
 Current code area:
 

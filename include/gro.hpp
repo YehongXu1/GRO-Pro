@@ -111,6 +111,10 @@ public:
     std::vector<Cost> compute_tdg_impact(
         const TrafficDependencyGraph& tdg) const;
 
+    std::vector<Cost> normalize_tdg_impacts_for_reroute(
+        const TrafficDependencyGraph& tdg,
+        const std::vector<Cost>& raw_impacts) const;
+
     void remove_trajectory_from_tdg(
         TrafficDependencyGraph& tdg,
         const Trajectory& trajectory,

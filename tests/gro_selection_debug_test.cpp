@@ -62,9 +62,9 @@ struct TdgStats {
 };
 
 struct ScoreStats {
-    gro::Cost sum = 0;
+    long double sum = 0.0;
     long double mean = 0.0;
-    gro::Cost max = 0;
+    long double max = 0.0;
 };
 
 struct SelectionResult {
@@ -314,14 +314,14 @@ std::vector<gro::QueryId> random_query_ids(
     return ids;
 }
 
-gro::Cost route_tdg_score(
+long double route_tdg_score(
     const gro::Trajectory& trajectory,
     const std::vector<gro::Cost>& impacts) {
-    gro::Cost score = 0;
+    long double score = 0.0;
     for (gro::TDGNodeId node_id : trajectory.tdg_node_ids) {
         if (node_id >= 0 &&
             node_id < static_cast<gro::TDGNodeId>(impacts.size())) {
-            score += impacts[node_id];
+            score += static_cast<long double>(std::max<gro::Cost>(0, impacts[node_id]));
         }
     }
     return score;
@@ -337,14 +337,12 @@ ScoreStats score_stats(
     }
 
     for (gro::QueryId query_id : query_ids) {
-        gro::Cost score =
+        long double score =
             route_tdg_score(traffic_result.trajectories[query_id], impacts);
         stats.sum += score;
         stats.max = std::max(stats.max, score);
     }
-    stats.mean =
-        static_cast<long double>(stats.sum) /
-        static_cast<long double>(query_ids.size());
+    stats.mean = stats.sum / static_cast<long double>(query_ids.size());
     return stats;
 }
 
@@ -434,11 +432,11 @@ SelectionResult select_queries_with_removal_mode(
 
     auto route_score = [&](const gro::Trajectory& trajectory,
                            const std::vector<gro::Cost>& impacts) {
-        gro::Cost score = 0;
+        long double score = 0.0;
         for (gro::TDGNodeId node_id : trajectory.tdg_node_ids) {
             if (node_id >= 0 &&
                 node_id < static_cast<gro::TDGNodeId>(impacts.size())) {
-                score += impacts[node_id];
+                score += static_cast<long double>(std::max<gro::Cost>(0, impacts[node_id]));
             }
         }
         return score;
@@ -468,7 +466,7 @@ SelectionResult select_queries_with_removal_mode(
         std::vector<gro::Cost> impacts =
             algorithm.compute_tdg_impact(working_tdg);
 
-        std::vector<std::pair<gro::Cost, gro::QueryId>> ranking;
+        std::vector<std::pair<long double, gro::QueryId>> ranking;
         ranking.reserve(candidate_ids.size() - selected.size());
         for (gro::QueryId query_id : candidate_ids) {
             if (selected.find(query_id) != selected.end()) {

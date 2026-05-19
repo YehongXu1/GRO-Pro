@@ -43,7 +43,7 @@ struct Options {
 };
 
 struct ScoreStats {
-    gro::Cost sum = 0;
+    long double sum = 0.0;
     long double mean = 0.0;
 };
 
@@ -226,14 +226,14 @@ std::size_t tdg_edge_timeline_count(
     return count;
 }
 
-gro::Cost route_impact_score(
+long double route_impact_score(
     const gro::Trajectory& trajectory,
     const std::vector<gro::Cost>& impacts) {
-    gro::Cost score = 0;
+    long double score = 0.0;
     for (gro::TDGNodeId node_id : trajectory.tdg_node_ids) {
         if (node_id >= 0 &&
             node_id < static_cast<gro::TDGNodeId>(impacts.size())) {
-            score += impacts[node_id];
+            score += static_cast<long double>(std::max<gro::Cost>(0, impacts[node_id]));
         }
     }
     return score;
@@ -252,9 +252,7 @@ ScoreStats score_stats(
         stats.sum +=
             route_impact_score(traffic_result.trajectories[query_id], impacts);
     }
-    stats.mean =
-        static_cast<long double>(stats.sum) /
-        static_cast<long double>(query_ids.size());
+    stats.mean = stats.sum / static_cast<long double>(query_ids.size());
     return stats;
 }
 
@@ -295,7 +293,8 @@ void write_header(std::ofstream& out) {
     out << "run_id,dataset,hop,rep,seed,query_count,"
         << "selection_method,selection_fraction,random_seed,selected_count,"
         << "lambda,reroute_method,impact_weight,total_before,total_after,"
-        << "tdg_prepare_sec,reroute_sec,evaluate_after_sec,"
+        << "tdg_prepare_sec,normalize_sec,reroute_sec,evaluate_after_sec,"
+        << "method_total_sec,"
         << "mean_selected_impact_score,mean_all_query_impact_score,"
         << "tdg_node_count,tdg_edge_timeline_count\n";
 }
@@ -314,12 +313,15 @@ void write_row(
     gro::Cost total_before,
     gro::Cost total_after,
     long long tdg_prepare_us,
+    long long normalize_us,
     long long reroute_us,
     long long evaluate_after_us,
     long double mean_selected_impact_score,
     long double mean_all_query_impact_score,
     std::size_t tdg_node_count,
     std::size_t tdg_edge_timeline_count) {
+    long long method_total_us =
+        tdg_prepare_us + normalize_us + reroute_us + evaluate_after_us;
     out << std::setprecision(12)
         << run_id << ','
         << dataset.dataset << ','
@@ -337,8 +339,10 @@ void write_row(
         << total_before << ','
         << total_after << ','
         << static_cast<double>(tdg_prepare_us) / 1000000.0 << ','
+        << static_cast<double>(normalize_us) / 1000000.0 << ','
         << static_cast<double>(reroute_us) / 1000000.0 << ','
         << static_cast<double>(evaluate_after_us) / 1000000.0 << ','
+        << static_cast<double>(method_total_us) / 1000000.0 << ','
         << static_cast<double>(mean_selected_impact_score) << ','
         << static_cast<double>(mean_all_query_impact_score) << ','
         << tdg_node_count << ','
@@ -412,10 +416,15 @@ int main(int argc, char** argv) {
             long long compute_impact_us = gro::elapsed_us(impact_start);
             long long tdg_prepare_us = build_tdg_us + compute_impact_us;
 
+            auto normalize_start = gro::Clock::now();
+            std::vector<gro::Cost> reroute_impacts =
+                base_algorithm.normalize_tdg_impacts_for_reroute(tdg, impacts);
+            long long normalize_us = gro::elapsed_us(normalize_start);
+
             std::vector<gro::QueryId> all_query_ids(queries.size());
             std::iota(all_query_ids.begin(), all_query_ids.end(), 0);
             ScoreStats all_scores =
-                score_stats(all_query_ids, initial_traffic, impacts);
+                score_stats(all_query_ids, initial_traffic, reroute_impacts);
 
             int selection_fraction =
                 algorithm_options.baseline_fraction_to_reroute;
@@ -426,7 +435,7 @@ int main(int argc, char** argv) {
                         selection_fraction,
                         options.random_seed);
                 ScoreStats selected_scores =
-                    score_stats(selected_ids, initial_traffic, impacts);
+                    score_stats(selected_ids, initial_traffic, reroute_impacts);
 
                 std::string prefix =
                     dataset.info.dataset +
@@ -459,18 +468,19 @@ int main(int argc, char** argv) {
                     selection_fraction,
                     options.random_seed,
                     selected_ids.size(),
-            algorithm_options.lambda,
-            "normal_td_dijkstra",
+                    algorithm_options.lambda,
+                    "normal_td_dijkstra",
                     -1,
                     total_before,
                     normal_total_after,
                     0,
+                    0,
                     normal_reroute_us,
                     normal_evaluate_us,
-            selected_scores.mean,
-            all_scores.mean,
-            tdg.nodes.size(),
-            tdg_edge_timeline_count(tdg));
+                    selected_scores.mean,
+                    all_scores.mean,
+                    tdg.nodes.size(),
+                    tdg_edge_timeline_count(tdg));
 
                 std::cout << "run_id=" << prefix << "_normal_td_dijkstra"
                           << " selected_count=" << selected_ids.size()
@@ -478,6 +488,10 @@ int main(int argc, char** argv) {
                           << " total_after=" << normal_total_after
                           << " reroute_sec="
                           << static_cast<double>(normal_reroute_us) / 1000000.0
+                          << " method_total_sec="
+                          << static_cast<double>(
+                                 normal_reroute_us + normal_evaluate_us) /
+                                 1000000.0
                           << "\n";
 
                 std::vector<std::vector<gro::QueryId>> one_batch{
@@ -498,7 +512,7 @@ int main(int argc, char** argv) {
                             queries,
                             initial_traffic,
                             tdg,
-                            impacts);
+                            reroute_impacts);
                     long long reroute_us = gro::elapsed_us(reroute_start);
 
                     long long evaluate_after_us = 0;
@@ -529,6 +543,7 @@ int main(int argc, char** argv) {
                         total_before,
                         total_after,
                         tdg_prepare_us,
+                        normalize_us,
                         reroute_us,
                         evaluate_after_us,
                         selected_scores.mean,
@@ -542,8 +557,17 @@ int main(int argc, char** argv) {
                               << " total_after=" << total_after
                               << " tdg_prepare_sec="
                               << static_cast<double>(tdg_prepare_us) / 1000000.0
+                              << " normalize_sec="
+                              << static_cast<double>(normalize_us) / 1000000.0
                               << " reroute_sec="
                               << static_cast<double>(reroute_us) / 1000000.0
+                              << " method_total_sec="
+                              << static_cast<double>(
+                                     tdg_prepare_us +
+                                     normalize_us +
+                                     reroute_us +
+                                     evaluate_after_us) /
+                                     1000000.0
                               << "\n";
                 }
             }

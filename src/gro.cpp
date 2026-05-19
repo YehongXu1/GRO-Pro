@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
 #include <stack>
 #include <unordered_map>
 #include <unordered_set>
@@ -79,6 +80,46 @@ std::string seconds_text(long long microseconds) {
     out << std::fixed << std::setprecision(6)
         << static_cast<double>(microseconds) / 1000000.0;
     return out.str();
+}
+
+Cost impact_cap() {
+    return std::numeric_limits<Cost>::max() / 4;
+}
+
+Cost clamp_impact(__int128 value) {
+    if (value <= 0) {
+        return 0;
+    }
+    const __int128 cap = static_cast<__int128>(impact_cap());
+    if (value > cap) {
+        return impact_cap();
+    }
+    return static_cast<Cost>(value);
+}
+
+Cost add_impact_saturated(Cost lhs, Cost rhs) {
+    return clamp_impact(
+        static_cast<__int128>(std::max<Cost>(0, lhs)) +
+        static_cast<__int128>(std::max<Cost>(0, rhs)));
+}
+
+Cost scale_impact_percent_saturated(Cost value, int percent) {
+    if (percent <= 0 || value <= 0) {
+        return 0;
+    }
+    return clamp_impact(
+        static_cast<__int128>(value) *
+        static_cast<__int128>(percent) /
+        100);
+}
+
+Cost percentile_value(std::vector<Cost> values, int percentile) {
+    if (values.empty()) {
+        return 0;
+    }
+    size_t index = percentile_index(values.size(), percentile);
+    std::nth_element(values.begin(), values.begin() + index, values.end());
+    return values[index];
 }
 
 void log_select_summary(
@@ -727,9 +768,11 @@ std::vector<Cost> GROAlgorithm::compute_tdg_impact(
 
         Cost child_impact = 0;
         for (TDGNodeId child_id : children(node_id)) {
-            child_impact += impacts[child_id];
+            child_impact = add_impact_saturated(child_impact, impacts[child_id]);
         }
-        impacts[node_id] += options_.lambda * child_impact / 100;
+        impacts[node_id] = add_impact_saturated(
+            impacts[node_id],
+            scale_impact_percent_saturated(child_impact, options_.lambda));
 
         for (TDGNodeId parent_id : parents(node_id)) {
             --child_count[parent_id];
@@ -740,6 +783,65 @@ std::vector<Cost> GROAlgorithm::compute_tdg_impact(
     }
 
     return impacts;
+}
+
+std::vector<Cost> GROAlgorithm::normalize_tdg_impacts_for_reroute(
+    const TrafficDependencyGraph& tdg,
+    const std::vector<Cost>& raw_impacts) const {
+    std::vector<Cost> normalized(raw_impacts.size(), 0);
+    if (raw_impacts.empty() || tdg.nodes.empty()) {
+        return normalized;
+    }
+
+    std::vector<Cost> impact_values;
+    impact_values.reserve(raw_impacts.size());
+    for (Cost impact : raw_impacts) {
+        impact_values.push_back(std::max<Cost>(0, impact));
+    }
+
+    Cost impact_clip = percentile_value(std::move(impact_values), 99);
+    if (impact_clip <= 0) {
+        return normalized;
+    }
+
+    std::vector<Cost> edge_time_values;
+    edge_time_values.reserve(tdg.nodes.size());
+    for (const TDGNode& node : tdg.nodes) {
+        if (node.edge_id < 0 ||
+            node.edge_id >= static_cast<EdgeId>(graph_.edges.size())) {
+            continue;
+        }
+        edge_time_values.push_back(
+            std::max<Cost>(
+                1,
+                bpr_travel_time(
+                    graph_.edges[node.edge_id],
+                    node.flow,
+                    traffic_options_)));
+    }
+
+    Cost time_scale = percentile_value(std::move(edge_time_values), 90);
+    if (time_scale <= 0) {
+        time_scale = 1;
+    }
+
+    const long double log_clip =
+        std::log1p(static_cast<long double>(impact_clip));
+    if (log_clip <= 0.0L) {
+        return normalized;
+    }
+
+    for (size_t index = 0; index < raw_impacts.size(); ++index) {
+        Cost clipped =
+            std::min(std::max<Cost>(0, raw_impacts[index]), impact_clip);
+        long double ratio =
+            std::log1p(static_cast<long double>(clipped)) / log_clip;
+        long double scaled = ratio * static_cast<long double>(time_scale);
+        normalized[index] = clamp_impact(
+            static_cast<__int128>(std::llround(scaled)));
+    }
+
+    return normalized;
 }
 
 void GROAlgorithm::remove_trajectory_from_tdg(
@@ -1021,7 +1123,7 @@ std::vector<QueryId> GROAlgorithm::select_queries(
     auto route_score = [&](const Trajectory& trajectory, const std::vector<Cost>& impacts) {
         Cost score = 0;
         for (TDGNodeId node_id : trajectory.tdg_node_ids) {
-            score += impacts[node_id];
+            score = add_impact_saturated(score, impacts[node_id]);
         }
         return score;
     };
@@ -1357,10 +1459,9 @@ Trajectory GROAlgorithm::reroute_query(
                 }
             }
 
-            Cost next_score =
-                scores[node_id] +
-                travel_time +
-                options_.impact_weight * impact / 100;
+            Cost next_score = add_impact_saturated(
+                add_impact_saturated(scores[node_id], travel_time),
+                scale_impact_percent_saturated(impact, options_.impact_weight));
             if (next_score < scores[edge.to]) {
                 arrival[edge.to] = next_time;
                 scores[edge.to] = next_score;
@@ -1597,13 +1698,19 @@ AlgorithmResult GROAlgorithm::run(const std::vector<Query>& queries) const {
             static_cast<long long>(query_batches.size()),
             batch_queries_us);
 
+        phase_start = Clock::now();
+        std::vector<Cost> reroute_impacts =
+            normalize_tdg_impacts_for_reroute(tdg, node_impacts);
+        log_timing(options_.enable_timing_log, i, "normalize_impact",
+                   static_cast<long long>(reroute_impacts.size()), phase_start);
+
         std::vector<Route> new_routes =
             reroute_queries(
                 query_batches,
                 queries,
                 traffic_result,
                 tdg,
-                node_impacts,
+                reroute_impacts,
                 i);
         for (const Route &route : new_routes) {
             routes[route.query_id] = route;
