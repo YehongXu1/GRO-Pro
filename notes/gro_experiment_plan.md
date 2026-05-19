@@ -127,74 +127,13 @@ TDG selection is only moderately better than most_delayed.
 The selection evidence is positive but not yet the strongest part of the paper.
 ```
 
-Implemented selection alternative:
+Selection methods to include in the next ablation:
 
-```text
-The current removability rule is too much like a safety constraint:
+- `tdg_anchor`: the original TDG selection method.
+- `tdg_excess`: the new excess-relief TDG selection method.
 
-    do not remove a route if any traversed TDG state would drop below
-    (1 - gamma) times its original flow.
-
-This prevents some over-removal, but it does not directly test whether the next
-route removal is still useful. It can therefore select too many routes under
-larger gamma, while smaller gamma may stop at a reasonable size but miss useful
-set-level combinations.
-```
-
-We added a separate excess-flow marginal-relief selection method instead of
-replacing the old selection method:
-
-```text
-GROAlgorithm::select_queries_by_excess_relief(...)
-```
-
-Its score is:
-
-```text
-node_excess(v) =
-    max(0, current_flow(v) / capacity(v) - 1)
-
-node_relief(v) =
-    normalized_impact(v) * node_excess(v)
-
-route_score(r) =
-    aggregate node_relief(v) over important TDG nodes covered by r
-```
-
-After selecting a route, update TDG state values and recompute or refresh the
-affected relief scores. Stop when the remaining important congestion mass or
-best route score is too small. This makes selection closer to an adaptive set
-selection policy:
-
-```text
-select routes while they still explain meaningful excess congestion;
-stop naturally when no remaining route has enough marginal relief.
-```
-
-Impact normalization for selection:
-
-```text
-Use normalized impact for the selection score.
-
-For selection, normalized_impact should be dimensionless, such as:
-
-    normalized_impact(v) =
-        log(1 + min(raw_impact(v), P99(raw_impact)))
-        / log(1 + P99(raw_impact))
-
-This keeps the propagated-impact ordering signal, compresses outliers, and
-prevents a few long dependency chains from dominating the route score.
-```
-
-This differs from reroute normalization. Reroute needs impact in travel-time
-units because the penalty is added to Dijkstra travel time. Selection only needs
-a stable weighting signal, so `[0, 1]` normalized impact is preferable.
-
-The current ablation runner exposes this method as:
-
-```text
---selection-methods tdg_excess
-```
+Algorithm details for `tdg_excess` are recorded separately in
+`notes/gro_algorithm_changes.md`.
 
 Decision rule:
 

@@ -106,19 +106,5 @@ This differs from reroute normalization:
 - selection normalization should stay in `[0, 1]` because it is used as a
   stable weight in an excess-flow relief score.
 
-The selection relief score is:
-
-```text
-node_excess(v) =
-    max(0, current_flow(v) / capacity(v) - 1)
-
-node_relief(v) =
-    selection_impact(v) * node_excess(v)
-
-route_score(r) =
-    aggregate node_relief(v) over important TDG nodes covered by r
-```
-
-The corresponding stopping rule should depend on remaining congestion mass or
-the best remaining route score, rather than only checking whether removing a
-route violates a flow-drop threshold.
+The full excess-relief selection rule and stopping condition are recorded in
+`notes/gro_algorithm_changes.md`.

@@ -1396,6 +1396,30 @@ std::vector<QueryId> GROAlgorithm::select_queries_by_excess_relief(
         return score;
     };
 
+    std::vector<int> updated(tdg.nodes.size(), 0);
+    int update_epoch = 0;
+    auto decrease_trajectory_flow_only = [&](const Trajectory& trajectory) {
+        ++update_epoch;
+        if (update_epoch == std::numeric_limits<int>::max()) {
+            std::fill(updated.begin(), updated.end(), 0);
+            update_epoch = 1;
+        }
+
+        for (TDGNodeId node_id : trajectory.tdg_node_ids) {
+            if (node_id < 0 ||
+                node_id >= static_cast<TDGNodeId>(working_tdg.nodes.size()) ||
+                node_id >= static_cast<TDGNodeId>(updated.size()) ||
+                updated[node_id] == update_epoch) {
+                continue;
+            }
+            updated[node_id] = update_epoch;
+            TDGNode& node = working_tdg.nodes[node_id];
+            if (node.flow > 0) {
+                node.flow -= 1;
+            }
+        }
+    };
+
     long double initial_mass = congestion_mass();
     if (initial_mass <= 0.0L) {
         log_select_summary(
@@ -1430,8 +1454,8 @@ std::vector<QueryId> GROAlgorithm::select_queries_by_excess_relief(
         }
 
         auto rank_start = Clock::now();
-        std::vector<std::pair<long double, QueryId>> ranking;
-        ranking.reserve(candidate_ids.size() - selected.size());
+        QueryId best_query_id = kInvalidId;
+        long double best_score = 0.0L;
         for (QueryId query_id : candidate_ids) {
             if (selected.find(query_id) != selected.end() ||
                 query_id < 0 ||
@@ -1440,35 +1464,25 @@ std::vector<QueryId> GROAlgorithm::select_queries_by_excess_relief(
             }
 
             long double score = route_score(result.trajectories[query_id]);
-            if (score > 0.0L) {
-                ranking.push_back({score, query_id});
+            if (score > best_score ||
+                (score == best_score &&
+                 best_query_id != kInvalidId &&
+                 query_id < best_query_id)) {
+                best_score = score;
+                best_query_id = query_id;
             }
         }
+        rank_us += elapsed_us(rank_start);
 
-        if (ranking.empty()) {
-            rank_us += elapsed_us(rank_start);
+        if (best_query_id == kInvalidId || best_score <= 0.0L) {
             break;
         }
 
-        std::sort(
-            ranking.begin(),
-            ranking.end(),
-            [](const auto& lhs, const auto& rhs) {
-                if (lhs.first != rhs.first) {
-                    return lhs.first > rhs.first;
-                }
-                return lhs.second < rhs.second;
-            });
-        rank_us += elapsed_us(rank_start);
-
-        QueryId query_id = ranking.front().second;
+        QueryId query_id = best_query_id;
         selected.insert(query_id);
 
         auto remove_start = Clock::now();
-        remove_trajectory_from_tdg(
-            working_tdg,
-            result.trajectories[query_id],
-            result);
+        decrease_trajectory_flow_only(result.trajectories[query_id]);
         remove_us += elapsed_us(remove_start);
     }
 
