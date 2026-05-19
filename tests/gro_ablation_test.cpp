@@ -206,7 +206,7 @@ Options parse_args(int argc, char** argv) {
             std::cout
                 << "Usage: ./gro_ablation_test [config] "
                 << "[--query-file path | --query-dir path] [--output path] "
-                << "[--selection-methods random,most_delayed,tdg_anchor] "
+                << "[--selection-methods random,most_delayed,tdg_anchor,tdg_excess] "
                 << "[--reroute-methods normal,tdg] "
                 << "[--fixed-fractions 10,30] [--tdg-gammas 50] "
                 << "[--impact-weights 30] "
@@ -501,6 +501,10 @@ bool is_tdg_selection_method(const std::string& method) {
     return method.rfind("tdg", 0) == 0;
 }
 
+bool is_tdg_excess_selection_method(const std::string& method) {
+    return method == "tdg_excess" || method == "tdg_excess_relief";
+}
+
 long double route_tdg_score(
     const gro::Trajectory& trajectory,
     const std::vector<gro::Cost>& impacts) {
@@ -641,7 +645,8 @@ std::vector<SelectionRun> build_selection_runs(
     const std::vector<gro::Query>& queries,
     const std::vector<gro::Route>& initial_routes,
     const gro::TrafficResult& initial_traffic,
-    const gro::TrafficDependencyGraph& tdg) {
+    const gro::TrafficDependencyGraph& tdg,
+    const std::vector<gro::Cost>& raw_impacts) {
     std::vector<SelectionRun> runs;
 
     std::unordered_set<gro::QueryId> all_query_set;
@@ -677,6 +682,28 @@ std::vector<SelectionRun> build_selection_runs(
                         initial_routes,
                         initial_traffic);
                 run.select_us = gro::elapsed_us(start);
+                runs.push_back(std::move(run));
+            }
+        } else if (is_tdg_excess_selection_method(method)) {
+            for (int gamma : options.tdg_gammas) {
+                gro::AlgorithmOptions run_options = algorithm_options;
+                run_options.gamma = gamma;
+                gro::GROAlgorithm selector(graph, run_options, traffic_options);
+
+                SelectionRun run;
+                run.method = "tdg_excess";
+                run.removal_mode = RemovalMode::AnchorImportant;
+                run.gamma = gamma;
+
+                auto select_start = gro::Clock::now();
+                run.selected_ids =
+                    selector.select_queries_by_excess_relief(
+                        all_query_set,
+                        queries,
+                        initial_traffic,
+                        tdg,
+                        raw_impacts);
+                run.select_us = gro::elapsed_us(select_start);
                 runs.push_back(std::move(run));
             }
         } else if (is_tdg_selection_method(method)) {
@@ -776,6 +803,9 @@ std::string selection_label(const SelectionRun& selection) {
             "_gamma" +
             std::to_string(selection.gamma);
     }
+    if (selection.method == "tdg_excess") {
+        return "tdg_excess_gamma" + std::to_string(selection.gamma);
+    }
     return selection.method + std::to_string(selection.selection_fraction);
 }
 
@@ -819,7 +849,7 @@ void write_row(
     std::size_t tdg_node_count,
     std::size_t tdg_edge_timeline_count,
     long long cumulative_us) {
-    bool uses_tdg_selection = selection.method == "tdg";
+    bool uses_tdg_selection = is_tdg_selection_method(selection.method);
     bool uses_tdg_reroute = reroute_method == "tdg_impact_reroute";
 
     long long included_initial_routes_us = iteration == 0 ? initial_routes_us : 0;
@@ -854,7 +884,7 @@ void write_row(
         << query_count << ','
         << iteration << ','
         << selection.method << ','
-        << (selection.method == "tdg" ? removal_mode_name(selection.removal_mode) : "none") << ','
+        << (uses_tdg_selection ? removal_mode_name(selection.removal_mode) : "none") << ','
         << selection.selection_fraction << ','
         << selection.gamma << ','
         << reroute_method << ','
@@ -1029,7 +1059,8 @@ int main(int argc, char** argv) {
                                         queries,
                                         initial_routes,
                                         traffic_result,
-                                        tdg);
+                                        tdg,
+                                        raw_impacts);
                                 require(
                                     selection_runs.size() == 1,
                                     "Expected exactly one selection run");
@@ -1111,7 +1142,7 @@ int main(int argc, char** argv) {
                                         evaluate_after_us);
 
                                 bool uses_tdg_selection =
-                                    selection.method == "tdg";
+                                    is_tdg_selection_method(selection.method);
                                 bool uses_tdg_reroute =
                                     reroute_method_name ==
                                     "tdg_impact_reroute";

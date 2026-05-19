@@ -115,6 +115,9 @@ public:
         const TrafficDependencyGraph& tdg,
         const std::vector<Cost>& raw_impacts) const;
 
+    std::vector<double> normalize_tdg_impacts_for_selection(
+        const std::vector<Cost>& raw_impacts) const;
+
     void remove_trajectory_from_tdg(
         TrafficDependencyGraph& tdg,
         const Trajectory& trajectory,
@@ -140,6 +143,21 @@ public:
         int iteration = -1) const;
 
     std::vector<QueryId> select_queries(
+        const std::vector<Query>& queries,
+        const TrafficResult& result,
+        const TrafficDependencyGraph& tdg,
+        const std::vector<Cost>& node_impacts,
+        int iteration = -1) const;
+
+    std::vector<QueryId> select_queries_by_excess_relief(
+        const std::unordered_set<QueryId>& candidate_query_ids,
+        const std::vector<Query>& queries,
+        const TrafficResult& result,
+        const TrafficDependencyGraph& tdg,
+        const std::vector<Cost>& node_impacts,
+        int iteration = -1) const;
+
+    std::vector<QueryId> select_queries_by_excess_relief(
         const std::vector<Query>& queries,
         const TrafficResult& result,
         const TrafficDependencyGraph& tdg,

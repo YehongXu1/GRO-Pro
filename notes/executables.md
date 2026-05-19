@@ -131,7 +131,7 @@ runs the full `max_iterations` loop from `config/config.yaml`.
 ./gro_ablation_test config/config.yaml \
   --query-file data/MH_Synthetic_query_sets/Hop10Rep1-0.txt \
   --output python/results/gro_ablation_smoke.csv \
-  --selection-methods random,most_delayed,tdg_anchor \
+  --selection-methods random,most_delayed,tdg_anchor,tdg_excess \
   --reroute-methods normal,tdg \
   --fixed-fractions 10,30 \
   --tdg-gammas 50 \
@@ -143,7 +143,7 @@ runs the full `max_iterations` loop from `config/config.yaml`.
 
 Run the iterative end-to-end GRO component ablation split by MH synthetic
 configuration. Each job writes
-`20 datasets x 10 method combinations x 5 iterations = 1000` rows with the
+`20 datasets x 12 method combinations x 5 iterations = 1200` rows with the
 default `max_iterations=5`.
 
 ```bash
@@ -154,7 +154,7 @@ for hop in 10 20 40; do
       --hop "$hop" \
       --rep "$rep" \
       --output "python/results/gro_ablation_Hop${hop}Rep${rep}.csv" \
-      --selection-methods random,most_delayed,tdg_anchor \
+      --selection-methods random,most_delayed,tdg_anchor,tdg_excess \
       --reroute-methods normal,tdg \
       --fixed-fractions 10,30 \
       --tdg-gammas 50 \

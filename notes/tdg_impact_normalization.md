@@ -19,8 +19,8 @@ directly in rerouting has two problems:
 
 ## Current Fix
 
-The raw impact computation is still used for TDG-based query selection. For
-rerouting, we now precompute a normalized TDG impact vector once per iteration:
+For rerouting, we now precompute a normalized TDG impact vector once per
+iteration:
 
 ```text
 clip = P99(raw_node_impact)
@@ -63,12 +63,14 @@ for the shared reroute implementation path.
   integer overflow.
 - `GROAlgorithm::normalize_tdg_impacts_for_reroute(...)` computes the log-P99
   normalized vector.
-- `GROAlgorithm::run(...)` uses raw impact for selection and normalized impact
-  for rerouting.
+- `GROAlgorithm::run(...)` still uses the original selection path and
+  normalized impact for rerouting.
 - `GROAlgorithm::run_tdg_reroute_baseline(...)` also uses normalized impact for
   the TDG reroute baseline.
 - `gro_reroute_debug_test` records `normalize_sec` so the overhead can be
   checked directly.
+- `GROAlgorithm::select_queries_by_excess_relief(...)` uses normalized impact
+  for the new excess-flow selection alternative.
 
 ## Cost
 
@@ -80,3 +82,43 @@ O(number of TDG nodes)
 ```
 
 It is not inside the Dijkstra edge-relaxation loop.
+
+## Selection Normalization
+
+The earlier implementation used raw impact for TDG-based query selection. This
+is likely too brittle. Selection is not only a ranking problem; it is a set
+selection problem where the algorithm should keep removing routes only while
+they explain meaningful remaining congestion.
+
+The excess-flow selection alternative uses normalized impact as a
+dimensionless weight:
+
+```text
+selection_impact(v) =
+    log(1 + min(raw_impact(v), P99(raw_impact)))
+    / log(1 + P99(raw_impact))
+```
+
+This differs from reroute normalization:
+
+- reroute normalization maps impact back to travel-time units because the
+  penalty is added to the Dijkstra travel-time score;
+- selection normalization should stay in `[0, 1]` because it is used as a
+  stable weight in an excess-flow relief score.
+
+The selection relief score is:
+
+```text
+node_excess(v) =
+    max(0, current_flow(v) / capacity(v) - 1)
+
+node_relief(v) =
+    selection_impact(v) * node_excess(v)
+
+route_score(r) =
+    aggregate node_relief(v) over important TDG nodes covered by r
+```
+
+The corresponding stopping rule should depend on remaining congestion mass or
+the best remaining route score, rather than only checking whether removing a
+route violates a flow-drop threshold.
