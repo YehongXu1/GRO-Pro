@@ -1,6 +1,0 @@
-run_id,dataset,hop,rep,seed,algorithm,query_count,lambda,gamma,theta_percentile,impact_weight,conflict_threshold,random_seed,max_iterations
-gamma0,Hop10Rep1-0,10,1,0,tdg_selection_no_candidate_vs_random,1024,45,0,90,15,70,0,5
-gamma25,Hop10Rep1-0,10,1,0,tdg_selection_no_candidate_vs_random,1024,45,25,90,15,70,0,5
-gamma50,Hop10Rep1-0,10,1,0,tdg_selection_no_candidate_vs_random,1024,45,50,90,15,70,0,5
-gamma75,Hop10Rep1-0,10,1,0,tdg_selection_no_candidate_vs_random,1024,45,75,90,15,70,0,5
-gamma100,Hop10Rep1-0,10,1,0,tdg_selection_no_candidate_vs_random,1024,45,100,90,15,70,0,5

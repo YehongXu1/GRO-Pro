@@ -1,2 +1,0 @@
-dataset,hop,rep,seed,algorithm,query_count,lambda,gamma,theta_percentile,impact_weight,conflict_threshold,random_seed,max_iterations
-small_queries,-1,-1,-1,tdg_selection_no_candidate_vs_random,6,45,50,90,15,70,0,5

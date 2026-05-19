@@ -13,6 +13,7 @@ cmake-build-*/
 gro_test
 gro_baseline_test
 gro_selection_debug_test
+gro_reroute_debug_test
 svp_test
 gor_test
 sor_test

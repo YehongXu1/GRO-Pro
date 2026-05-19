@@ -428,6 +428,12 @@ score = travel_time + impact_weight * impact / 100
 Current code area:
 
 - `GROAlgorithm::reroute_query(...)`
+- `tests/gro_reroute_debug_test.cpp`
+
+The reroute diagnostic uses random selected queries only. Selection is fixed
+before rerouting, and every reroute method replaces the same selected query set
+back into the full route set. `total_before` and `total_after` are both full
+system total travel time over all queries.
 
 Experiments:
 
@@ -438,17 +444,24 @@ impact_weight = 0.0, 0.05, 0.15, 0.30, 0.50, 1.00
 Sanity check:
 
 - `impact_weight = 0.0` should behave like normal TD-Dijkstra, except for
-  batching/implementation differences.
+  implementation differences. The current diagnostic uses one batch containing
+  all selected random queries, so this first test isolates impact weighting
+  rather than batching.
 - If `impact_weight = 0.0` differs strongly from `baseline_reroute_queries`,
   inspect reroute implementation first.
 
 Metrics:
 
 - `selected_count`
-- `batch_count`
 - `total_before`
 - `total_after`
 - `impact_weight`
+- `tdg_prepare_sec`
+- `reroute_sec`
+- `evaluate_after_sec`
+- `mean_selected_impact_score`
+- `mean_all_query_impact_score`
+- `tdg_node_count`
 
 Interpretation:
 

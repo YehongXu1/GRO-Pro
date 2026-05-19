@@ -11,6 +11,7 @@ max_time: 3600
 
 max_iterations: 5
 enable_timing_log: true
+baseline_fraction_to_reroute: 0.30
 baseline_random_seed: 0
 lambda: 0.45
 gamma: 0.5

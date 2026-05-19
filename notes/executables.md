@@ -90,6 +90,27 @@ nohup ./gro_selection_debug_test config/config.yaml \
   > gro_selection_debug_removal_modes.log 2>&1 &
 ```
 
+Run the reroute diagnostic with random selected queries:
+
+```bash
+./gro_reroute_debug_test config/config.yaml \
+  --query-file data/MH_Synthetic_query_sets/Hop10Rep1-0.txt \
+  --output python/results/gro_reroute_debug_smoke.csv \
+  --impact-weights 0,5,15,30,50,100 \
+  --random-seed 0
+```
+
+Run the reroute diagnostic on the full MH synthetic query directory:
+
+```bash
+nohup ./gro_reroute_debug_test config/config.yaml \
+  --query-dir data/MH_Synthetic_query_sets \
+  --output python/results/gro_reroute_debug.csv \
+  --impact-weights 0,5,15,30,50,100 \
+  --random-seed 0 \
+  > gro_reroute_debug.log 2>&1 &
+```
+
 Run GRO unit test:
 
 ```bash
