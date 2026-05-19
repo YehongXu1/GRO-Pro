@@ -136,24 +136,45 @@ runs the full `max_iterations` loop from `config/config.yaml`.
   --fixed-fractions 10,30 \
   --tdg-gammas 50 \
   --impact-weights 30 \
+  --hop 10 \
+  --rep 1 \
   --random-seed 0
 ```
 
-Run the iterative end-to-end GRO component ablation on the full MH synthetic
-query directory. With the default `max_iterations=5`, this writes
-`180 datasets x 10 method combinations x 5 iterations = 9000` rows.
+Run the iterative end-to-end GRO component ablation split by MH synthetic
+configuration. Each job writes
+`20 datasets x 10 method combinations x 5 iterations = 1000` rows with the
+default `max_iterations=5`.
 
 ```bash
-nohup ./gro_ablation_test config/config.yaml \
-  --query-dir data/MH_Synthetic_query_sets \
-  --output python/results/gro_ablation.csv \
-  --selection-methods random,most_delayed,tdg_anchor \
-  --reroute-methods normal,tdg \
-  --fixed-fractions 10,30 \
-  --tdg-gammas 50 \
-  --impact-weights 30 \
-  --random-seed 0 \
-  > gro_ablation.log 2>&1 &
+for hop in 10 20 40; do
+  for rep in 1 2 4; do
+    nohup ./gro_ablation_test config/config.yaml \
+      --query-dir data/MH_Synthetic_query_sets \
+      --hop "$hop" \
+      --rep "$rep" \
+      --output "python/results/gro_ablation_Hop${hop}Rep${rep}.csv" \
+      --selection-methods random,most_delayed,tdg_anchor \
+      --reroute-methods normal,tdg \
+      --fixed-fractions 10,30 \
+      --tdg-gammas 50 \
+      --impact-weights 30 \
+      --random-seed 0 \
+      > "gro_ablation_Hop${hop}Rep${rep}.log" 2>&1 &
+  done
+done
+```
+
+Merge the nine ablation output files:
+
+```bash
+head -1 python/results/gro_ablation_Hop10Rep1.csv > python/results/gro_ablation.csv
+for hop in 10 20 40; do
+  for rep in 1 2 4; do
+    tail -n +2 "python/results/gro_ablation_Hop${hop}Rep${rep}.csv" \
+      >> python/results/gro_ablation.csv
+  done
+done
 ```
 
 Run GRO unit test:

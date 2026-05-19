@@ -47,6 +47,8 @@ struct Options {
     unsigned int random_seed = 0;
     bool random_seed_set = false;
     int max_files = 0;
+    int hop_filter = -1;
+    int rep_filter = -1;
     std::vector<int> fixed_fractions = {10, 30};
     std::vector<std::string> selection_methods = {
         "random",
@@ -176,6 +178,10 @@ Options parse_args(int argc, char** argv) {
             add_dataset_filter_names(options.dataset_filter, require_value(arg));
         } else if (arg == "--dataset-list") {
             load_dataset_filter_file(options.dataset_filter, require_value(arg));
+        } else if (arg == "--hop") {
+            options.hop_filter = std::stoi(require_value(arg));
+        } else if (arg == "--rep") {
+            options.rep_filter = std::stoi(require_value(arg));
         } else if (arg == "--output") {
             options.output_path = require_value(arg);
         } else if (arg == "--random-seed") {
@@ -204,6 +210,7 @@ Options parse_args(int argc, char** argv) {
                 << "[--reroute-methods normal,tdg] "
                 << "[--fixed-fractions 10,30] [--tdg-gammas 50] "
                 << "[--impact-weights 30] "
+                << "[--hop 10] [--rep 1] "
                 << "[--datasets Hop10Rep1-0,Hop10Rep1-1] "
                 << "[--dataset-list path] [--random-seed n] [--max-files n]\n";
             std::exit(0);
@@ -296,6 +303,23 @@ std::vector<DatasetInput> resolve_datasets(
                 [&](const DatasetInput& dataset) {
                     return options.dataset_filter.find(dataset.info.dataset) ==
                            options.dataset_filter.end();
+                }),
+            datasets.end());
+    }
+
+    if (options.hop_filter >= 0 || options.rep_filter >= 0) {
+        datasets.erase(
+            std::remove_if(
+                datasets.begin(),
+                datasets.end(),
+                [&](const DatasetInput& dataset) {
+                    bool hop_mismatch =
+                        options.hop_filter >= 0 &&
+                        dataset.info.hop != options.hop_filter;
+                    bool rep_mismatch =
+                        options.rep_filter >= 0 &&
+                        dataset.info.rep != options.rep_filter;
+                    return hop_mismatch || rep_mismatch;
                 }),
             datasets.end());
     }
