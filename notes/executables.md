@@ -90,6 +90,19 @@ nohup ./gro_selection_debug_test config/config.yaml \
   > gro_selection_debug_removal_modes.log 2>&1 &
 ```
 
+Run fixed-size simple selection baselines, such as random and most-delayed
+queries at 10% and 30%:
+
+```bash
+nohup ./gro_fixed_random_selection_test config/config.yaml \
+  --query-dir data/MH_Synthetic_query_sets \
+  --output python/results/gro_simple_selection_baselines_10_30.csv \
+  --random-fractions 10,30 \
+  --methods random,most_delayed \
+  --random-seed 0 \
+  > gro_simple_selection_baselines_10_30.log 2>&1 &
+```
+
 Run the reroute diagnostic with random selected queries:
 
 ```bash

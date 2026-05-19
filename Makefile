@@ -45,15 +45,16 @@ GRO_TEST_OBJECTS = tests/gro_test.o
 GRO_BASELINE_TEST_OBJECTS = tests/gro_baseline_test.o
 GRO_SELECTION_DEBUG_TEST_OBJECTS = tests/gro_selection_debug_test.o
 GRO_REROUTE_DEBUG_TEST_OBJECTS = tests/gro_reroute_debug_test.o
+GRO_FIXED_RANDOM_SELECTION_TEST_OBJECTS = tests/gro_fixed_random_selection_test.o
 MH_SYNTHETIC_EXPERIMENT_OBJECTS = tests/mh_synthetic_experiment.o
 SVP_TEST_OBJECTS = tests/svp_test.o
 GOR_TEST_OBJECTS = tests/gor_test.o
 SOR_TEST_OBJECTS = tests/sor_test.o
 FAHL_TEST_OBJECTS = tests/fahl_test.o
 
-TARGETS = gro_test gro_baseline_test gro_selection_debug_test gro_reroute_debug_test mh_synthetic_experiment svp_test gor_test sor_test fahl_test
+TARGETS = gro_test gro_baseline_test gro_selection_debug_test gro_reroute_debug_test gro_fixed_random_selection_test mh_synthetic_experiment svp_test gor_test sor_test fahl_test
 
-.PHONY: all build clean test run-gro run-gro-baseline run-gro-selection-debug run-gro-reroute-debug run-svp run-gor run-sor run-fahl help
+.PHONY: all build clean test run-gro run-gro-baseline run-gro-selection-debug run-gro-reroute-debug run-gro-fixed-random-selection run-svp run-gor run-sor run-fahl help
 
 # 默认目标 - 只构建，不运行测试或实验
 all: build
@@ -73,6 +74,9 @@ gro_selection_debug_test: $(OBJECTS_LIB) $(GRO_SELECTION_DEBUG_TEST_OBJECTS) Mak
 	$(CXX) $(CXXFLAGS) $(OPENMP_FLAGS) -o $@ $(filter-out Makefile,$^) $(LIB_DIRS) $(LIBS)
 
 gro_reroute_debug_test: $(OBJECTS_LIB) $(GRO_REROUTE_DEBUG_TEST_OBJECTS) Makefile
+	$(CXX) $(CXXFLAGS) $(OPENMP_FLAGS) -o $@ $(filter-out Makefile,$^) $(LIB_DIRS) $(LIBS)
+
+gro_fixed_random_selection_test: $(OBJECTS_LIB) $(GRO_FIXED_RANDOM_SELECTION_TEST_OBJECTS) Makefile
 	$(CXX) $(CXXFLAGS) $(OPENMP_FLAGS) -o $@ $(filter-out Makefile,$^) $(LIB_DIRS) $(LIBS)
 
 mh_synthetic_experiment: $(OBJECTS_LIB) $(MH_SYNTHETIC_EXPERIMENT_OBJECTS) Makefile
@@ -117,6 +121,9 @@ run-gro-selection-debug: gro_selection_debug_test
 run-gro-reroute-debug: gro_reroute_debug_test
 	./gro_reroute_debug_test $(TEST_CONFIG)
 
+run-gro-fixed-random-selection: gro_fixed_random_selection_test
+	./gro_fixed_random_selection_test $(TEST_CONFIG)
+
 run-svp: svp_test
 	./svp_test $(TEST_CONFIG)
 
@@ -131,7 +138,7 @@ run-fahl: fahl_test
 
 # 清理构建输出
 clean:
-	@rm -f $(OBJECTS_LIB) $(GRO_TEST_OBJECTS) $(GRO_BASELINE_TEST_OBJECTS) $(GRO_SELECTION_DEBUG_TEST_OBJECTS) $(GRO_REROUTE_DEBUG_TEST_OBJECTS) $(MH_SYNTHETIC_EXPERIMENT_OBJECTS) $(SVP_TEST_OBJECTS) $(GOR_TEST_OBJECTS) $(SOR_TEST_OBJECTS) $(FAHL_TEST_OBJECTS) $(TARGETS)
+	@rm -f $(OBJECTS_LIB) $(GRO_TEST_OBJECTS) $(GRO_BASELINE_TEST_OBJECTS) $(GRO_SELECTION_DEBUG_TEST_OBJECTS) $(GRO_REROUTE_DEBUG_TEST_OBJECTS) $(GRO_FIXED_RANDOM_SELECTION_TEST_OBJECTS) $(MH_SYNTHETIC_EXPERIMENT_OBJECTS) $(SVP_TEST_OBJECTS) $(GOR_TEST_OBJECTS) $(SOR_TEST_OBJECTS) $(FAHL_TEST_OBJECTS) $(TARGETS)
 	@echo "✓ 清理完成"
 
 # 重新构建
@@ -146,6 +153,7 @@ help:
 	@echo "  make run-gro-baseline - 只运行 gro_baseline_test"
 	@echo "  make run-gro-selection-debug - 只运行 gro_selection_debug_test"
 	@echo "  make run-gro-reroute-debug - 只运行 gro_reroute_debug_test"
+	@echo "  make run-gro-fixed-random-selection - 只运行 gro_fixed_random_selection_test"
 	@echo "  make run-svp  - 只运行 svp_test"
 	@echo "  make run-gor  - 只运行 gor_test"
 	@echo "  make run-sor  - 只运行 sor_test"
