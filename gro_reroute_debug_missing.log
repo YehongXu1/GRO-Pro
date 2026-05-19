@@ -1,0 +1,124 @@
+Reroute diagnostic written:
+  "python/results/gro_reroute_debug_missing.csv"
+datasets=15
+run_id=Hop40Rep4-5_random30_normal_td_dijkstra selected_count=1228 total_before=682106836 total_after=569948257 reroute_sec=0.502211 method_total_sec=14.0887
+run_id=Hop40Rep4-5_random30_tdg_impact_w0 selected_count=1228 total_before=682106836 total_after=569948257 tdg_prepare_sec=3.13802 normalize_sec=0.042225 reroute_sec=1.16423 method_total_sec=17.8223
+run_id=Hop40Rep4-5_random30_tdg_impact_w5 selected_count=1228 total_before=682106836 total_after=552567808 tdg_prepare_sec=3.13802 normalize_sec=0.042225 reroute_sec=1.10486 method_total_sec=16.649
+run_id=Hop40Rep4-5_random30_tdg_impact_w15 selected_count=1228 total_before=682106836 total_after=548007907 tdg_prepare_sec=3.13802 normalize_sec=0.042225 reroute_sec=1.08107 method_total_sec=16.2275
+run_id=Hop40Rep4-5_random30_tdg_impact_w30 selected_count=1228 total_before=682106836 total_after=540776998 tdg_prepare_sec=3.13802 normalize_sec=0.042225 reroute_sec=1.08802 method_total_sec=15.8484
+run_id=Hop40Rep4-5_random30_tdg_impact_w50 selected_count=1228 total_before=682106836 total_after=544478009 tdg_prepare_sec=3.13802 normalize_sec=0.042225 reroute_sec=1.02755 method_total_sec=15.5044
+run_id=Hop40Rep4-5_random30_tdg_impact_w100 selected_count=1228 total_before=682106836 total_after=545518550 tdg_prepare_sec=3.13802 normalize_sec=0.042225 reroute_sec=1.00292 method_total_sec=15.6503
+dataset=Hop40Rep4-5 done rows_written=7
+run_id=Hop40Rep4-6_random30_normal_td_dijkstra selected_count=1228 total_before=513597388 total_after=501459984 reroute_sec=0.30299 method_total_sec=14.1047
+run_id=Hop40Rep4-6_random30_tdg_impact_w0 selected_count=1228 total_before=513597388 total_after=501459984 tdg_prepare_sec=2.36615 normalize_sec=0.024591 reroute_sec=1.32286 method_total_sec=17.4816
+run_id=Hop40Rep4-6_random30_tdg_impact_w5 selected_count=1228 total_before=513597388 total_after=498863466 tdg_prepare_sec=2.36615 normalize_sec=0.024591 reroute_sec=1.28154 method_total_sec=17.3633
+run_id=Hop40Rep4-6_random30_tdg_impact_w15 selected_count=1228 total_before=513597388 total_after=498976638 tdg_prepare_sec=2.36615 normalize_sec=0.024591 reroute_sec=1.261 method_total_sec=17.46
+run_id=Hop40Rep4-6_random30_tdg_impact_w30 selected_count=1228 total_before=513597388 total_after=498409403 tdg_prepare_sec=2.36615 normalize_sec=0.024591 reroute_sec=1.22353 method_total_sec=16.8642
+run_id=Hop40Rep4-6_random30_tdg_impact_w50 selected_count=1228 total_before=513597388 total_after=497179234 tdg_prepare_sec=2.36615 normalize_sec=0.024591 reroute_sec=1.14424 method_total_sec=16.44
+run_id=Hop40Rep4-6_random30_tdg_impact_w100 selected_count=1228 total_before=513597388 total_after=499354419 tdg_prepare_sec=2.36615 normalize_sec=0.024591 reroute_sec=1.10941 method_total_sec=16.484
+dataset=Hop40Rep4-6 done rows_written=14
+run_id=Hop40Rep4-7_random30_normal_td_dijkstra selected_count=1228 total_before=562882531 total_after=532851575 reroute_sec=0.524189 method_total_sec=26.6389
+run_id=Hop40Rep4-7_random30_tdg_impact_w0 selected_count=1228 total_before=562882531 total_after=532851575 tdg_prepare_sec=3.57354 normalize_sec=0.017078 reroute_sec=1.4936 method_total_sec=30.9736
+run_id=Hop40Rep4-7_random30_tdg_impact_w5 selected_count=1228 total_before=562882531 total_after=527084356 tdg_prepare_sec=3.57354 normalize_sec=0.017078 reroute_sec=1.46104 method_total_sec=30.1802
+run_id=Hop40Rep4-7_random30_tdg_impact_w15 selected_count=1228 total_before=562882531 total_after=520781342 tdg_prepare_sec=3.57354 normalize_sec=0.017078 reroute_sec=1.49953 method_total_sec=30.45
+run_id=Hop40Rep4-7_random30_tdg_impact_w30 selected_count=1228 total_before=562882531 total_after=507808897 tdg_prepare_sec=3.57354 normalize_sec=0.017078 reroute_sec=1.99394 method_total_sec=30.3693
+run_id=Hop40Rep4-7_random30_tdg_impact_w50 selected_count=1228 total_before=562882531 total_after=506571170 tdg_prepare_sec=3.57354 normalize_sec=0.017078 reroute_sec=1.63796 method_total_sec=30.1231
+run_id=Hop40Rep4-7_random30_tdg_impact_w100 selected_count=1228 total_before=562882531 total_after=512489892 tdg_prepare_sec=3.57354 normalize_sec=0.017078 reroute_sec=1.59359 method_total_sec=30.3129
+dataset=Hop40Rep4-7 done rows_written=21
+run_id=Hop40Rep4-8_random30_normal_td_dijkstra selected_count=1228 total_before=614696489 total_after=571596383 reroute_sec=0.347972 method_total_sec=27.4351
+run_id=Hop40Rep4-8_random30_tdg_impact_w0 selected_count=1228 total_before=614696489 total_after=571596383 tdg_prepare_sec=3.96671 normalize_sec=0.021864 reroute_sec=0.697415 method_total_sec=31.6635
+run_id=Hop40Rep4-8_random30_tdg_impact_w5 selected_count=1228 total_before=614696489 total_after=543177222 tdg_prepare_sec=3.96671 normalize_sec=0.021864 reroute_sec=0.664267 method_total_sec=27.6025
+run_id=Hop40Rep4-8_random30_tdg_impact_w15 selected_count=1228 total_before=614696489 total_after=524910303 tdg_prepare_sec=3.96671 normalize_sec=0.021864 reroute_sec=0.665754 method_total_sec=25.9307
+run_id=Hop40Rep4-8_random30_tdg_impact_w30 selected_count=1228 total_before=614696489 total_after=498227475 tdg_prepare_sec=3.96671 normalize_sec=0.021864 reroute_sec=0.59931 method_total_sec=22.2905
+run_id=Hop40Rep4-8_random30_tdg_impact_w50 selected_count=1228 total_before=614696489 total_after=492838921 tdg_prepare_sec=3.96671 normalize_sec=0.021864 reroute_sec=0.617165 method_total_sec=22.0566
+run_id=Hop40Rep4-8_random30_tdg_impact_w100 selected_count=1228 total_before=614696489 total_after=489227108 tdg_prepare_sec=3.96671 normalize_sec=0.021864 reroute_sec=0.624035 method_total_sec=21.7184
+dataset=Hop40Rep4-8 done rows_written=28
+run_id=Hop40Rep4-9_random30_normal_td_dijkstra selected_count=1228 total_before=524044468 total_after=503552856 reroute_sec=0.390928 method_total_sec=14.0277
+run_id=Hop40Rep4-9_random30_tdg_impact_w0 selected_count=1228 total_before=524044468 total_after=503552856 tdg_prepare_sec=2.73043 normalize_sec=0.03013 reroute_sec=1.2391 method_total_sec=17.5479
+run_id=Hop40Rep4-9_random30_tdg_impact_w5 selected_count=1228 total_before=524044468 total_after=496435585 tdg_prepare_sec=2.73043 normalize_sec=0.03013 reroute_sec=1.22516 method_total_sec=17.3413
+run_id=Hop40Rep4-9_random30_tdg_impact_w15 selected_count=1228 total_before=524044468 total_after=496472792 tdg_prepare_sec=2.73043 normalize_sec=0.03013 reroute_sec=1.18473 method_total_sec=17.1809
+run_id=Hop40Rep4-9_random30_tdg_impact_w30 selected_count=1228 total_before=524044468 total_after=486880313 tdg_prepare_sec=2.73043 normalize_sec=0.03013 reroute_sec=1.15849 method_total_sec=16.8182
+run_id=Hop40Rep4-9_random30_tdg_impact_w50 selected_count=1228 total_before=524044468 total_after=479153614 tdg_prepare_sec=2.73043 normalize_sec=0.03013 reroute_sec=1.12277 method_total_sec=16.4746
+run_id=Hop40Rep4-9_random30_tdg_impact_w100 selected_count=1228 total_before=524044468 total_after=470834555 tdg_prepare_sec=2.73043 normalize_sec=0.03013 reroute_sec=1.06592 method_total_sec=16.1055
+dataset=Hop40Rep4-9 done rows_written=35
+run_id=Hop40Rep4-10_random30_normal_td_dijkstra selected_count=1228 total_before=334009304 total_after=275609207 reroute_sec=0.341957 method_total_sec=5.91984
+run_id=Hop40Rep4-10_random30_tdg_impact_w0 selected_count=1228 total_before=334009304 total_after=275609207 tdg_prepare_sec=1.65911 normalize_sec=0.029115 reroute_sec=0.808629 method_total_sec=8.05915
+run_id=Hop40Rep4-10_random30_tdg_impact_w5 selected_count=1228 total_before=334009304 total_after=266591883 tdg_prepare_sec=1.65911 normalize_sec=0.029115 reroute_sec=0.805163 method_total_sec=7.83185
+run_id=Hop40Rep4-10_random30_tdg_impact_w15 selected_count=1228 total_before=334009304 total_after=267874561 tdg_prepare_sec=1.65911 normalize_sec=0.029115 reroute_sec=0.769027 method_total_sec=7.71959
+run_id=Hop40Rep4-10_random30_tdg_impact_w30 selected_count=1228 total_before=334009304 total_after=268727058 tdg_prepare_sec=1.65911 normalize_sec=0.029115 reroute_sec=0.753163 method_total_sec=7.61975
+run_id=Hop40Rep4-10_random30_tdg_impact_w50 selected_count=1228 total_before=334009304 total_after=265115215 tdg_prepare_sec=1.65911 normalize_sec=0.029115 reroute_sec=0.723257 method_total_sec=7.49809
+run_id=Hop40Rep4-10_random30_tdg_impact_w100 selected_count=1228 total_before=334009304 total_after=265293023 tdg_prepare_sec=1.65911 normalize_sec=0.029115 reroute_sec=0.713607 method_total_sec=7.51737
+dataset=Hop40Rep4-10 done rows_written=42
+run_id=Hop40Rep4-11_random30_normal_td_dijkstra selected_count=1228 total_before=568914937 total_after=436278943 reroute_sec=0.38249 method_total_sec=9.56701
+run_id=Hop40Rep4-11_random30_tdg_impact_w0 selected_count=1228 total_before=568914937 total_after=436278943 tdg_prepare_sec=2.63164 normalize_sec=0.036922 reroute_sec=0.793922 method_total_sec=12.5293
+run_id=Hop40Rep4-11_random30_tdg_impact_w5 selected_count=1228 total_before=568914937 total_after=441586593 tdg_prepare_sec=2.63164 normalize_sec=0.036922 reroute_sec=0.773865 method_total_sec=12.7179
+run_id=Hop40Rep4-11_random30_tdg_impact_w15 selected_count=1228 total_before=568914937 total_after=441202310 tdg_prepare_sec=2.63164 normalize_sec=0.036922 reroute_sec=0.750972 method_total_sec=12.8208
+run_id=Hop40Rep4-11_random30_tdg_impact_w30 selected_count=1228 total_before=568914937 total_after=441900812 tdg_prepare_sec=2.63164 normalize_sec=0.036922 reroute_sec=0.791321 method_total_sec=12.755
+run_id=Hop40Rep4-11_random30_tdg_impact_w50 selected_count=1228 total_before=568914937 total_after=440411975 tdg_prepare_sec=2.63164 normalize_sec=0.036922 reroute_sec=0.757217 method_total_sec=12.6329
+run_id=Hop40Rep4-11_random30_tdg_impact_w100 selected_count=1228 total_before=568914937 total_after=439309849 tdg_prepare_sec=2.63164 normalize_sec=0.036922 reroute_sec=0.740963 method_total_sec=12.4994
+dataset=Hop40Rep4-11 done rows_written=49
+run_id=Hop40Rep4-12_random30_normal_td_dijkstra selected_count=1228 total_before=439699762 total_after=426794656 reroute_sec=0.418356 method_total_sec=9.77306
+run_id=Hop40Rep4-12_random30_tdg_impact_w0 selected_count=1228 total_before=439699762 total_after=426794656 tdg_prepare_sec=2.25245 normalize_sec=0.030329 reroute_sec=1.01523 method_total_sec=12.6773
+run_id=Hop40Rep4-12_random30_tdg_impact_w5 selected_count=1228 total_before=439699762 total_after=408565823 tdg_prepare_sec=2.25245 normalize_sec=0.030329 reroute_sec=0.989871 method_total_sec=12.1757
+run_id=Hop40Rep4-12_random30_tdg_impact_w15 selected_count=1228 total_before=439699762 total_after=361130467 tdg_prepare_sec=2.25245 normalize_sec=0.030329 reroute_sec=0.813155 method_total_sec=10.8968
+run_id=Hop40Rep4-12_random30_tdg_impact_w30 selected_count=1228 total_before=439699762 total_after=346314207 tdg_prepare_sec=2.25245 normalize_sec=0.030329 reroute_sec=0.826328 method_total_sec=10.5381
+run_id=Hop40Rep4-12_random30_tdg_impact_w50 selected_count=1228 total_before=439699762 total_after=341541919 tdg_prepare_sec=2.25245 normalize_sec=0.030329 reroute_sec=0.772162 method_total_sec=10.5133
+run_id=Hop40Rep4-12_random30_tdg_impact_w100 selected_count=1228 total_before=439699762 total_after=339446930 tdg_prepare_sec=2.25245 normalize_sec=0.030329 reroute_sec=0.825772 method_total_sec=10.4414
+dataset=Hop40Rep4-12 done rows_written=56
+run_id=Hop40Rep4-13_random30_normal_td_dijkstra selected_count=1228 total_before=509051773 total_after=455588914 reroute_sec=0.282754 method_total_sec=12.7251
+run_id=Hop40Rep4-13_random30_tdg_impact_w0 selected_count=1228 total_before=509051773 total_after=455588914 tdg_prepare_sec=2.52513 normalize_sec=0.022829 reroute_sec=0.784383 method_total_sec=15.558
+run_id=Hop40Rep4-13_random30_tdg_impact_w5 selected_count=1228 total_before=509051773 total_after=436053092 tdg_prepare_sec=2.52513 normalize_sec=0.022829 reroute_sec=0.663435 method_total_sec=14.6676
+run_id=Hop40Rep4-13_random30_tdg_impact_w15 selected_count=1228 total_before=509051773 total_after=421997719 tdg_prepare_sec=2.52513 normalize_sec=0.022829 reroute_sec=0.590272 method_total_sec=13.7217
+run_id=Hop40Rep4-13_random30_tdg_impact_w30 selected_count=1228 total_before=509051773 total_after=418174974 tdg_prepare_sec=2.52513 normalize_sec=0.022829 reroute_sec=0.566489 method_total_sec=13.5972
+run_id=Hop40Rep4-13_random30_tdg_impact_w50 selected_count=1228 total_before=509051773 total_after=417877350 tdg_prepare_sec=2.52513 normalize_sec=0.022829 reroute_sec=0.520672 method_total_sec=13.5332
+run_id=Hop40Rep4-13_random30_tdg_impact_w100 selected_count=1228 total_before=509051773 total_after=415212572 tdg_prepare_sec=2.52513 normalize_sec=0.022829 reroute_sec=0.517164 method_total_sec=13.3636
+dataset=Hop40Rep4-13 done rows_written=63
+run_id=Hop40Rep4-14_random30_normal_td_dijkstra selected_count=1228 total_before=524485737 total_after=441528970 reroute_sec=0.429883 method_total_sec=13.2443
+run_id=Hop40Rep4-14_random30_tdg_impact_w0 selected_count=1228 total_before=524485737 total_after=441528970 tdg_prepare_sec=2.85934 normalize_sec=0.02602 reroute_sec=0.864839 method_total_sec=16.4835
+run_id=Hop40Rep4-14_random30_tdg_impact_w5 selected_count=1228 total_before=524485737 total_after=436291409 tdg_prepare_sec=2.85934 normalize_sec=0.02602 reroute_sec=0.839417 method_total_sec=16.2003
+run_id=Hop40Rep4-14_random30_tdg_impact_w15 selected_count=1228 total_before=524485737 total_after=430995761 tdg_prepare_sec=2.85934 normalize_sec=0.02602 reroute_sec=0.797535 method_total_sec=16.1528
+run_id=Hop40Rep4-14_random30_tdg_impact_w30 selected_count=1228 total_before=524485737 total_after=430738958 tdg_prepare_sec=2.85934 normalize_sec=0.02602 reroute_sec=0.839217 method_total_sec=16.357
+run_id=Hop40Rep4-14_random30_tdg_impact_w50 selected_count=1228 total_before=524485737 total_after=431087471 tdg_prepare_sec=2.85934 normalize_sec=0.02602 reroute_sec=0.782578 method_total_sec=16.2603
+run_id=Hop40Rep4-14_random30_tdg_impact_w100 selected_count=1228 total_before=524485737 total_after=433678504 tdg_prepare_sec=2.85934 normalize_sec=0.02602 reroute_sec=0.813616 method_total_sec=16.4877
+dataset=Hop40Rep4-14 done rows_written=70
+run_id=Hop40Rep4-15_random30_normal_td_dijkstra selected_count=1228 total_before=488986860 total_after=411237077 reroute_sec=0.52047 method_total_sec=10.4058
+run_id=Hop40Rep4-15_random30_tdg_impact_w0 selected_count=1228 total_before=488986860 total_after=411237077 tdg_prepare_sec=2.56052 normalize_sec=0.037254 reroute_sec=1.06399 method_total_sec=13.4212
+run_id=Hop40Rep4-15_random30_tdg_impact_w5 selected_count=1228 total_before=488986860 total_after=413855609 tdg_prepare_sec=2.56052 normalize_sec=0.037254 reroute_sec=1.10363 method_total_sec=13.6709
+run_id=Hop40Rep4-15_random30_tdg_impact_w15 selected_count=1228 total_before=488986860 total_after=413674476 tdg_prepare_sec=2.56052 normalize_sec=0.037254 reroute_sec=1.14184 method_total_sec=13.5689
+run_id=Hop40Rep4-15_random30_tdg_impact_w30 selected_count=1228 total_before=488986860 total_after=404639579 tdg_prepare_sec=2.56052 normalize_sec=0.037254 reroute_sec=1.0639 method_total_sec=12.9924
+run_id=Hop40Rep4-15_random30_tdg_impact_w50 selected_count=1228 total_before=488986860 total_after=411378801 tdg_prepare_sec=2.56052 normalize_sec=0.037254 reroute_sec=0.938133 method_total_sec=13.2079
+run_id=Hop40Rep4-15_random30_tdg_impact_w100 selected_count=1228 total_before=488986860 total_after=410250766 tdg_prepare_sec=2.56052 normalize_sec=0.037254 reroute_sec=0.951288 method_total_sec=13.3317
+dataset=Hop40Rep4-15 done rows_written=77
+run_id=Hop40Rep4-16_random30_normal_td_dijkstra selected_count=1228 total_before=512508943 total_after=466067243 reroute_sec=0.266205 method_total_sec=15.0412
+run_id=Hop40Rep4-16_random30_tdg_impact_w0 selected_count=1228 total_before=512508943 total_after=466067243 tdg_prepare_sec=2.78898 normalize_sec=0.024687 reroute_sec=0.643118 method_total_sec=18.236
+run_id=Hop40Rep4-16_random30_tdg_impact_w5 selected_count=1228 total_before=512508943 total_after=454137078 tdg_prepare_sec=2.78898 normalize_sec=0.024687 reroute_sec=0.578602 method_total_sec=17.3758
+run_id=Hop40Rep4-16_random30_tdg_impact_w15 selected_count=1228 total_before=512508943 total_after=433721602 tdg_prepare_sec=2.78898 normalize_sec=0.024687 reroute_sec=0.578635 method_total_sec=16.074
+run_id=Hop40Rep4-16_random30_tdg_impact_w30 selected_count=1228 total_before=512508943 total_after=433058669 tdg_prepare_sec=2.78898 normalize_sec=0.024687 reroute_sec=0.548141 method_total_sec=16.1595
+run_id=Hop40Rep4-16_random30_tdg_impact_w50 selected_count=1228 total_before=512508943 total_after=432318812 tdg_prepare_sec=2.78898 normalize_sec=0.024687 reroute_sec=0.543888 method_total_sec=15.8959
+run_id=Hop40Rep4-16_random30_tdg_impact_w100 selected_count=1228 total_before=512508943 total_after=429944093 tdg_prepare_sec=2.78898 normalize_sec=0.024687 reroute_sec=0.553492 method_total_sec=15.9846
+dataset=Hop40Rep4-16 done rows_written=84
+run_id=Hop40Rep4-17_random30_normal_td_dijkstra selected_count=1228 total_before=354383320 total_after=316308491 reroute_sec=0.45587 method_total_sec=8.57717
+run_id=Hop40Rep4-17_random30_tdg_impact_w0 selected_count=1228 total_before=354383320 total_after=316308491 tdg_prepare_sec=2.11847 normalize_sec=0.030875 reroute_sec=0.989987 method_total_sec=11.203
+run_id=Hop40Rep4-17_random30_tdg_impact_w5 selected_count=1228 total_before=354383320 total_after=311425390 tdg_prepare_sec=2.11847 normalize_sec=0.030875 reroute_sec=0.984834 method_total_sec=10.8306
+run_id=Hop40Rep4-17_random30_tdg_impact_w15 selected_count=1228 total_before=354383320 total_after=306666047 tdg_prepare_sec=2.11847 normalize_sec=0.030875 reroute_sec=0.985539 method_total_sec=10.5436
+run_id=Hop40Rep4-17_random30_tdg_impact_w30 selected_count=1228 total_before=354383320 total_after=303251492 tdg_prepare_sec=2.11847 normalize_sec=0.030875 reroute_sec=0.860183 method_total_sec=10.2219
+run_id=Hop40Rep4-17_random30_tdg_impact_w50 selected_count=1228 total_before=354383320 total_after=303184381 tdg_prepare_sec=2.11847 normalize_sec=0.030875 reroute_sec=0.911732 method_total_sec=10.2033
+run_id=Hop40Rep4-17_random30_tdg_impact_w100 selected_count=1228 total_before=354383320 total_after=303524314 tdg_prepare_sec=2.11847 normalize_sec=0.030875 reroute_sec=0.981949 method_total_sec=10.3243
+dataset=Hop40Rep4-17 done rows_written=91
+run_id=Hop40Rep4-18_random30_normal_td_dijkstra selected_count=1228 total_before=353030165 total_after=300810805 reroute_sec=0.498205 method_total_sec=6.57724
+run_id=Hop40Rep4-18_random30_tdg_impact_w0 selected_count=1228 total_before=353030165 total_after=300810805 tdg_prepare_sec=2.02277 normalize_sec=0.034006 reroute_sec=1.20552 method_total_sec=9.28684
+run_id=Hop40Rep4-18_random30_tdg_impact_w5 selected_count=1228 total_before=353030165 total_after=297374135 tdg_prepare_sec=2.02277 normalize_sec=0.034006 reroute_sec=1.19089 method_total_sec=8.97806
+run_id=Hop40Rep4-18_random30_tdg_impact_w15 selected_count=1228 total_before=353030165 total_after=290481965 tdg_prepare_sec=2.02277 normalize_sec=0.034006 reroute_sec=1.11048 method_total_sec=8.66116
+run_id=Hop40Rep4-18_random30_tdg_impact_w30 selected_count=1228 total_before=353030165 total_after=289796898 tdg_prepare_sec=2.02277 normalize_sec=0.034006 reroute_sec=0.964923 method_total_sec=8.42657
+run_id=Hop40Rep4-18_random30_tdg_impact_w50 selected_count=1228 total_before=353030165 total_after=290116271 tdg_prepare_sec=2.02277 normalize_sec=0.034006 reroute_sec=1.04775 method_total_sec=8.44055
+run_id=Hop40Rep4-18_random30_tdg_impact_w100 selected_count=1228 total_before=353030165 total_after=289712364 tdg_prepare_sec=2.02277 normalize_sec=0.034006 reroute_sec=0.957117 method_total_sec=8.40273
+dataset=Hop40Rep4-18 done rows_written=98
+run_id=Hop40Rep4-19_random30_normal_td_dijkstra selected_count=1228 total_before=431756459 total_after=398480855 reroute_sec=0.509595 method_total_sec=9.03813
+run_id=Hop40Rep4-19_random30_tdg_impact_w0 selected_count=1228 total_before=431756459 total_after=398480855 tdg_prepare_sec=2.26668 normalize_sec=0.040182 reroute_sec=1.07557 method_total_sec=11.8545
+run_id=Hop40Rep4-19_random30_tdg_impact_w5 selected_count=1228 total_before=431756459 total_after=394947784 tdg_prepare_sec=2.26668 normalize_sec=0.040182 reroute_sec=1.04019 method_total_sec=11.8696
+run_id=Hop40Rep4-19_random30_tdg_impact_w15 selected_count=1228 total_before=431756459 total_after=394999639 tdg_prepare_sec=2.26668 normalize_sec=0.040182 reroute_sec=1.07427 method_total_sec=11.8428
+run_id=Hop40Rep4-19_random30_tdg_impact_w30 selected_count=1228 total_before=431756459 total_after=389265726 tdg_prepare_sec=2.26668 normalize_sec=0.040182 reroute_sec=1.04453 method_total_sec=11.4691
+run_id=Hop40Rep4-19_random30_tdg_impact_w50 selected_count=1228 total_before=431756459 total_after=384836477 tdg_prepare_sec=2.26668 normalize_sec=0.040182 reroute_sec=1.05705 method_total_sec=11.4555
+run_id=Hop40Rep4-19_random30_tdg_impact_w100 selected_count=1228 total_before=431756459 total_after=376637730 tdg_prepare_sec=2.26668 normalize_sec=0.040182 reroute_sec=1.09654 method_total_sec=11.0332
+dataset=Hop40Rep4-19 done rows_written=105
+DONE datasets=15 rows=105

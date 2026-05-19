@@ -347,6 +347,7 @@ void write_row(
         << static_cast<double>(mean_all_query_impact_score) << ','
         << tdg_node_count << ','
         << tdg_edge_timeline_count << '\n';
+    out.flush();
 }
 
 }  // namespace
@@ -378,6 +379,7 @@ int main(int argc, char** argv) {
             static_cast<bool>(out),
             "Cannot open output: " + options.output_path.string());
         write_header(out);
+        std::size_t rows_written = 0;
 
         std::cout << "Reroute diagnostic written:\n"
                   << "  " << options.output_path << "\n"
@@ -481,6 +483,7 @@ int main(int argc, char** argv) {
                     all_scores.mean,
                     tdg.nodes.size(),
                     tdg_edge_timeline_count(tdg));
+                ++rows_written;
 
                 std::cout << "run_id=" << prefix << "_normal_td_dijkstra"
                           << " selected_count=" << selected_ids.size()
@@ -550,6 +553,7 @@ int main(int argc, char** argv) {
                         all_scores.mean,
                         tdg.nodes.size(),
                         tdg_edge_timeline_count(tdg));
+                    ++rows_written;
 
                     std::cout << "run_id=" << run_id
                               << " selected_count=" << selected_ids.size()
@@ -571,7 +575,15 @@ int main(int argc, char** argv) {
                               << "\n";
                 }
             }
+            std::cout << "dataset=" << dataset.info.dataset
+                      << " done rows_written=" << rows_written << "\n";
         }
+        out.close();
+        require(
+            static_cast<bool>(out),
+            "Failed while writing output: " + options.output_path.string());
+        std::cout << "DONE datasets=" << datasets.size()
+                  << " rows=" << rows_written << "\n";
         return 0;
     } catch (const std::exception& error) {
         std::cerr << "Error: " << error.what() << "\n";

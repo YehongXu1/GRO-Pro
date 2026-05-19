@@ -26,6 +26,29 @@ python/results/gro_selection_debug_removal_modes_random_timing_by_hop_rep.csv
 python/results/gro_selection_debug_removal_modes_random_timing_by_hop_rep_gamma.csv
 ```
 
+Fixed-percentage simple baseline output:
+
+```text
+python/results/gro_simple_selection_baselines_10_30.csv
+```
+
+Comparison between TDG selection and fixed simple baselines:
+
+```text
+python/results/gro_simple_selection_baselines_10_30_vs_tdg_selection_rows.csv
+python/results/gro_simple_selection_baselines_10_30_vs_tdg_selection_summary.csv
+python/results/gro_simple_selection_baselines_10_30_vs_tdg_selection_by_hop_rep.csv
+```
+
+Important completeness note:
+
+```text
+The fixed simple-baseline file is complete:
+720 rows = 180 query sets x 2 methods x 2 fixed fractions.
+Each query set has random 10%, random 30%, most_delayed 10%,
+and most_delayed 30%.
+```
+
 The analysis was run with:
 
 ```bash
@@ -151,4 +174,79 @@ For parameter choice:
 ```text
 gamma=50 maximizes average value.
 gamma=25 gives a better value/time tradeoff.
+```
+
+## Fixed 10% / 30% Simple Baseline Comparison
+
+Simple baselines:
+
+```text
+random: select a fixed random 10% or 30% of queries.
+most_delayed: select the queries with largest
+              actual_travel_time - free_flow_shortest_path_time.
+```
+
+This comparison is not same-size unless TDG's selected fraction is close to the
+baseline fraction. Therefore, selected fractions must be reported together with
+the value.
+
+Per-query remaining travel time is also recorded because it is less sensitive
+to different selected fractions:
+
+```text
+remaining_avg_query_tt = remaining_TTT / (query_count - selected_count)
+
+avg_query_tt_value_vs_baseline =
+    baseline_remaining_avg_query_tt - tdg_remaining_avg_query_tt
+```
+
+Positive `avg_query_tt_value_vs_baseline` means the queries left after TDG
+selection have lower average travel time than the queries left after the
+baseline selection.
+
+Results from all 180 query sets:
+
+```text
+gamma=25, anchor_important:
+  TDG selected fraction = 16.3%
+  vs random 10%:       +12,155,168, extra time +1.668s
+  vs most_delayed 10%: +7,741,658, extra time +1.667s
+  vs random 30%:       -26,627,726
+  vs most_delayed 30%: -34,321,828
+
+gamma=50, anchor_important:
+  TDG selected fraction = 42.7%
+  vs random 30%:       +24,354,289, extra time +2.475s
+  vs most_delayed 30%: +16,660,187, extra time +2.474s
+
+gamma=50, all_nodes:
+  TDG selected fraction = 41.2%
+  vs random 30%:       +22,118,243, extra time +2.416s
+  vs most_delayed 30%: +14,424,141, extra time +2.415s
+```
+
+Per-query remaining travel-time comparison:
+
+| TDG setting | baseline | TDG selected | baseline selected | baseline avg remaining TT | TDG avg remaining TT | TDG lower by | win rate |
+|---|---|---:|---:|---:|---:|---:|---:|
+| gamma25 anchor | random 10% | 16.3% | 10.0% | 57,569 | 55,475 | 2,095 | 82.2% |
+| gamma25 anchor | most_delayed 10% | 16.3% | 10.0% | 55,751 | 55,475 | 277 | 54.4% |
+| gamma50 anchor | random 30% | 42.7% | 30.0% | 52,695 | 47,814 | 4,881 | 97.8% |
+| gamma50 anchor | most_delayed 30% | 42.7% | 30.0% | 48,866 | 47,814 | 1,052 | 65.6% |
+| gamma50 all_nodes | random 30% | 41.2% | 30.0% | 52,695 | 48,360 | 4,335 | 98.9% |
+| gamma50 all_nodes | most_delayed 30% | 41.2% | 30.0% | 48,866 | 48,360 | 506 | 62.2% |
+
+Interpretation:
+
+```text
+Against fixed 10% baselines, gamma=25 TDG selection looks better, but TDG
+selects about 16%, not 10%.
+
+Against fixed 30% baselines, gamma=25 is worse because it selects much fewer
+queries. gamma=50 is better than fixed 30% random and most-delayed, but it
+also selects about 41%-43% of queries.
+
+Therefore this fixed-fraction comparison is useful as a heuristic baseline
+check, but the same-size random comparison remains the cleanest selection-only
+quality test.
 ```

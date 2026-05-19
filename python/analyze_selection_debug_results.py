@@ -3,7 +3,6 @@
 import argparse
 from pathlib import Path
 
-import matplotlib.pyplot as plt
 import pandas as pd
 
 
@@ -167,6 +166,8 @@ def summarize_random_baseline_timing(df: pd.DataFrame, by: list[str]) -> pd.Data
 
 
 def plot_summary(summary: pd.DataFrame, output_path: Path) -> None:
+    import matplotlib.pyplot as plt
+
     colors = {
         "all_nodes": "#4C78A8",
         "anchor_important": "#F58518",
@@ -215,6 +216,8 @@ def plot_summary(summary: pd.DataFrame, output_path: Path) -> None:
 
 
 def plot_distribution(df: pd.DataFrame, output_path: Path) -> None:
+    import matplotlib.pyplot as plt
+
     fig, axes = plt.subplots(1, 2, figsize=(14, 5), constrained_layout=True)
     labels = [MODE_LABELS[m] for m in MODE_ORDER]
 
@@ -326,7 +329,12 @@ def main() -> None:
     parser.add_argument(
         "--output-dir",
         default="python/results",
-        help="Directory for summaries and plots.",
+        help="Directory for summary CSV files.",
+    )
+    parser.add_argument(
+        "--plots",
+        action="store_true",
+        help="Also write PNG plots. Disabled by default to keep results clean.",
     )
     args = parser.parse_args()
 
@@ -365,8 +373,6 @@ def main() -> None:
     random_timing_by_hop_rep_gamma_path = (
         output_dir / f"{stem}_random_timing_by_hop_rep_gamma.csv"
     )
-    summary_plot_path = output_dir / f"{stem}_analysis_summary.png"
-    dist_plot_path = output_dir / f"{stem}_analysis_distribution.png"
 
     summary.to_csv(summary_path, index=False)
     by_hop_rep.to_csv(by_hop_rep_path, index=False)
@@ -379,8 +385,11 @@ def main() -> None:
     random_timing_by_hop_rep_gamma.to_csv(
         random_timing_by_hop_rep_gamma_path, index=False
     )
-    plot_summary(summary, summary_plot_path)
-    plot_distribution(df, dist_plot_path)
+    if args.plots:
+        summary_plot_path = output_dir / f"{stem}_analysis_summary.png"
+        dist_plot_path = output_dir / f"{stem}_analysis_distribution.png"
+        plot_summary(summary, summary_plot_path)
+        plot_distribution(df, dist_plot_path)
 
     print_console_summary(df, summary)
     print_comparison_summary(comparison)
@@ -392,8 +401,9 @@ def main() -> None:
     print(f"random_timing_by_query_count_csv={random_timing_by_query_count_path}")
     print(f"random_timing_by_hop_rep_csv={random_timing_by_hop_rep_path}")
     print(f"random_timing_by_hop_rep_gamma_csv={random_timing_by_hop_rep_gamma_path}")
-    print(f"summary_plot={summary_plot_path}")
-    print(f"distribution_plot={dist_plot_path}")
+    if args.plots:
+        print(f"summary_plot={summary_plot_path}")
+        print(f"distribution_plot={dist_plot_path}")
 
 
 if __name__ == "__main__":

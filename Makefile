@@ -46,15 +46,16 @@ GRO_BASELINE_TEST_OBJECTS = tests/gro_baseline_test.o
 GRO_SELECTION_DEBUG_TEST_OBJECTS = tests/gro_selection_debug_test.o
 GRO_REROUTE_DEBUG_TEST_OBJECTS = tests/gro_reroute_debug_test.o
 GRO_FIXED_RANDOM_SELECTION_TEST_OBJECTS = tests/gro_fixed_random_selection_test.o
+GRO_ABLATION_TEST_OBJECTS = tests/gro_ablation_test.o
 MH_SYNTHETIC_EXPERIMENT_OBJECTS = tests/mh_synthetic_experiment.o
 SVP_TEST_OBJECTS = tests/svp_test.o
 GOR_TEST_OBJECTS = tests/gor_test.o
 SOR_TEST_OBJECTS = tests/sor_test.o
 FAHL_TEST_OBJECTS = tests/fahl_test.o
 
-TARGETS = gro_test gro_baseline_test gro_selection_debug_test gro_reroute_debug_test gro_fixed_random_selection_test mh_synthetic_experiment svp_test gor_test sor_test fahl_test
+TARGETS = gro_test gro_baseline_test gro_selection_debug_test gro_reroute_debug_test gro_fixed_random_selection_test gro_ablation_test mh_synthetic_experiment svp_test gor_test sor_test fahl_test
 
-.PHONY: all build clean test run-gro run-gro-baseline run-gro-selection-debug run-gro-reroute-debug run-gro-fixed-random-selection run-svp run-gor run-sor run-fahl help
+.PHONY: all build clean test run-gro run-gro-baseline run-gro-selection-debug run-gro-reroute-debug run-gro-fixed-random-selection run-gro-ablation run-svp run-gor run-sor run-fahl help
 
 # 默认目标 - 只构建，不运行测试或实验
 all: build
@@ -77,6 +78,9 @@ gro_reroute_debug_test: $(OBJECTS_LIB) $(GRO_REROUTE_DEBUG_TEST_OBJECTS) Makefil
 	$(CXX) $(CXXFLAGS) $(OPENMP_FLAGS) -o $@ $(filter-out Makefile,$^) $(LIB_DIRS) $(LIBS)
 
 gro_fixed_random_selection_test: $(OBJECTS_LIB) $(GRO_FIXED_RANDOM_SELECTION_TEST_OBJECTS) Makefile
+	$(CXX) $(CXXFLAGS) $(OPENMP_FLAGS) -o $@ $(filter-out Makefile,$^) $(LIB_DIRS) $(LIBS)
+
+gro_ablation_test: $(OBJECTS_LIB) $(GRO_ABLATION_TEST_OBJECTS) Makefile
 	$(CXX) $(CXXFLAGS) $(OPENMP_FLAGS) -o $@ $(filter-out Makefile,$^) $(LIB_DIRS) $(LIBS)
 
 mh_synthetic_experiment: $(OBJECTS_LIB) $(MH_SYNTHETIC_EXPERIMENT_OBJECTS) Makefile
@@ -123,6 +127,9 @@ run-gro-reroute-debug: gro_reroute_debug_test
 
 run-gro-fixed-random-selection: gro_fixed_random_selection_test
 	./gro_fixed_random_selection_test $(TEST_CONFIG)
+
+run-gro-ablation: gro_ablation_test
+	./gro_ablation_test $(TEST_CONFIG)
 
 run-svp: svp_test
 	./svp_test $(TEST_CONFIG)

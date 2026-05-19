@@ -53,6 +53,30 @@ def compare(tdg: pd.DataFrame, baselines: pd.DataFrame) -> pd.DataFrame:
         merged["tdg_selection_sec"] - merged["baseline_select_sec"]
     )
     merged["tdg_better"] = merged["value_vs_baseline"] > 0
+    merged["tdg_remaining_count"] = merged["query_count"] - merged["selected_count"]
+    merged["baseline_remaining_count"] = (
+        merged["query_count"] - merged["baseline_selected_count"]
+    )
+    merged["tdg_remaining_avg_query_tt"] = (
+        merged["tdg_unselected_after_remove"]
+        / merged["tdg_remaining_count"].replace(0, pd.NA)
+    )
+    merged["baseline_remaining_avg_query_tt"] = (
+        merged["baseline_unselected_after_remove"]
+        / merged["baseline_remaining_count"].replace(0, pd.NA)
+    )
+    merged["avg_query_tt_value_vs_baseline"] = (
+        merged["baseline_remaining_avg_query_tt"]
+        - merged["tdg_remaining_avg_query_tt"]
+    )
+    merged["pct_avg_query_tt_vs_baseline"] = (
+        merged["avg_query_tt_value_vs_baseline"]
+        / merged["baseline_remaining_avg_query_tt"].replace(0, pd.NA)
+        * 100.0
+    )
+    merged["tdg_avg_query_tt_better"] = (
+        merged["avg_query_tt_value_vs_baseline"] > 0
+    )
     return merged
 
 
@@ -71,6 +95,27 @@ def summarize(df: pd.DataFrame, group_cols: list[str]) -> pd.DataFrame:
             mean_time_extra_vs_baseline_sec=("time_extra_vs_baseline_sec", "mean"),
             mean_tdg_selected_fraction=("tdg_selected_fraction", "mean"),
             mean_baseline_selected_fraction=("baseline_selected_fraction", "mean"),
+            avg_tt_win_rate=("tdg_avg_query_tt_better", "mean"),
+            mean_avg_query_tt_value_vs_baseline=(
+                "avg_query_tt_value_vs_baseline",
+                "mean",
+            ),
+            median_avg_query_tt_value_vs_baseline=(
+                "avg_query_tt_value_vs_baseline",
+                "median",
+            ),
+            mean_pct_avg_query_tt_vs_baseline=(
+                "pct_avg_query_tt_vs_baseline",
+                "mean",
+            ),
+            mean_tdg_remaining_avg_query_tt=(
+                "tdg_remaining_avg_query_tt",
+                "mean",
+            ),
+            mean_baseline_remaining_avg_query_tt=(
+                "baseline_remaining_avg_query_tt",
+                "mean",
+            ),
         )
     )
     return summary
@@ -88,6 +133,9 @@ def print_main_summary(summary: pd.DataFrame) -> None:
         "mean_time_extra_vs_baseline_sec",
         "mean_tdg_selected_fraction",
         "mean_baseline_selected_fraction",
+        "avg_tt_win_rate",
+        "mean_avg_query_tt_value_vs_baseline",
+        "mean_pct_avg_query_tt_vs_baseline",
     ]
     shown = summary[cols].copy()
     shown["win_rate"] = shown["win_rate"].map(lambda x: f"{x:.1%}")
@@ -106,6 +154,13 @@ def print_main_summary(summary: pd.DataFrame) -> None:
     shown["mean_baseline_selected_fraction"] = shown[
         "mean_baseline_selected_fraction"
     ].map(lambda x: f"{x:.1%}")
+    shown["avg_tt_win_rate"] = shown["avg_tt_win_rate"].map(lambda x: f"{x:.1%}")
+    shown["mean_avg_query_tt_value_vs_baseline"] = shown[
+        "mean_avg_query_tt_value_vs_baseline"
+    ].map(lambda x: f"{x:.2f}")
+    shown["mean_pct_avg_query_tt_vs_baseline"] = shown[
+        "mean_pct_avg_query_tt_vs_baseline"
+    ].map(lambda x: f"{x:.2f}%")
     print(shown.to_string(index=False))
 
 
