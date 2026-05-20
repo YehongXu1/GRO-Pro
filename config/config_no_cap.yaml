@@ -8,6 +8,7 @@ queries_path: ../data/MH_20hops1000.txt
 alpha: 0.15
 beta: 4.0
 max_time: 0
+min_bpr_capacity: 5
 
 max_iterations: 5
 enable_timing_log: false

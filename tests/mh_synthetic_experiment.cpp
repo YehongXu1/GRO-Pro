@@ -41,6 +41,9 @@ struct Options {
     int rep_filter = -1;
     int seed_filter = -1;
     int max_iterations = -1;
+    int beta_override = -1;
+    gro::Time max_time_override = -1;
+    gro::Flow min_bpr_capacity_override = -1;
 };
 
 std::vector<std::string> split_csv(const std::string& text) {
@@ -81,6 +84,14 @@ Options parse_args(int argc, char** argv) {
             options.max_files = std::stoi(require_value(arg));
         } else if (arg == "--max-iterations") {
             options.max_iterations = std::stoi(require_value(arg));
+        } else if (arg == "--beta") {
+            options.beta_override = std::stoi(require_value(arg));
+        } else if (arg == "--max-time") {
+            options.max_time_override =
+                static_cast<gro::Time>(std::stoll(require_value(arg)));
+        } else if (arg == "--min-bpr-capacity") {
+            options.min_bpr_capacity_override =
+                static_cast<gro::Flow>(std::stoi(require_value(arg)));
         } else if (arg == "--hop") {
             options.hop_filter = std::stoi(require_value(arg));
         } else if (arg == "--rep") {
@@ -226,6 +237,16 @@ int main(int argc, char** argv) {
         algorithm_options.enable_timing_log = options.timing_log;
         gro::TrafficOptions traffic_options =
             gro::load_traffic_options(options.config_path);
+        if (options.beta_override >= 0) {
+            traffic_options.beta = options.beta_override;
+        }
+        if (options.max_time_override >= 0) {
+            traffic_options.max_travel_time = options.max_time_override;
+        }
+        if (options.min_bpr_capacity_override >= 0) {
+            traffic_options.min_bpr_capacity =
+                options.min_bpr_capacity_override;
+        }
 
         std::vector<Dataset> datasets =
             filter_datasets(discover_datasets(options.query_dir), options);

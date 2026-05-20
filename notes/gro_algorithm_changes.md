@@ -251,3 +251,48 @@ rather than rank-and-removability-driven selection.
 
 > The method is congestion-status-driven: impact tells us which TDG nodes are important, while the current working flow tells us whether they still need relief.
 
+## BPR Small-Capacity Filter
+
+### Motivation
+
+In the MH synthetic graph, edge capacity is not provided directly. The project
+currently derives it from free-flow time:
+
+```text
+capacity = free_flow_time / 40
+```
+
+This creates a small number of very low-capacity roads. Under the BPR travel-time
+function, especially with beta = 4 and no travel-time cap, these roads can create
+extremely large penalties and dominate total travel time. That makes the
+experiment reflect artifacts from capacity estimation rather than the behavior of
+the routing methods.
+
+### Change
+
+The BPR evaluator now supports:
+
+```yaml
+min_bpr_capacity: 5
+```
+
+If an edge has:
+
+```text
+capacity <= min_bpr_capacity
+```
+
+then the evaluator uses the edge free-flow time directly instead of applying the
+BPR penalty. Edges with missing or non-positive capacity also use free-flow time.
+
+### Current Setting
+
+For MH, `min_bpr_capacity = 5` filters only the lowest-capacity tail:
+
+```text
+capacity <= 5: 1514 / 36792 edges, about 4.1%
+```
+
+This is intentionally conservative. It removes the most extreme artificial
+penalties while leaving normal-capacity roads governed by the BPR congestion
+model.

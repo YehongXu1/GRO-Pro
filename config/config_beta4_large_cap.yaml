@@ -1,0 +1,24 @@
+# GRO config with BPR beta=4 and a very large per-edge travel-time cap.
+# Use this to test whether beta=4 remains stable when the cap is much looser
+# than the default 3600 seconds but still finite.
+
+graph_path: ../data/MH.txt
+coordinates_path:../data/MH_NodeIDLonLat.txt
+queries_path: ../data/MH_20hops1000.txt
+
+alpha: 0.15
+beta: 4.0
+max_time: 1000000
+min_bpr_capacity: 5
+
+max_iterations: 5
+enable_timing_log: false
+baseline_fraction_to_reroute: 0.30
+baseline_random_seed: 0
+lambda: 0.45
+gamma: 0.5
+impact_weight: 0.15
+theta_percentile: 0.90
+min_slot_width: 600
+svp_k: 3
+svp_theta: 0.80

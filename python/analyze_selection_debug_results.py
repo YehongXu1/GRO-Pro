@@ -323,7 +323,7 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--input",
-        default="python/results/gro_selection_debug_removal_modes.csv",
+        default="python/results/mh/gro_selection_debug_removal_modes.csv",
         help="Selection debug CSV.",
     )
     parser.add_argument(

@@ -396,18 +396,18 @@ simple baseline fractions = 10, 30
 Current relevant files:
 
 ```text
-python/results/gro_selection_debug_removal_modes.csv
-python/results/gro_simple_selection_baselines_10_30.csv
-python/results/gro_reroute_debug.csv
-python/results/gro_ablation_baseline_random_normal.csv
-python/results/gro_ablation_baseline_delayed_normal.csv
-python/results/gro_ablation_baseline_random_tdg_reroute.csv
-python/results/gro_ablation_baseline_delayed_tdg_reroute.csv
-python/results/gro_ablation_tdg_anchor_normal.csv
-python/results/gro_ablation_tdg_excess_normal.csv
-python/results/gro_ablation_tdg_anchor_full.csv
-python/results/gro_ablation_tdg_excess_full.csv
-python/results/gro_ablation.csv
+python/results/mh/gro_selection_debug_removal_modes.csv
+python/results/mh/gro_simple_selection_baselines_10_30.csv
+python/results/mh/gro_reroute_debug.csv
+python/results/mh/gro_ablation_baseline_random_normal.csv
+python/results/mh/gro_ablation_baseline_delayed_normal.csv
+python/results/mh/gro_ablation_baseline_random_tdg_reroute.csv
+python/results/mh/gro_ablation_baseline_delayed_tdg_reroute.csv
+python/results/mh/gro_ablation_tdg_anchor_normal.csv
+python/results/mh/gro_ablation_tdg_excess_normal.csv
+python/results/mh/gro_ablation_tdg_anchor_full.csv
+python/results/mh/gro_ablation_tdg_excess_full.csv
+python/results/mh/gro_ablation.csv
 ```
 
 Command records are kept in:

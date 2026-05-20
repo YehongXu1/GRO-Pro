@@ -45,7 +45,8 @@ struct Graph {
     std::vector<std::vector<EdgeId>> outgoing_edges;
     std::vector<std::vector<EdgeId>> incoming_edges;
     std::vector<Coordinate> node_coordinates;
-    int vertex_count, edge_count;
+    int vertex_count = 0;
+    int edge_count = 0;
 };
 
 struct Query {
@@ -89,6 +90,7 @@ struct TrafficOptions {
     int alpha = 15; // in percent
     int beta = 4;
     Time max_travel_time = 0;
+    Flow min_bpr_capacity = 0;
 };
 
 using ParameterMap = std::unordered_map<std::string, std::string>;

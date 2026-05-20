@@ -255,11 +255,11 @@ def print_table(df: pd.DataFrame, cols: list[str]) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--input", default="python/results/gro_reroute_debug.csv")
+    parser.add_argument("--input", default="python/results/mh/gro_reroute_debug.csv")
     parser.add_argument("--output-dir", default="python/results")
     parser.add_argument(
         "--expected-datasets",
-        default="python/results/gro_selection_debug_removal_modes.csv",
+        default="python/results/mh/gro_selection_debug_removal_modes.csv",
     )
     args = parser.parse_args()
 

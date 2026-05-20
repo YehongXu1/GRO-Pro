@@ -168,11 +168,11 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--tdg-selection",
-        default="python/results/gro_selection_debug_removal_modes.csv",
+        default="python/results/mh/gro_selection_debug_removal_modes.csv",
     )
     parser.add_argument(
         "--simple-baselines",
-        default="python/results/gro_simple_selection_baselines_10_30.csv",
+        default="python/results/mh/gro_simple_selection_baselines_10_30.csv",
     )
     parser.add_argument("--output-dir", default="python/results")
     args = parser.parse_args()

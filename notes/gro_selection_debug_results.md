@@ -7,7 +7,7 @@ This note records the current selection-only diagnostic results.
 Raw experiment output:
 
 ```text
-python/results/gro_selection_debug_removal_modes.csv
+python/results/mh/gro_selection_debug_removal_modes.csv
 ```
 
 Analysis script:
@@ -16,28 +16,31 @@ Analysis script:
 python/analyze_selection_debug_results.py
 ```
 
-Derived result tables:
+Derived result tables are no longer kept in `python/results/mh` by default.
+Regenerate them from the raw CSV when needed:
 
-```text
-python/results/gro_selection_debug_removal_modes_comparison_summary.csv
-python/results/gro_selection_debug_removal_modes_random_timing_by_gamma.csv
-python/results/gro_selection_debug_removal_modes_random_timing_by_query_count.csv
-python/results/gro_selection_debug_removal_modes_random_timing_by_hop_rep.csv
-python/results/gro_selection_debug_removal_modes_random_timing_by_hop_rep_gamma.csv
+```bash
+/Users/xyh/opt/anaconda3/envs/plot/bin/python \
+  python/analyze_selection_debug_results.py \
+  --input python/results/mh/gro_selection_debug_removal_modes.csv \
+  --output-dir python/results/mh
 ```
 
 Fixed-percentage simple baseline output:
 
 ```text
-python/results/gro_simple_selection_baselines_10_30.csv
+python/results/mh/gro_simple_selection_baselines_10_30.csv
 ```
 
-Comparison between TDG selection and fixed simple baselines:
+Comparison between TDG selection and fixed simple baselines can be regenerated
+when needed:
 
-```text
-python/results/gro_simple_selection_baselines_10_30_vs_tdg_selection_rows.csv
-python/results/gro_simple_selection_baselines_10_30_vs_tdg_selection_summary.csv
-python/results/gro_simple_selection_baselines_10_30_vs_tdg_selection_by_hop_rep.csv
+```bash
+/Users/xyh/opt/anaconda3/envs/plot/bin/python \
+  python/compare_selection_with_simple_baselines.py \
+  --tdg-selection python/results/mh/gro_selection_debug_removal_modes.csv \
+  --simple-baselines python/results/mh/gro_simple_selection_baselines_10_30.csv \
+  --output-dir python/results/mh
 ```
 
 Important completeness note:
@@ -47,15 +50,6 @@ The fixed simple-baseline file is complete:
 720 rows = 180 query sets x 2 methods x 2 fixed fractions.
 Each query set has random 10%, random 30%, most_delayed 10%,
 and most_delayed 30%.
-```
-
-The analysis was run with:
-
-```bash
-MPLCONFIGDIR=/private/tmp/gro_mpl conda run -p /Users/xyh/opt/anaconda3/envs/plot \
-  python python/analyze_selection_debug_results.py \
-  --input python/results/gro_selection_debug_removal_modes.csv \
-  --output-dir python/results
 ```
 
 ## Metric Definitions

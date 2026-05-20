@@ -40,7 +40,10 @@ LIBS ?= $(DEFAULT_LIBS)
 TEST_CONFIG ?= config/test_config.yaml
 ABLATION_CONFIG ?= config/config.yaml
 QUERY_DIR ?= data/MH_Synthetic_query_sets
-RESULTS_DIR ?= python/results
+RESULTS_DIR ?= python/results/mh
+BJ_CONFIG ?= config/config_bj.yaml
+BJ_QUERY_DIR ?= data/BJ_Synthetic_query_sets
+BJ_RESULTS_DIR ?= python/results/bj
 RANDOM_SEED ?= 0
 FIXED_FRACTIONS ?= 10,30
 TDG_GAMMAS ?= 50
@@ -107,7 +110,8 @@ ABLATION_METHODS = \
 	run-ablation-tdg-anchor-normal \
 	run-ablation-tdg-excess-normal \
 	run-ablation-tdg-anchor-full \
-	run-ablation-tdg-excess-full
+	run-ablation-tdg-excess-full \
+	run-bj-ablation-methods check-bj-ablation-methods merge-bj-ablation-methods
 
 all: build
 
@@ -238,6 +242,22 @@ run-ablation-tdg-anchor-full: gro_ablation_test | $(RESULTS_DIR)
 run-ablation-tdg-excess-full: gro_ablation_test | $(RESULTS_DIR)
 	$(call RUN_ABLATION,tdg_excess_full,tdg_excess,tdg)
 
+run-bj-ablation-methods:
+	$(MAKE) run-ablation-methods \
+	  ABLATION_CONFIG=$(BJ_CONFIG) \
+	  QUERY_DIR=$(BJ_QUERY_DIR) \
+	  RESULTS_DIR=$(BJ_RESULTS_DIR) \
+	  FIXED_FRACTIONS=$(FIXED_FRACTIONS) \
+	  TDG_GAMMAS=$(TDG_GAMMAS) \
+	  IMPACT_WEIGHTS=$(IMPACT_WEIGHTS) \
+	  RANDOM_SEED=$(RANDOM_SEED)
+
+check-bj-ablation-methods:
+	$(MAKE) check-ablation-methods RESULTS_DIR=$(BJ_RESULTS_DIR)
+
+merge-bj-ablation-methods:
+	$(MAKE) merge-ablation-methods RESULTS_DIR=$(BJ_RESULTS_DIR)
+
 merge-ablation-methods: | $(RESULTS_DIR)
 	@first=1; \
 	for method in $(ABLATION_METHODS); do \
@@ -283,11 +303,15 @@ help:
 	@echo ""
 	@echo "Experiments:"
 	@echo "  make run-ablation-methods     - run all method-split ablations sequentially"
+	@echo "  make run-bj-ablation-methods  - run all method-split ablations on BJ synthetic sets"
 	@echo "  make merge-ablation-methods   - merge method CSVs into gro_ablation.csv"
 	@echo "  make check-ablation-methods   - show method CSV row counts"
+	@echo "  make check-bj-ablation-methods - show BJ method CSV row counts"
 	@echo ""
 	@echo "Overrides:"
 	@echo "  ABLATION_CONFIG=config/config.yaml QUERY_DIR=data/MH_Synthetic_query_sets"
+	@echo "  BJ_CONFIG=config/config_bj.yaml BJ_QUERY_DIR=data/BJ_Synthetic_query_sets"
+	@echo "  RESULTS_DIR=python/results/mh BJ_RESULTS_DIR=python/results/bj"
 	@echo "  FIXED_FRACTIONS=10,30 TDG_GAMMAS=50 IMPACT_WEIGHTS=30 RANDOM_SEED=0"
 	@echo "  Linux/server: make"
 	@echo "  macOS Homebrew GCC: make CXX=g++-14"

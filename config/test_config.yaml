@@ -9,6 +9,7 @@ queries_path: ../tests/small_queries.txt
 alpha: 0.15
 beta: 4.0
 max_time: 3600
+min_bpr_capacity: 5
 
 max_iterations: 5
 baseline_fraction_to_reroute: 0.30

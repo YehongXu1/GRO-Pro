@@ -29,12 +29,27 @@ Useful overrides:
 ```bash
 make CXX=g++-14
 make ABLATION_CONFIG=config/config.yaml QUERY_DIR=data/MH_Synthetic_query_sets
+make ABLATION_CONFIG=config/config_bj.yaml QUERY_DIR=data/BJ_Synthetic_query_sets RESULTS_DIR=python/results/bj
 ```
 
 ## Main Iterative Ablation
 
-Preferred output layout: one CSV per method, all MH synthetic query sets inside
-each file.
+Preferred output layout: one CSV per method.
+
+```text
+MH results: python/results/mh/
+BJ results: python/results/bj/
+logs:       logs/
+```
+
+The fixed-fraction baselines use:
+
+```text
+FIXED_FRACTIONS=10,30
+```
+
+This means each fixed-selection method writes both 10% and 30% selection
+fraction rows into the same method CSV.
 
 Run all method-split ablations sequentially:
 
@@ -89,15 +104,97 @@ nohup make run-ablation-tdg-excess-full > gro_ablation_tdg_excess_full.log 2>&1 
 Expected output files:
 
 ```text
-python/results/gro_ablation_baseline_random_normal.csv
-python/results/gro_ablation_baseline_delayed_normal.csv
-python/results/gro_ablation_baseline_random_tdg_reroute.csv
-python/results/gro_ablation_baseline_delayed_tdg_reroute.csv
-python/results/gro_ablation_tdg_anchor_normal.csv
-python/results/gro_ablation_tdg_excess_normal.csv
-python/results/gro_ablation_tdg_anchor_full.csv
-python/results/gro_ablation_tdg_excess_full.csv
-python/results/gro_ablation.csv
+python/results/mh/gro_ablation_baseline_random_normal.csv
+python/results/mh/gro_ablation_baseline_delayed_normal.csv
+python/results/mh/gro_ablation_baseline_random_tdg_reroute.csv
+python/results/mh/gro_ablation_baseline_delayed_tdg_reroute.csv
+python/results/mh/gro_ablation_tdg_anchor_normal.csv
+python/results/mh/gro_ablation_tdg_excess_normal.csv
+python/results/mh/gro_ablation_tdg_anchor_full.csv
+python/results/mh/gro_ablation_tdg_excess_full.csv
+python/results/mh/gro_ablation.csv
+```
+
+## Beijing Full Iterative Ablation
+
+Build once:
+
+```bash
+make
+```
+
+BJ uses:
+
+```text
+config:      config/config_bj.yaml
+query dir:   data/BJ_Synthetic_query_sets
+results dir: python/results/bj
+iterations:  10
+fractions:   10,30
+```
+
+Run all BJ method-split jobs sequentially:
+
+```bash
+nohup make run-bj-ablation-methods \
+  FIXED_FRACTIONS=10,30 \
+  TDG_GAMMAS=50 \
+  IMPACT_WEIGHTS=30 \
+  RANDOM_SEED=0 \
+  > logs/bj_ablation_methods.log 2>&1 &
+```
+
+Check BJ outputs:
+
+```bash
+make check-bj-ablation-methods
+```
+
+Merge BJ outputs:
+
+```bash
+make merge-bj-ablation-methods
+```
+
+Expected BJ output files:
+
+```text
+python/results/bj/gro_ablation_baseline_random_normal.csv
+python/results/bj/gro_ablation_baseline_delayed_normal.csv
+python/results/bj/gro_ablation_baseline_random_tdg_reroute.csv
+python/results/bj/gro_ablation_baseline_delayed_tdg_reroute.csv
+python/results/bj/gro_ablation_tdg_anchor_normal.csv
+python/results/bj/gro_ablation_tdg_excess_normal.csv
+python/results/bj/gro_ablation_tdg_anchor_full.csv
+python/results/bj/gro_ablation_tdg_excess_full.csv
+python/results/bj/gro_ablation.csv
+```
+
+To run BJ method jobs in parallel on the server:
+
+```bash
+nohup make run-ablation-baseline-random-normal ABLATION_CONFIG=config/config_bj.yaml QUERY_DIR=data/BJ_Synthetic_query_sets RESULTS_DIR=python/results/bj FIXED_FRACTIONS=10,30 TDG_GAMMAS=50 IMPACT_WEIGHTS=30 RANDOM_SEED=0 > logs/bj_ablation_baseline_random_normal.log 2>&1 &
+
+nohup make run-ablation-baseline-delayed-normal ABLATION_CONFIG=config/config_bj.yaml QUERY_DIR=data/BJ_Synthetic_query_sets RESULTS_DIR=python/results/bj FIXED_FRACTIONS=10,30 TDG_GAMMAS=50 IMPACT_WEIGHTS=30 RANDOM_SEED=0 > logs/bj_ablation_baseline_delayed_normal.log 2>&1 &
+
+nohup make run-ablation-baseline-random-tdg-reroute ABLATION_CONFIG=config/config_bj.yaml QUERY_DIR=data/BJ_Synthetic_query_sets RESULTS_DIR=python/results/bj FIXED_FRACTIONS=10,30 TDG_GAMMAS=50 IMPACT_WEIGHTS=30 RANDOM_SEED=0 > logs/bj_ablation_baseline_random_tdg_reroute.log 2>&1 &
+
+nohup make run-ablation-baseline-delayed-tdg-reroute ABLATION_CONFIG=config/config_bj.yaml QUERY_DIR=data/BJ_Synthetic_query_sets RESULTS_DIR=python/results/bj FIXED_FRACTIONS=10,30 TDG_GAMMAS=50 IMPACT_WEIGHTS=30 RANDOM_SEED=0 > logs/bj_ablation_baseline_delayed_tdg_reroute.log 2>&1 &
+
+nohup make run-ablation-tdg-anchor-normal ABLATION_CONFIG=config/config_bj.yaml QUERY_DIR=data/BJ_Synthetic_query_sets RESULTS_DIR=python/results/bj FIXED_FRACTIONS=10,30 TDG_GAMMAS=50 IMPACT_WEIGHTS=30 RANDOM_SEED=0 > logs/bj_ablation_tdg_anchor_normal.log 2>&1 &
+
+nohup make run-ablation-tdg-excess-normal ABLATION_CONFIG=config/config_bj.yaml QUERY_DIR=data/BJ_Synthetic_query_sets RESULTS_DIR=python/results/bj FIXED_FRACTIONS=10,30 TDG_GAMMAS=50 IMPACT_WEIGHTS=30 RANDOM_SEED=0 > logs/bj_ablation_tdg_excess_normal.log 2>&1 &
+
+nohup make run-ablation-tdg-anchor-full ABLATION_CONFIG=config/config_bj.yaml QUERY_DIR=data/BJ_Synthetic_query_sets RESULTS_DIR=python/results/bj FIXED_FRACTIONS=10,30 TDG_GAMMAS=50 IMPACT_WEIGHTS=30 RANDOM_SEED=0 > logs/bj_ablation_tdg_anchor_full.log 2>&1 &
+
+nohup make run-ablation-tdg-excess-full ABLATION_CONFIG=config/config_bj.yaml QUERY_DIR=data/BJ_Synthetic_query_sets RESULTS_DIR=python/results/bj FIXED_FRACTIONS=10,30 TDG_GAMMAS=50 IMPACT_WEIGHTS=30 RANDOM_SEED=0 > logs/bj_ablation_tdg_excess_full.log 2>&1 &
+```
+
+If you only want to vary random-selection fraction 10% vs 30% with normal
+TD-Dijkstra first, run just:
+
+```bash
+nohup make run-ablation-baseline-random-normal ABLATION_CONFIG=config/config_bj.yaml QUERY_DIR=data/BJ_Synthetic_query_sets RESULTS_DIR=python/results/bj FIXED_FRACTIONS=10,30 RANDOM_SEED=0 > logs/bj_ablation_baseline_random_normal.log 2>&1 &
 ```
 
 ## Diagnostics
@@ -108,7 +205,7 @@ the new `tdg_excess` selection.
 ```bash
 nohup ./gro_selection_debug_test config/config.yaml \
   --query-dir data/MH_Synthetic_query_sets \
-  --output python/results/gro_selection_debug_removal_modes.csv \
+  --output python/results/mh/gro_selection_debug_removal_modes.csv \
   --gamma-values 25,50,75 \
   --removal-modes all_nodes,congestion_important,anchor_important \
   --random-seed 0 \
@@ -120,7 +217,7 @@ Simple selection-only baselines:
 ```bash
 nohup ./gro_fixed_random_selection_test config/config.yaml \
   --query-dir data/MH_Synthetic_query_sets \
-  --output python/results/gro_simple_selection_baselines_10_30.csv \
+  --output python/results/mh/gro_simple_selection_baselines_10_30.csv \
   --random-fractions 10,30 \
   --methods random,most_delayed \
   --random-seed 0 \
@@ -132,7 +229,7 @@ Reroute-only diagnostic:
 ```bash
 nohup ./gro_reroute_debug_test config/config.yaml \
   --query-dir data/MH_Synthetic_query_sets \
-  --output python/results/gro_reroute_debug.csv \
+  --output python/results/mh/gro_reroute_debug.csv \
   --impact-weights 0,5,15,30,50,100 \
   --random-seed 0 \
   > gro_reroute_debug.log 2>&1 &
@@ -143,12 +240,12 @@ No-cap stability checks:
 ```bash
 ./mh_synthetic_experiment config/config_no_cap.yaml \
   --query-dir data/MH_Synthetic_query_sets \
-  --output python/results/random30_normal_no_cap_all_time64.csv \
+  --output python/results/mh/random30_normal_no_cap_all_time64.csv \
   --algorithms baseline
 
 ./mh_synthetic_experiment config/config_no_cap_beta2.yaml \
   --query-dir data/MH_Synthetic_query_sets \
-  --output python/results/random30_normal_no_cap_beta2_all_time64.csv \
+  --output python/results/mh/random30_normal_no_cap_beta2_all_time64.csv \
   --algorithms baseline
 ```
 
@@ -159,9 +256,9 @@ Use the existing plot environment directly:
 ```bash
 /Users/xyh/opt/anaconda3/envs/plot/bin/python \
   python/compare_selection_with_simple_baselines.py \
-  --tdg-selection python/results/gro_selection_debug_removal_modes.csv \
-  --simple-baselines python/results/gro_simple_selection_baselines_10_30.csv \
-  --output-dir python/results
+  --tdg-selection python/results/mh/gro_selection_debug_removal_modes.csv \
+  --simple-baselines python/results/mh/gro_simple_selection_baselines_10_30.csv \
+  --output-dir python/results/mh
 ```
 
 ## Unit Tests

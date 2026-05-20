@@ -300,6 +300,9 @@ TrafficOptions load_traffic_options(const std::string& path, TrafficOptions defa
     if (auto it = parameters.find("max_time"); it != parameters.end()) {
         options.max_travel_time = static_cast<Time>(std::stoll(it->second));
     }
+    if (auto it = parameters.find("min_bpr_capacity"); it != parameters.end()) {
+        options.min_bpr_capacity = parse_integer(it->second);
+    }
     return options;
 }
 
@@ -335,6 +338,15 @@ Graph read_graph(const std::string& graph_path, const std::string& coordinates_p
             values.push_back(value);
         }
 
+        if (values.size() >= 5 && values[0] < 0) {
+            graph.vertex_count = values[1];
+            graph.edge_count = values[2];
+            graph.outgoing_edges.assign(graph.vertex_count, {});
+            graph.incoming_edges.assign(graph.vertex_count, {});
+            graph.node_coordinates.assign(graph.vertex_count, {});
+            continue;
+        }
+
         if (values.size() < 3) {
             continue;
         }
@@ -353,9 +365,21 @@ Graph read_graph(const std::string& graph_path, const std::string& coordinates_p
             edge.capacity = edge.free_flow_time / 40;  // Assume a default capacity based on free flow time if not provided
         }
 
+        NodeId max_node = std::max(edge.from, edge.to);
+        if (max_node >= static_cast<NodeId>(graph.outgoing_edges.size())) {
+            graph.outgoing_edges.resize(max_node + 1);
+            graph.incoming_edges.resize(max_node + 1);
+            graph.node_coordinates.resize(max_node + 1);
+            graph.vertex_count = std::max(graph.vertex_count, max_node + 1);
+        }
+
         graph.outgoing_edges[edge.from].push_back(edge.id);
         graph.incoming_edges[edge.to].push_back(edge.id);
         graph.edges.push_back(edge);
+    }
+
+    if (graph.edge_count == 0) {
+        graph.edge_count = static_cast<int>(graph.edges.size());
     }
 
     if (!coordinates_path.empty()) {
@@ -524,7 +548,13 @@ Cost route_edge_length(const Graph& graph, const std::vector<EdgeId>& edge_ids) 
 }
 
 Cost bpr_travel_time(const Edge& edge, Flow flow, const TrafficOptions& options) {
-    Flow capacity = edge.capacity > 0 ? edge.capacity : 1;
+    if (edge.capacity <= 0 ||
+        (options.min_bpr_capacity > 0 &&
+         edge.capacity <= options.min_bpr_capacity)) {
+        return edge.free_flow_time;
+    }
+
+    Flow capacity = edge.capacity;
     Flow safe_flow = flow > 0 ? flow : 0;
 
     __int128 numerator = static_cast<__int128>(edge.free_flow_time) * options.alpha;
