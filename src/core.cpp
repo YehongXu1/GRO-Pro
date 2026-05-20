@@ -398,7 +398,8 @@ std::vector<Query> read_queries(const std::string& queries_path) {
 
     std::vector<Query> queries;
     std::string line;
-    int origin = 0, destination = 0, departure_time = 0;
+    int origin = 0, destination = 0;
+    Time departure_time = 0;
     while (std::getline(file, line)) {
         line = trim(line);
         if (line.empty() || line[0] == '#') {

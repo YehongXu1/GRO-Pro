@@ -36,73 +36,120 @@ OPENMP_FLAGS ?= $(DEFAULT_OPENMP_FLAGS)
 INCLUDE_DIRS ?= $(DEFAULT_INCLUDE_DIRS)
 LIB_DIRS ?= $(DEFAULT_LIB_DIRS)
 LIBS ?= $(DEFAULT_LIBS)
+
 TEST_CONFIG ?= config/test_config.yaml
+ABLATION_CONFIG ?= config/config.yaml
+QUERY_DIR ?= data/MH_Synthetic_query_sets
+RESULTS_DIR ?= python/results
+RANDOM_SEED ?= 0
+FIXED_FRACTIONS ?= 10,30
+TDG_GAMMAS ?= 50
+IMPACT_WEIGHTS ?= 30
 
-# 源文件和目标
-SOURCES_LIB = src/core.cpp src/gro.cpp src/gro_baseline.cpp src/svp.cpp src/gor.cpp src/sor.cpp src/fahl.cpp
+SOURCES_LIB = \
+	src/core.cpp \
+	src/gro.cpp \
+	src/gro_baseline.cpp \
+	src/svp.cpp \
+	src/gor.cpp \
+	src/sor.cpp \
+	src/fahl.cpp
+
 OBJECTS_LIB = $(SOURCES_LIB:.cpp=.o)
-GRO_TEST_OBJECTS = tests/gro_test.o
-GRO_BASELINE_TEST_OBJECTS = tests/gro_baseline_test.o
-GRO_SELECTION_DEBUG_TEST_OBJECTS = tests/gro_selection_debug_test.o
-GRO_REROUTE_DEBUG_TEST_OBJECTS = tests/gro_reroute_debug_test.o
-GRO_FIXED_RANDOM_SELECTION_TEST_OBJECTS = tests/gro_fixed_random_selection_test.o
-GRO_ABLATION_TEST_OBJECTS = tests/gro_ablation_test.o
-MH_SYNTHETIC_EXPERIMENT_OBJECTS = tests/mh_synthetic_experiment.o
-SVP_TEST_OBJECTS = tests/svp_test.o
-GOR_TEST_OBJECTS = tests/gor_test.o
-SOR_TEST_OBJECTS = tests/sor_test.o
-FAHL_TEST_OBJECTS = tests/fahl_test.o
+HEADERS = $(wildcard include/*.hpp)
 
-TARGETS = gro_test gro_baseline_test gro_selection_debug_test gro_reroute_debug_test gro_fixed_random_selection_test gro_ablation_test mh_synthetic_experiment svp_test gor_test sor_test fahl_test
+TARGETS = \
+	gro_test \
+	gro_baseline_test \
+	gro_selection_debug_test \
+	gro_reroute_debug_test \
+	gro_fixed_random_selection_test \
+	gro_ablation_test \
+	mh_synthetic_experiment \
+	svp_test \
+	gor_test \
+	sor_test \
+	fahl_test
 
-.PHONY: all build clean test run-gro run-gro-baseline run-gro-selection-debug run-gro-reroute-debug run-gro-fixed-random-selection run-gro-ablation run-svp run-gor run-sor run-fahl help
+TEST_OBJECTS = \
+	tests/gro_test.o \
+	tests/gro_baseline_test.o \
+	tests/gro_selection_debug_test.o \
+	tests/gro_reroute_debug_test.o \
+	tests/gro_fixed_random_selection_test.o \
+	tests/gro_ablation_test.o \
+	tests/mh_synthetic_experiment.o \
+	tests/svp_test.o \
+	tests/gor_test.o \
+	tests/sor_test.o \
+	tests/fahl_test.o
 
-# 默认目标 - 只构建，不运行测试或实验
+ABLATION_METHODS = \
+	baseline_random_normal \
+	baseline_delayed_normal \
+	baseline_random_tdg_reroute \
+	baseline_delayed_tdg_reroute \
+	tdg_anchor_normal \
+	tdg_excess_normal \
+	tdg_anchor_full \
+	tdg_excess_full
+
+.PHONY: \
+	all build clean rebuild test help \
+	run-gro run-gro-baseline run-gro-selection-debug run-gro-reroute-debug \
+	run-gro-fixed-random-selection run-gro-ablation \
+	run-svp run-gor run-sor run-fahl \
+	run-ablation-methods merge-ablation-methods check-ablation-methods \
+	run-ablation-baseline-random-normal \
+	run-ablation-baseline-delayed-normal \
+	run-ablation-baseline-random-tdg-reroute \
+	run-ablation-baseline-delayed-tdg-reroute \
+	run-ablation-tdg-anchor-normal \
+	run-ablation-tdg-excess-normal \
+	run-ablation-tdg-anchor-full \
+	run-ablation-tdg-excess-full
+
 all: build
 
-# 构建项目
 build: $(TARGETS)
 	@echo "✓ 构建完成"
 
-# 链接可执行文件
-gro_test: $(OBJECTS_LIB) $(GRO_TEST_OBJECTS) Makefile
+gro_test: $(OBJECTS_LIB) tests/gro_test.o Makefile
 	$(CXX) $(CXXFLAGS) $(OPENMP_FLAGS) -o $@ $(filter-out Makefile,$^) $(LIB_DIRS) $(LIBS)
 
-gro_baseline_test: $(OBJECTS_LIB) $(GRO_BASELINE_TEST_OBJECTS) Makefile
+gro_baseline_test: $(OBJECTS_LIB) tests/gro_baseline_test.o Makefile
 	$(CXX) $(CXXFLAGS) $(OPENMP_FLAGS) -o $@ $(filter-out Makefile,$^) $(LIB_DIRS) $(LIBS)
 
-gro_selection_debug_test: $(OBJECTS_LIB) $(GRO_SELECTION_DEBUG_TEST_OBJECTS) Makefile
+gro_selection_debug_test: $(OBJECTS_LIB) tests/gro_selection_debug_test.o Makefile
 	$(CXX) $(CXXFLAGS) $(OPENMP_FLAGS) -o $@ $(filter-out Makefile,$^) $(LIB_DIRS) $(LIBS)
 
-gro_reroute_debug_test: $(OBJECTS_LIB) $(GRO_REROUTE_DEBUG_TEST_OBJECTS) Makefile
+gro_reroute_debug_test: $(OBJECTS_LIB) tests/gro_reroute_debug_test.o Makefile
 	$(CXX) $(CXXFLAGS) $(OPENMP_FLAGS) -o $@ $(filter-out Makefile,$^) $(LIB_DIRS) $(LIBS)
 
-gro_fixed_random_selection_test: $(OBJECTS_LIB) $(GRO_FIXED_RANDOM_SELECTION_TEST_OBJECTS) Makefile
+gro_fixed_random_selection_test: $(OBJECTS_LIB) tests/gro_fixed_random_selection_test.o Makefile
 	$(CXX) $(CXXFLAGS) $(OPENMP_FLAGS) -o $@ $(filter-out Makefile,$^) $(LIB_DIRS) $(LIBS)
 
-gro_ablation_test: $(OBJECTS_LIB) $(GRO_ABLATION_TEST_OBJECTS) Makefile
+gro_ablation_test: $(OBJECTS_LIB) tests/gro_ablation_test.o Makefile
 	$(CXX) $(CXXFLAGS) $(OPENMP_FLAGS) -o $@ $(filter-out Makefile,$^) $(LIB_DIRS) $(LIBS)
 
-mh_synthetic_experiment: $(OBJECTS_LIB) $(MH_SYNTHETIC_EXPERIMENT_OBJECTS) Makefile
+mh_synthetic_experiment: $(OBJECTS_LIB) tests/mh_synthetic_experiment.o Makefile
 	$(CXX) $(CXXFLAGS) $(OPENMP_FLAGS) -o $@ $(filter-out Makefile,$^) $(LIB_DIRS) $(LIBS)
 
-svp_test: $(OBJECTS_LIB) $(SVP_TEST_OBJECTS) Makefile
+svp_test: $(OBJECTS_LIB) tests/svp_test.o Makefile
 	$(CXX) $(CXXFLAGS) $(OPENMP_FLAGS) -o $@ $(filter-out Makefile,$^) $(LIB_DIRS) $(LIBS)
 
-gor_test: $(OBJECTS_LIB) $(GOR_TEST_OBJECTS) Makefile
+gor_test: $(OBJECTS_LIB) tests/gor_test.o Makefile
 	$(CXX) $(CXXFLAGS) $(OPENMP_FLAGS) -o $@ $(filter-out Makefile,$^) $(LIB_DIRS) $(LIBS)
 
-sor_test: $(OBJECTS_LIB) $(SOR_TEST_OBJECTS) Makefile
+sor_test: $(OBJECTS_LIB) tests/sor_test.o Makefile
 	$(CXX) $(CXXFLAGS) $(OPENMP_FLAGS) -o $@ $(filter-out Makefile,$^) $(LIB_DIRS) $(LIBS)
 
-fahl_test: $(OBJECTS_LIB) $(FAHL_TEST_OBJECTS) Makefile
+fahl_test: $(OBJECTS_LIB) tests/fahl_test.o Makefile
 	$(CXX) $(CXXFLAGS) $(OPENMP_FLAGS) -o $@ $(filter-out Makefile,$^) $(LIB_DIRS) $(LIBS)
 
-# 编译 .cpp 文件为 .o 文件
-%.o: %.cpp Makefile
+%.o: %.cpp $(HEADERS) Makefile
 	$(CXX) $(CXXFLAGS) $(OPENMP_FLAGS) $(INCLUDE_DIRS) -c $< -o $@
 
-# 运行测试
 test: build
 	./gro_test $(TEST_CONFIG)
 	./gro_baseline_test $(TEST_CONFIG)
@@ -112,7 +159,6 @@ test: build
 	./fahl_test $(TEST_CONFIG)
 	@echo "✓ 测试完成"
 
-# 单独运行某个测试
 run-gro: gro_test
 	./gro_test $(TEST_CONFIG)
 
@@ -143,31 +189,105 @@ run-sor: sor_test
 run-fahl: fahl_test
 	./fahl_test $(TEST_CONFIG)
 
-# 清理构建输出
+$(RESULTS_DIR):
+	mkdir -p $(RESULTS_DIR)
+
+define RUN_ABLATION
+./gro_ablation_test $(ABLATION_CONFIG) \
+  --query-dir $(QUERY_DIR) \
+  --output $(RESULTS_DIR)/gro_ablation_$(1).csv \
+  --selection-methods $(2) \
+  --reroute-methods $(3) \
+  --fixed-fractions $(FIXED_FRACTIONS) \
+  --tdg-gammas $(TDG_GAMMAS) \
+  --impact-weights $(IMPACT_WEIGHTS) \
+  --random-seed $(RANDOM_SEED)
+endef
+
+run-ablation-methods: \
+	run-ablation-baseline-random-normal \
+	run-ablation-baseline-delayed-normal \
+	run-ablation-baseline-random-tdg-reroute \
+	run-ablation-baseline-delayed-tdg-reroute \
+	run-ablation-tdg-anchor-normal \
+	run-ablation-tdg-excess-normal \
+	run-ablation-tdg-anchor-full \
+	run-ablation-tdg-excess-full
+
+run-ablation-baseline-random-normal: gro_ablation_test | $(RESULTS_DIR)
+	$(call RUN_ABLATION,baseline_random_normal,random,normal)
+
+run-ablation-baseline-delayed-normal: gro_ablation_test | $(RESULTS_DIR)
+	$(call RUN_ABLATION,baseline_delayed_normal,most_delayed,normal)
+
+run-ablation-baseline-random-tdg-reroute: gro_ablation_test | $(RESULTS_DIR)
+	$(call RUN_ABLATION,baseline_random_tdg_reroute,random,tdg)
+
+run-ablation-baseline-delayed-tdg-reroute: gro_ablation_test | $(RESULTS_DIR)
+	$(call RUN_ABLATION,baseline_delayed_tdg_reroute,most_delayed,tdg)
+
+run-ablation-tdg-anchor-normal: gro_ablation_test | $(RESULTS_DIR)
+	$(call RUN_ABLATION,tdg_anchor_normal,tdg_anchor,normal)
+
+run-ablation-tdg-excess-normal: gro_ablation_test | $(RESULTS_DIR)
+	$(call RUN_ABLATION,tdg_excess_normal,tdg_excess,normal)
+
+run-ablation-tdg-anchor-full: gro_ablation_test | $(RESULTS_DIR)
+	$(call RUN_ABLATION,tdg_anchor_full,tdg_anchor,tdg)
+
+run-ablation-tdg-excess-full: gro_ablation_test | $(RESULTS_DIR)
+	$(call RUN_ABLATION,tdg_excess_full,tdg_excess,tdg)
+
+merge-ablation-methods: | $(RESULTS_DIR)
+	@first=1; \
+	for method in $(ABLATION_METHODS); do \
+	  file="$(RESULTS_DIR)/gro_ablation_$$method.csv"; \
+	  if [ ! -f "$$file" ]; then \
+	    echo "missing $$file"; \
+	    exit 1; \
+	  fi; \
+	  if [ $$first -eq 1 ]; then \
+	    head -1 "$$file" > "$(RESULTS_DIR)/gro_ablation.csv"; \
+	    first=0; \
+	  fi; \
+	  tail -n +2 "$$file" >> "$(RESULTS_DIR)/gro_ablation.csv"; \
+	done; \
+	echo "wrote $(RESULTS_DIR)/gro_ablation.csv"
+
+check-ablation-methods:
+	@for method in $(ABLATION_METHODS); do \
+	  file="$(RESULTS_DIR)/gro_ablation_$$method.csv"; \
+	  if [ -f "$$file" ]; then \
+	    wc -l "$$file"; \
+	  else \
+	    echo "missing $$file"; \
+	  fi; \
+	done
+
 clean:
-	@rm -f $(OBJECTS_LIB) $(GRO_TEST_OBJECTS) $(GRO_BASELINE_TEST_OBJECTS) $(GRO_SELECTION_DEBUG_TEST_OBJECTS) $(GRO_REROUTE_DEBUG_TEST_OBJECTS) $(GRO_FIXED_RANDOM_SELECTION_TEST_OBJECTS) $(MH_SYNTHETIC_EXPERIMENT_OBJECTS) $(SVP_TEST_OBJECTS) $(GOR_TEST_OBJECTS) $(SOR_TEST_OBJECTS) $(FAHL_TEST_OBJECTS) $(TARGETS)
+	@rm -f $(OBJECTS_LIB) $(TEST_OBJECTS) $(TARGETS)
 	@echo "✓ 清理完成"
 
-# 重新构建
 rebuild: clean build
 
-# 显示帮助信息
 help:
-	@echo "可用命令："
-	@echo "  make          - 构建项目"
-	@echo "  make test     - 使用小数据运行测试"
-	@echo "  make run-gro  - 只运行 gro_test"
-	@echo "  make run-gro-baseline - 只运行 gro_baseline_test"
-	@echo "  make run-gro-selection-debug - 只运行 gro_selection_debug_test"
-	@echo "  make run-gro-reroute-debug - 只运行 gro_reroute_debug_test"
-	@echo "  make run-gro-fixed-random-selection - 只运行 gro_fixed_random_selection_test"
-	@echo "  make run-svp  - 只运行 svp_test"
-	@echo "  make run-gor  - 只运行 gor_test"
-	@echo "  make run-sor  - 只运行 sor_test"
-	@echo "  make run-fahl - 只运行 fahl_test"
-	@echo "  make run-gro TEST_CONFIG=config/config.yaml - 指定配置文件运行"
+	@echo "Build:"
+	@echo "  make                         - build all executables"
+	@echo "  make gro_ablation_test        - build one executable"
+	@echo "  make clean                    - remove build outputs"
+	@echo "  make rebuild                  - clean and build"
+	@echo ""
+	@echo "Tests:"
+	@echo "  make test                     - run core unit/smoke tests"
+	@echo "  make run-gro TEST_CONFIG=...  - run gro_test with a config"
+	@echo ""
+	@echo "Experiments:"
+	@echo "  make run-ablation-methods     - run all method-split ablations sequentially"
+	@echo "  make merge-ablation-methods   - merge method CSVs into gro_ablation.csv"
+	@echo "  make check-ablation-methods   - show method CSV row counts"
+	@echo ""
+	@echo "Overrides:"
+	@echo "  ABLATION_CONFIG=config/config.yaml QUERY_DIR=data/MH_Synthetic_query_sets"
+	@echo "  FIXED_FRACTIONS=10,30 TDG_GAMMAS=50 IMPACT_WEIGHTS=30 RANDOM_SEED=0"
 	@echo "  Linux/server: make"
-	@echo "  macOS Homebrew GCC: make CXX=g++-14 （如果自动检测不到）"
-	@echo "  make clean    - 清理编译文件"
-	@echo "  make rebuild  - 清理并重新构建"
-	@echo "  make help     - 显示此帮助信息"
+	@echo "  macOS Homebrew GCC: make CXX=g++-14"

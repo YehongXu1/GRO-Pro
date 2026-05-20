@@ -1,84 +1,109 @@
 # Executables
 
-Build all executables:
+This file records the commands we currently use. Prefer the `make` targets for
+repeatable experiments; use direct executable commands only for diagnostics or
+one-off runs.
+
+## Build
+
+Build everything:
 
 ```bash
 make
 ```
 
-Run all MH synthetic experiments:
+Build only the iterative ablation runner:
 
 ```bash
-./mh_synthetic_experiment config/config.yaml \
-  --query-dir data/MH_Synthetic_query_sets \
-  --output python/results/mh_synthetic_all_cpp.csv \
-  --algorithms tdg,baseline,tdg_selection_baseline,tdg_reroute_baseline
+make gro_ablation_test
 ```
 
-The C++ runner writes all plotted series into the main CSV. Prefer this path
-for new experiments so figures and data files have a one-to-one relationship.
-
-Plot the existing MH synthetic C++ result CSV with total travel time on the
-y-axis:
+Run the small test suite:
 
 ```bash
-python3 python/display_mh_synthetic_total.py \
-  --input python/results/mh_synthetic_all_cpp.csv \
-  --output python/results/mh_synthetic_all_cpp_mean_total.png \
-  --summary-output python/results/mh_synthetic_all_cpp_mean_total.csv
+make test
 ```
 
-Run a small MH synthetic smoke test:
+Useful overrides:
 
 ```bash
-./mh_synthetic_experiment config/config.yaml \
-  --query-dir data/MH_Synthetic_query_sets \
-  --output python/results/mh_synthetic_smoke_cpp.csv \
-  --algorithms tdg,baseline,tdg_selection_baseline,tdg_reroute_baseline \
-  --max-files 1
+make CXX=g++-14
+make ABLATION_CONFIG=config/config.yaml QUERY_DIR=data/MH_Synthetic_query_sets
 ```
 
-Run one MH synthetic seed across all hop/rep settings:
+## Main Iterative Ablation
+
+Preferred output layout: one CSV per method, all MH synthetic query sets inside
+each file.
+
+Run all method-split ablations sequentially:
 
 ```bash
-./mh_synthetic_experiment config/config.yaml \
-  --query-dir data/MH_Synthetic_query_sets \
-  --output python/results/mh_synthetic_seed1_cpp.csv \
-  --algorithms tdg,baseline,tdg_selection_baseline,tdg_reroute_baseline \
-  --seed 1 \
-  --max-iterations 10
+make run-ablation-methods
 ```
 
-Run one MH synthetic panel:
+On a server:
 
 ```bash
-./mh_synthetic_experiment config/config.yaml \
-  --query-dir data/MH_Synthetic_query_sets \
-  --output python/results/mh_synthetic_hop20_rep2_seed1_cpp.csv \
-  --algorithms tdg,baseline,tdg_selection_baseline,tdg_reroute_baseline \
-  --hop 20 \
-  --rep 2 \
-  --seed 1
+nohup make run-ablation-methods > gro_ablation_methods.log 2>&1 &
 ```
 
-Run baseline unit test:
+Check result file row counts:
 
 ```bash
-./gro_baseline_test config/test_config.yaml
+make check-ablation-methods
 ```
 
-Run the no-candidate-filter selection diagnostic:
+Merge the method files into one CSV:
 
 ```bash
-./gro_selection_debug_test config/config.yaml \
-  --query-file data/MH_Synthetic_query_sets/Hop10Rep1-0.txt \
-  --output python/results/gro_selection_debug_iterations.csv \
-  --gamma-values 0,25,50,75,100 \
-  --removal-modes all_nodes,congestion_important,anchor_important \
-  --random-seed 0
+make merge-ablation-methods
 ```
 
-Run the same diagnostic on the full MH synthetic query directory:
+The method-split targets are:
+
+```bash
+make run-ablation-baseline-random-normal
+make run-ablation-baseline-delayed-normal
+make run-ablation-baseline-random-tdg-reroute
+make run-ablation-baseline-delayed-tdg-reroute
+make run-ablation-tdg-anchor-normal
+make run-ablation-tdg-excess-normal
+make run-ablation-tdg-anchor-full
+make run-ablation-tdg-excess-full
+```
+
+To run method jobs in parallel on a server:
+
+```bash
+nohup make run-ablation-baseline-random-normal > gro_ablation_baseline_random_normal.log 2>&1 &
+nohup make run-ablation-baseline-delayed-normal > gro_ablation_baseline_delayed_normal.log 2>&1 &
+nohup make run-ablation-baseline-random-tdg-reroute > gro_ablation_baseline_random_tdg_reroute.log 2>&1 &
+nohup make run-ablation-baseline-delayed-tdg-reroute > gro_ablation_baseline_delayed_tdg_reroute.log 2>&1 &
+nohup make run-ablation-tdg-anchor-normal > gro_ablation_tdg_anchor_normal.log 2>&1 &
+nohup make run-ablation-tdg-excess-normal > gro_ablation_tdg_excess_normal.log 2>&1 &
+nohup make run-ablation-tdg-anchor-full > gro_ablation_tdg_anchor_full.log 2>&1 &
+nohup make run-ablation-tdg-excess-full > gro_ablation_tdg_excess_full.log 2>&1 &
+```
+
+Expected output files:
+
+```text
+python/results/gro_ablation_baseline_random_normal.csv
+python/results/gro_ablation_baseline_delayed_normal.csv
+python/results/gro_ablation_baseline_random_tdg_reroute.csv
+python/results/gro_ablation_baseline_delayed_tdg_reroute.csv
+python/results/gro_ablation_tdg_anchor_normal.csv
+python/results/gro_ablation_tdg_excess_normal.csv
+python/results/gro_ablation_tdg_anchor_full.csv
+python/results/gro_ablation_tdg_excess_full.csv
+python/results/gro_ablation.csv
+```
+
+## Diagnostics
+
+Selection-only diagnostic. This uses the older TDG selection debug runner, not
+the new `tdg_excess` selection.
 
 ```bash
 nohup ./gro_selection_debug_test config/config.yaml \
@@ -90,8 +115,7 @@ nohup ./gro_selection_debug_test config/config.yaml \
   > gro_selection_debug_removal_modes.log 2>&1 &
 ```
 
-Run fixed-size simple selection baselines, such as random and most-delayed
-queries at 10% and 30%:
+Simple selection-only baselines:
 
 ```bash
 nohup ./gro_fixed_random_selection_test config/config.yaml \
@@ -103,17 +127,7 @@ nohup ./gro_fixed_random_selection_test config/config.yaml \
   > gro_simple_selection_baselines_10_30.log 2>&1 &
 ```
 
-Run the reroute diagnostic with random selected queries:
-
-```bash
-./gro_reroute_debug_test config/config.yaml \
-  --query-file data/MH_Synthetic_query_sets/Hop10Rep1-0.txt \
-  --output python/results/gro_reroute_debug_smoke.csv \
-  --impact-weights 0,5,15,30,50,100 \
-  --random-seed 0
-```
-
-Run the reroute diagnostic on the full MH synthetic query directory:
+Reroute-only diagnostic:
 
 ```bash
 nohup ./gro_reroute_debug_test config/config.yaml \
@@ -124,68 +138,39 @@ nohup ./gro_reroute_debug_test config/config.yaml \
   > gro_reroute_debug.log 2>&1 &
 ```
 
-Run the iterative end-to-end GRO component ablation. Each method combination
-runs the full `max_iterations` loop from `config/config.yaml`.
+No-cap stability checks:
 
 ```bash
-./gro_ablation_test config/config.yaml \
-  --query-file data/MH_Synthetic_query_sets/Hop10Rep1-0.txt \
-  --output python/results/gro_ablation_smoke.csv \
-  --selection-methods random,most_delayed,tdg_anchor,tdg_excess \
-  --reroute-methods normal,tdg \
-  --fixed-fractions 10,30 \
-  --tdg-gammas 50 \
-  --impact-weights 30 \
-  --hop 10 \
-  --rep 1 \
-  --random-seed 0
+./mh_synthetic_experiment config/config_no_cap.yaml \
+  --query-dir data/MH_Synthetic_query_sets \
+  --output python/results/random30_normal_no_cap_all_time64.csv \
+  --algorithms baseline
+
+./mh_synthetic_experiment config/config_no_cap_beta2.yaml \
+  --query-dir data/MH_Synthetic_query_sets \
+  --output python/results/random30_normal_no_cap_beta2_all_time64.csv \
+  --algorithms baseline
 ```
 
-Run the iterative end-to-end GRO component ablation split by MH synthetic
-configuration. Each job writes
-`20 datasets x 12 method combinations x 5 iterations = 1200` rows with the
-default `max_iterations=5`.
+## Python Analysis
+
+Use the existing plot environment directly:
 
 ```bash
-for hop in 10 20 40; do
-  for rep in 1 2 4; do
-    nohup ./gro_ablation_test config/config.yaml \
-      --query-dir data/MH_Synthetic_query_sets \
-      --hop "$hop" \
-      --rep "$rep" \
-      --output "python/results/gro_ablation_Hop${hop}Rep${rep}.csv" \
-      --selection-methods random,most_delayed,tdg_anchor,tdg_excess \
-      --reroute-methods normal,tdg \
-      --fixed-fractions 10,30 \
-      --tdg-gammas 50 \
-      --impact-weights 30 \
-      --random-seed 0 \
-      > "gro_ablation_Hop${hop}Rep${rep}.log" 2>&1 &
-  done
-done
+/Users/xyh/opt/anaconda3/envs/plot/bin/python \
+  python/compare_selection_with_simple_baselines.py \
+  --tdg-selection python/results/gro_selection_debug_removal_modes.csv \
+  --simple-baselines python/results/gro_simple_selection_baselines_10_30.csv \
+  --output-dir python/results
 ```
 
-Merge the nine ablation output files:
+## Unit Tests
 
-```bash
-head -1 python/results/gro_ablation_Hop10Rep1.csv > python/results/gro_ablation.csv
-for hop in 10 20 40; do
-  for rep in 1 2 4; do
-    tail -n +2 "python/results/gro_ablation_Hop${hop}Rep${rep}.csv" \
-      >> python/results/gro_ablation.csv
-  done
-done
-```
-
-Run GRO unit test:
+Run individual tests:
 
 ```bash
 ./gro_test config/test_config.yaml
-```
-
-Run other baseline unit tests:
-
-```bash
+./gro_baseline_test config/test_config.yaml
 ./svp_test config/test_config.yaml
 ./gor_test config/test_config.yaml
 ./sor_test config/test_config.yaml

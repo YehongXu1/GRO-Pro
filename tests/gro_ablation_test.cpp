@@ -984,7 +984,7 @@ int main(int argc, char** argv) {
                             std::vector<int> weights =
                                 reroute_method_option == "tdg"
                                     ? options.impact_weights
-                                    : std::vector<int>{-1};
+                                    : std::vector<int>{0};
 
                             for (int impact_weight : weights) {
                                 std::vector<gro::Route> routes = initial_routes;

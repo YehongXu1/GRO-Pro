@@ -14,6 +14,9 @@ gro_test
 gro_baseline_test
 gro_selection_debug_test
 gro_reroute_debug_test
+gro_fixed_random_selection_test
+gro_ablation_test
+mh_synthetic_experiment
 svp_test
 gor_test
 sor_test
@@ -47,4 +50,6 @@ tmp/
 
 #python
 .python
+python/results/
+*.log
  
