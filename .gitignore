@@ -16,6 +16,7 @@ gro_selection_debug_test
 gro_reroute_debug_test
 gro_fixed_random_selection_test
 gro_ablation_test
+gro_slot_legacy_ablation_test
 mh_synthetic_experiment
 svp_test
 gor_test
@@ -50,6 +51,9 @@ tmp/
 
 #python
 .python
+__pycache__/
+*.pyc
 python/results/
+python/figures/
 *.log
  

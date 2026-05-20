@@ -1,3 +1,0 @@
-method,dataset,hop,rep,seed,iteration,total_travel_time,candidate_count,selected_count,reroute_count,batch_count,evaluate_sec,candidate_sec,select_sec,batch_sec,reroute_sec,iteration_sec,run_sec
-gro,Hop10Rep1-0,10,1,0,-1,25716996,,,,,,,,,,,1.587804
-gro,Hop10Rep1-0,10,1,0,0,27030182,300,146,146,28,,0.028715,0.161044,0.046299,0.077311,,

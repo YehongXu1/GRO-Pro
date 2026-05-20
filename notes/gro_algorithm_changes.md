@@ -296,3 +296,108 @@ capacity <= 5: 1514 / 36792 edges, about 4.1%
 This is intentionally conservative. It removes the most extreme artificial
 penalties while leaving normal-capacity roads governed by the BPR congestion
 model.
+
+## BPR Congestion Threshold
+
+### Motivation
+
+The previous ContGRO implementation only applied the BPR congestion penalty when
+the current flow exceeded edge capacity:
+
+```text
+if flow <= capacity: travel_time = free_flow_time
+```
+
+The refactored implementation had been applying a small BPR penalty even below
+capacity. That changes the experimental semantics: TDG impact, candidate/query
+selection, TDG rerouting, and final total travel time all see congestion on roads
+that the earlier project treated as uncongested.
+
+### Change
+
+The current evaluator now follows the old experimental semantics:
+
+```text
+capacity <= min_bpr_capacity  => free_flow_time
+flow <= capacity              => free_flow_time
+flow > capacity               => BPR travel time
+```
+
+This makes the current project comparable to the older MH synthetic results.
+
+## MH Length-to-Time Graph Parsing
+
+### Motivation
+
+The MH graph file uses the older `% |V| |E|` format. In the previous ContGRO
+code, the third column of each edge is physical length, not free-flow travel
+time. The old reader converted it as:
+
+```text
+free_flow_time = round(length_meters / 60000 * 3600)
+capacity       = round(length_meters / 40)
+```
+
+The refactored reader had been treating that third column directly as
+free-flow time. For MH, this inflated base travel time by roughly 16.7x and
+therefore changed traffic evaluation, TDG impact, selection, rerouting, and all
+reported total travel times.
+
+### Change
+
+For `%`-header graph files, three-column edges are now parsed using the old
+length-to-time conversion. Five-column graph files, such as BJ, still use the
+provided edge time and capacity directly.
+
+## TDG BPR Relief Selection
+
+### Motivation
+
+`tdg_excess` can be too conservative on sparse workloads such as Rep1. It
+selects queries only when removing them substantially reduces TDG excess mass,
+so it may miss queries that still have rerouting value under the time-dependent
+BPR cost used by normal TD-Dijkstra.
+
+### Change
+
+A new selection method was added:
+
+```text
+tdg_bpr_relief
+```
+
+It keeps the same high-level selection pipeline:
+
+```text
+build TDG -> compute TDG impact -> score routes -> select by automatic score mass
+```
+
+but changes the TDG node score. For each TDG node, it computes an unthresholded
+BPR marginal relief:
+
+```text
+soft_bpr(flow) - soft_bpr(flow - 1)
+```
+
+This is used only as a selection proxy. The actual traffic evaluation still uses
+the configured evaluator semantics, including `min_bpr_capacity`,
+`flow <= capacity => free_flow_time`, and `max_time`.
+
+The marginal relief is log-normalized and multiplied by normalized TDG impact.
+Each query score is the sum of unique TDG node scores along its current
+trajectory. The method sorts queries by this score and selects until the
+cumulative selected score reaches `gamma%` of all positive query score mass.
+
+### Usage
+
+Example:
+
+```bash
+./gro_ablation_test config/config_bj.yaml \
+  --query-dir data/BJ_Synthetic_query_sets \
+  --output python/results/bj/gro_ablation_tdg_bpr_relief_normal.csv \
+  --selection-methods tdg_bpr_relief \
+  --reroute-methods normal \
+  --tdg-gammas 25,50 \
+  --random-seed 0
+```

@@ -1522,6 +1522,260 @@ std::vector<QueryId> GROAlgorithm::select_queries_by_excess_relief(
         iteration);
 }
 
+std::vector<QueryId> GROAlgorithm::select_queries_by_bpr_relief(
+    const std::unordered_set<QueryId>& candidate_set,
+    const std::vector<Query>& queries,
+    const TrafficResult& result,
+    const TrafficDependencyGraph& tdg,
+    const std::vector<Cost>& node_impacts,
+    int iteration) const {
+    (void)queries;
+    auto total_start = Clock::now();
+    if (candidate_set.empty() || tdg.nodes.empty()) {
+        log_select_summary(
+            options_.enable_timing_log,
+            iteration,
+            static_cast<long long>(candidate_set.size()),
+            0,
+            0,
+            0,
+            0,
+            0,
+            elapsed_us(total_start));
+        return {};
+    }
+
+    auto prepare_start = Clock::now();
+    std::vector<double> selection_impacts =
+        normalize_tdg_impacts_for_selection(node_impacts);
+
+    auto soft_bpr_time = [&](const Edge& edge, Flow flow) -> long double {
+        if (edge.capacity <= 0 ||
+            (traffic_options_.min_bpr_capacity > 0 &&
+             edge.capacity <= traffic_options_.min_bpr_capacity)) {
+            return static_cast<long double>(edge.free_flow_time);
+        }
+
+        Flow safe_flow = std::max<Flow>(0, flow);
+        long double ratio =
+            static_cast<long double>(safe_flow) /
+            static_cast<long double>(edge.capacity);
+        long double penalty =
+            static_cast<long double>(edge.free_flow_time) *
+            static_cast<long double>(traffic_options_.alpha) /
+            100.0L *
+            std::pow(ratio, traffic_options_.beta);
+        return static_cast<long double>(edge.free_flow_time) + penalty;
+    };
+
+    std::vector<long double> node_margins(tdg.nodes.size(), 0.0L);
+    std::vector<long double> positive_margins;
+    positive_margins.reserve(tdg.nodes.size());
+    for (const TDGNode& node : tdg.nodes) {
+        if (node.id < 0 ||
+            node.id >= static_cast<TDGNodeId>(tdg.nodes.size()) ||
+            node.id >= static_cast<TDGNodeId>(selection_impacts.size()) ||
+            node.edge_id < 0 ||
+            node.edge_id >= static_cast<EdgeId>(graph_.edges.size()) ||
+            node.flow <= 0) {
+            continue;
+        }
+
+        const Edge& edge = graph_.edges[node.edge_id];
+        long double current_time = soft_bpr_time(edge, node.flow);
+        long double without_one_time = soft_bpr_time(edge, node.flow - 1);
+        if (current_time <= without_one_time) {
+            continue;
+        }
+
+        long double margin = current_time - without_one_time;
+        node_margins[node.id] = margin;
+        positive_margins.push_back(margin);
+    }
+
+    if (positive_margins.empty()) {
+        long long prepare_us = elapsed_us(prepare_start);
+        log_select_summary(
+            options_.enable_timing_log,
+            iteration,
+            static_cast<long long>(candidate_set.size()),
+            0,
+            prepare_us,
+            0,
+            0,
+            0,
+            elapsed_us(total_start));
+        return {};
+    }
+
+    size_t margin_clip_index =
+        percentile_index(positive_margins.size(), 99);
+    std::nth_element(
+        positive_margins.begin(),
+        positive_margins.begin() + margin_clip_index,
+        positive_margins.end());
+    long double margin_clip =
+        std::max<long double>(1.0L, positive_margins[margin_clip_index]);
+    const long double log_margin_clip = std::log1p(margin_clip);
+    std::vector<long double> node_scores(tdg.nodes.size(), 0.0L);
+    for (TDGNodeId node_id = 0;
+         node_id < static_cast<TDGNodeId>(tdg.nodes.size());
+         ++node_id) {
+        if (node_id >= static_cast<TDGNodeId>(selection_impacts.size()) ||
+            node_margins[node_id] <= 0.0L ||
+            selection_impacts[node_id] <= 0.0) {
+            continue;
+        }
+
+        long double clipped_margin = std::min(
+            node_margins[node_id],
+            margin_clip);
+        long double normalized_margin =
+            std::log1p(clipped_margin) / log_margin_clip;
+        node_scores[node_id] =
+            normalized_margin *
+            static_cast<long double>(selection_impacts[node_id]);
+    }
+    long long prepare_us = elapsed_us(prepare_start);
+
+    std::vector<QueryId> candidate_ids(
+        candidate_set.begin(),
+        candidate_set.end());
+    std::sort(candidate_ids.begin(), candidate_ids.end());
+
+    std::vector<int> seen(tdg.nodes.size(), 0);
+    int seen_epoch = 0;
+    auto route_score = [&](const Trajectory& trajectory) -> long double {
+        ++seen_epoch;
+        if (seen_epoch == std::numeric_limits<int>::max()) {
+            std::fill(seen.begin(), seen.end(), 0);
+            seen_epoch = 1;
+        }
+
+        long double score = 0.0L;
+        for (TDGNodeId node_id : trajectory.tdg_node_ids) {
+            if (node_id < 0 ||
+                node_id >= static_cast<TDGNodeId>(node_scores.size()) ||
+                seen[node_id] == seen_epoch) {
+                continue;
+            }
+            seen[node_id] = seen_epoch;
+            score += node_scores[node_id];
+        }
+        return score;
+    };
+
+    auto rank_start = Clock::now();
+    std::vector<std::pair<long double, QueryId>> ranking;
+    ranking.reserve(candidate_ids.size());
+    long double total_positive_score = 0.0L;
+    for (QueryId query_id : candidate_ids) {
+        if (query_id < 0 ||
+            query_id >= static_cast<QueryId>(result.trajectories.size())) {
+            continue;
+        }
+
+        long double score = route_score(result.trajectories[query_id]);
+        if (score <= 0.0L) {
+            continue;
+        }
+        ranking.push_back({score, query_id});
+        total_positive_score += score;
+    }
+
+    std::sort(
+        ranking.begin(),
+        ranking.end(),
+        [](const auto& lhs, const auto& rhs) {
+            if (lhs.first != rhs.first) {
+                return lhs.first > rhs.first;
+            }
+            return lhs.second < rhs.second;
+        });
+    long long rank_us = elapsed_us(rank_start);
+
+    if (ranking.empty() || total_positive_score <= 0.0L) {
+        log_select_summary(
+            options_.enable_timing_log,
+            iteration,
+            static_cast<long long>(candidate_set.size()),
+            0,
+            prepare_us,
+            rank_us,
+            0,
+            0,
+            elapsed_us(total_start));
+        return {};
+    }
+
+    int clamped_gamma = std::clamp(options_.gamma, 0, 100);
+    if (clamped_gamma <= 0) {
+        log_select_summary(
+            options_.enable_timing_log,
+            iteration,
+            static_cast<long long>(candidate_set.size()),
+            0,
+            prepare_us,
+            rank_us,
+            0,
+            0,
+            elapsed_us(total_start));
+        return {};
+    }
+
+    long double target_score =
+        total_positive_score *
+        static_cast<long double>(clamped_gamma) /
+        100.0L;
+
+    auto scan_start = Clock::now();
+    std::vector<QueryId> selected_queries;
+    selected_queries.reserve(ranking.size());
+    long double covered_score = 0.0L;
+    for (const auto& item : ranking) {
+        if (covered_score >= target_score && !selected_queries.empty()) {
+            break;
+        }
+        selected_queries.push_back(item.second);
+        covered_score += item.first;
+    }
+    std::sort(selected_queries.begin(), selected_queries.end());
+    long long scan_us = elapsed_us(scan_start);
+
+    log_select_summary(
+        options_.enable_timing_log,
+        iteration,
+        static_cast<long long>(candidate_set.size()),
+        static_cast<long long>(selected_queries.size()),
+        prepare_us,
+        rank_us,
+        scan_us,
+        0,
+        elapsed_us(total_start));
+    return selected_queries;
+}
+
+std::vector<QueryId> GROAlgorithm::select_queries_by_bpr_relief(
+    const std::vector<Query>& queries,
+    const TrafficResult& result,
+    const TrafficDependencyGraph& tdg,
+    const std::vector<Cost>& node_impacts,
+    int iteration) const {
+    std::unordered_set<QueryId> candidate_set;
+    for (QueryId query_id = 0;
+         query_id < static_cast<QueryId>(queries.size());
+         ++query_id) {
+        candidate_set.insert(query_id);
+    }
+    return select_queries_by_bpr_relief(
+        candidate_set,
+        queries,
+        result,
+        tdg,
+        node_impacts,
+        iteration);
+}
+
 std::vector<std::vector<QueryId>> GROAlgorithm::batch_queries(
     const std::vector<QueryId>& selected_query_ids,
     const TrafficDependencyGraph &tdg,

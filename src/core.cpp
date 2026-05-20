@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <cctype>
 #include <chrono>
+#include <cmath>
 #include <filesystem>
 #include <fstream>
 #include <iomanip>
@@ -316,6 +317,7 @@ Graph read_graph(const std::string& graph_path, const std::string& coordinates_p
 
     std::string line;
     int vertex_count = 0, edge_count = 0;
+    bool length_weight_format = false;
     while (std::getline(graph_file, line)) {
         line = trim(line);
         if (line[0] == '%') {
@@ -328,6 +330,7 @@ Graph read_graph(const std::string& graph_path, const std::string& coordinates_p
                 graph.incoming_edges.resize(vertex_count);
                 graph.node_coordinates.resize(vertex_count);
             }
+            length_weight_format = true;
             continue;
         }
 
@@ -361,8 +364,20 @@ Graph read_graph(const std::string& graph_path, const std::string& coordinates_p
         } else {
             edge.from = values[0];
             edge.to = values[1];
-            edge.free_flow_time = values[2];
-            edge.capacity = edge.free_flow_time / 40;  // Assume a default capacity based on free flow time if not provided
+            if (length_weight_format) {
+                double length_meters = static_cast<double>(values[2]);
+                edge.free_flow_time = std::max<Cost>(
+                    1,
+                    static_cast<Cost>(std::llround(length_meters / 60000.0 * 3600.0)));
+                edge.capacity = std::max<Flow>(
+                    1,
+                    static_cast<Flow>(std::llround(length_meters / 40.0)));
+            } else {
+                edge.free_flow_time = values[2];
+                edge.capacity = std::max<Flow>(
+                    1,
+                    static_cast<Flow>(edge.free_flow_time / 40));
+            }
         }
 
         NodeId max_node = std::max(edge.from, edge.to);
@@ -556,6 +571,9 @@ Cost bpr_travel_time(const Edge& edge, Flow flow, const TrafficOptions& options)
 
     Flow capacity = edge.capacity;
     Flow safe_flow = flow > 0 ? flow : 0;
+    if (safe_flow <= capacity) {
+        return edge.free_flow_time;
+    }
 
     __int128 numerator = static_cast<__int128>(edge.free_flow_time) * options.alpha;
     __int128 denominator = 100;

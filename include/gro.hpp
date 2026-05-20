@@ -164,6 +164,21 @@ public:
         const std::vector<Cost>& node_impacts,
         int iteration = -1) const;
 
+    std::vector<QueryId> select_queries_by_bpr_relief(
+        const std::unordered_set<QueryId>& candidate_query_ids,
+        const std::vector<Query>& queries,
+        const TrafficResult& result,
+        const TrafficDependencyGraph& tdg,
+        const std::vector<Cost>& node_impacts,
+        int iteration = -1) const;
+
+    std::vector<QueryId> select_queries_by_bpr_relief(
+        const std::vector<Query>& queries,
+        const TrafficResult& result,
+        const TrafficDependencyGraph& tdg,
+        const std::vector<Cost>& node_impacts,
+        int iteration = -1) const;
+
     std::vector<std::vector<QueryId>> batch_queries(
         const std::vector<QueryId>& selected_query_ids,
         const TrafficDependencyGraph& tdg,

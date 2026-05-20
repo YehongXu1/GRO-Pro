@@ -24,6 +24,7 @@ enum class RemovalMode {
     AllNodes,
     CongestionImportant,
     AnchorImportant,
+    BprRelief,
 };
 
 struct DatasetInfo {
@@ -206,7 +207,7 @@ Options parse_args(int argc, char** argv) {
             std::cout
                 << "Usage: ./gro_ablation_test [config] "
                 << "[--query-file path | --query-dir path] [--output path] "
-                << "[--selection-methods random,most_delayed,tdg_anchor,tdg_excess] "
+                << "[--selection-methods random,most_delayed,tdg_anchor,tdg_excess,tdg_bpr_relief] "
                 << "[--reroute-methods normal,tdg] "
                 << "[--fixed-fractions 10,30] [--tdg-gammas 50] "
                 << "[--impact-weights 30] "
@@ -467,6 +468,8 @@ std::vector<char> important_tdg_nodes(
             algorithm.compute_anchor_scores(traffic_result);
         return algorithm.mark_anchor_tdg_nodes(tdg, anchor_scores);
     }
+    case RemovalMode::BprRelief:
+        return all_tdg_nodes_important(tdg);
     }
     return all_tdg_nodes_important(tdg);
 }
@@ -479,6 +482,8 @@ std::string removal_mode_name(RemovalMode mode) {
         return "congestion_important";
     case RemovalMode::AnchorImportant:
         return "anchor_important";
+    case RemovalMode::BprRelief:
+        return "bpr_relief";
     }
     return "all_nodes";
 }
@@ -503,6 +508,10 @@ bool is_tdg_selection_method(const std::string& method) {
 
 bool is_tdg_excess_selection_method(const std::string& method) {
     return method == "tdg_excess" || method == "tdg_excess_relief";
+}
+
+bool is_tdg_bpr_relief_selection_method(const std::string& method) {
+    return method == "tdg_bpr_relief" || method == "tdg_marginal";
 }
 
 long double route_tdg_score(
@@ -684,6 +693,28 @@ std::vector<SelectionRun> build_selection_runs(
                 run.select_us = gro::elapsed_us(start);
                 runs.push_back(std::move(run));
             }
+        } else if (is_tdg_bpr_relief_selection_method(method)) {
+            for (int gamma : options.tdg_gammas) {
+                gro::AlgorithmOptions run_options = algorithm_options;
+                run_options.gamma = gamma;
+                gro::GROAlgorithm selector(graph, run_options, traffic_options);
+
+                SelectionRun run;
+                run.method = "tdg_bpr_relief";
+                run.removal_mode = RemovalMode::BprRelief;
+                run.gamma = gamma;
+
+                auto select_start = gro::Clock::now();
+                run.selected_ids =
+                    selector.select_queries_by_bpr_relief(
+                        all_query_set,
+                        queries,
+                        initial_traffic,
+                        tdg,
+                        raw_impacts);
+                run.select_us = gro::elapsed_us(select_start);
+                runs.push_back(std::move(run));
+            }
         } else if (is_tdg_excess_selection_method(method)) {
             for (int gamma : options.tdg_gammas) {
                 gro::AlgorithmOptions run_options = algorithm_options;
@@ -805,6 +836,9 @@ std::string selection_label(const SelectionRun& selection) {
     }
     if (selection.method == "tdg_excess") {
         return "tdg_excess_gamma" + std::to_string(selection.gamma);
+    }
+    if (selection.method == "tdg_bpr_relief") {
+        return "tdg_bpr_relief_gamma" + std::to_string(selection.gamma);
     }
     return selection.method + std::to_string(selection.selection_fraction);
 }

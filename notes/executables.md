@@ -30,6 +30,7 @@ Useful overrides:
 make CXX=g++-14
 make ABLATION_CONFIG=config/config.yaml QUERY_DIR=data/MH_Synthetic_query_sets
 make ABLATION_CONFIG=config/config_bj.yaml QUERY_DIR=data/BJ_Synthetic_query_sets RESULTS_DIR=python/results/bj
+make RESULT_SUFFIX=capacity2_cap10e8
 ```
 
 ## Main Iterative Ablation
@@ -84,8 +85,10 @@ make run-ablation-baseline-random-tdg-reroute
 make run-ablation-baseline-delayed-tdg-reroute
 make run-ablation-tdg-anchor-normal
 make run-ablation-tdg-excess-normal
+make run-ablation-tdg-bpr-relief-normal
 make run-ablation-tdg-anchor-full
 make run-ablation-tdg-excess-full
+make run-ablation-tdg-bpr-relief-full
 ```
 
 To run method jobs in parallel on a server:
@@ -97,8 +100,10 @@ nohup make run-ablation-baseline-random-tdg-reroute > gro_ablation_baseline_rand
 nohup make run-ablation-baseline-delayed-tdg-reroute > gro_ablation_baseline_delayed_tdg_reroute.log 2>&1 &
 nohup make run-ablation-tdg-anchor-normal > gro_ablation_tdg_anchor_normal.log 2>&1 &
 nohup make run-ablation-tdg-excess-normal > gro_ablation_tdg_excess_normal.log 2>&1 &
+nohup make run-ablation-tdg-bpr-relief-normal > gro_ablation_tdg_bpr_relief_normal.log 2>&1 &
 nohup make run-ablation-tdg-anchor-full > gro_ablation_tdg_anchor_full.log 2>&1 &
 nohup make run-ablation-tdg-excess-full > gro_ablation_tdg_excess_full.log 2>&1 &
+nohup make run-ablation-tdg-bpr-relief-full > gro_ablation_tdg_bpr_relief_full.log 2>&1 &
 ```
 
 Expected output files:
@@ -110,8 +115,10 @@ python/results/mh/gro_ablation_baseline_random_tdg_reroute.csv
 python/results/mh/gro_ablation_baseline_delayed_tdg_reroute.csv
 python/results/mh/gro_ablation_tdg_anchor_normal.csv
 python/results/mh/gro_ablation_tdg_excess_normal.csv
+python/results/mh/gro_ablation_tdg_bpr_relief_normal.csv
 python/results/mh/gro_ablation_tdg_anchor_full.csv
 python/results/mh/gro_ablation_tdg_excess_full.csv
+python/results/mh/gro_ablation_tdg_bpr_relief_full.csv
 python/results/mh/gro_ablation.csv
 ```
 
@@ -126,68 +133,99 @@ make
 BJ uses:
 
 ```text
-config:      config/config_bj.yaml
-query dir:   data/BJ_Synthetic_query_sets
-results dir: python/results/bj
-iterations:  10
-fractions:   10,30
+default config: config/config_bj.yaml
+query dir:      data/BJ_Synthetic_query_sets
+results dir:    python/results/bj
+iterations:     10
+fractions:      10,30
+```
+
+For the current BJ ablation runs, prefer explicit capacity/cap configs and add
+the same value as `RESULT_SUFFIX` so the CSV filename records the setting:
+
+```text
+config/config_bj_capacity2_cap10e8.yaml -> RESULT_SUFFIX=capacity2_cap10e8
+config/config_bj_capacity5_cap10e8.yaml -> RESULT_SUFFIX=capacity5_cap10e8
 ```
 
 Run all BJ method-split jobs sequentially:
 
 ```bash
 nohup make run-bj-ablation-methods \
+  BJ_CONFIG=config/config_bj_capacity2_cap10e8.yaml \
   FIXED_FRACTIONS=10,30 \
   TDG_GAMMAS=50 \
   IMPACT_WEIGHTS=30 \
   RANDOM_SEED=0 \
-  > logs/bj_ablation_methods.log 2>&1 &
+  RESULT_SUFFIX=capacity2_cap10e8 \
+  > logs/bj_ablation_methods_capacity2_cap10e8.log 2>&1 &
+```
+
+If one full run is too slow, run one method at a time. Example:
+
+```bash
+nohup make run-ablation-tdg-excess-normal \
+  ABLATION_CONFIG=config/config_bj_capacity2_cap10e8.yaml \
+  QUERY_DIR=data/BJ_Synthetic_query_sets \
+  RESULTS_DIR=python/results/bj \
+  FIXED_FRACTIONS=10,30 \
+  TDG_GAMMAS=25,50 \
+  IMPACT_WEIGHTS=30 \
+  RANDOM_SEED=0 \
+  RESULT_SUFFIX=capacity2_cap10e8 \
+  > logs/bj_ablation_tdg_excess_normal_capacity2_cap10e8.log 2>&1 &
 ```
 
 Check BJ outputs:
 
 ```bash
-make check-bj-ablation-methods
+make check-bj-ablation-methods RESULT_SUFFIX=capacity2_cap10e8
 ```
 
 Merge BJ outputs:
 
 ```bash
-make merge-bj-ablation-methods
+make merge-bj-ablation-methods RESULT_SUFFIX=capacity2_cap10e8
 ```
 
 Expected BJ output files:
 
 ```text
-python/results/bj/gro_ablation_baseline_random_normal.csv
-python/results/bj/gro_ablation_baseline_delayed_normal.csv
-python/results/bj/gro_ablation_baseline_random_tdg_reroute.csv
-python/results/bj/gro_ablation_baseline_delayed_tdg_reroute.csv
-python/results/bj/gro_ablation_tdg_anchor_normal.csv
-python/results/bj/gro_ablation_tdg_excess_normal.csv
-python/results/bj/gro_ablation_tdg_anchor_full.csv
-python/results/bj/gro_ablation_tdg_excess_full.csv
-python/results/bj/gro_ablation.csv
+python/results/bj/gro_ablation_baseline_random_normal_capacity2_cap10e8.csv
+python/results/bj/gro_ablation_baseline_delayed_normal_capacity2_cap10e8.csv
+python/results/bj/gro_ablation_baseline_random_tdg_reroute_capacity2_cap10e8.csv
+python/results/bj/gro_ablation_baseline_delayed_tdg_reroute_capacity2_cap10e8.csv
+python/results/bj/gro_ablation_tdg_anchor_normal_capacity2_cap10e8.csv
+python/results/bj/gro_ablation_tdg_excess_normal_capacity2_cap10e8.csv
+python/results/bj/gro_ablation_tdg_bpr_relief_normal_capacity2_cap10e8.csv
+python/results/bj/gro_ablation_tdg_anchor_full_capacity2_cap10e8.csv
+python/results/bj/gro_ablation_tdg_excess_full_capacity2_cap10e8.csv
+python/results/bj/gro_ablation_tdg_bpr_relief_full_capacity2_cap10e8.csv
+python/results/bj/gro_ablation_capacity2_cap10e8.csv
 ```
 
 To run BJ method jobs in parallel on the server:
 
 ```bash
-nohup make run-ablation-baseline-random-normal ABLATION_CONFIG=config/config_bj.yaml QUERY_DIR=data/BJ_Synthetic_query_sets RESULTS_DIR=python/results/bj FIXED_FRACTIONS=10,30 TDG_GAMMAS=50 IMPACT_WEIGHTS=30 RANDOM_SEED=0 > logs/bj_ablation_baseline_random_normal.log 2>&1 &
+nohup make run-ablation-baseline-random-normal ABLATION_CONFIG=config/config_bj_capacity2_cap10e8.yaml QUERY_DIR=data/BJ_Synthetic_query_sets RESULTS_DIR=python/results/bj FIXED_FRACTIONS=10,30 TDG_GAMMAS=50 IMPACT_WEIGHTS=30 RANDOM_SEED=0 RESULT_SUFFIX=capacity2_cap10e8 > logs/bj_ablation_baseline_random_normal_capacity2_cap10e8.log 2>&1 &
 
-nohup make run-ablation-baseline-delayed-normal ABLATION_CONFIG=config/config_bj.yaml QUERY_DIR=data/BJ_Synthetic_query_sets RESULTS_DIR=python/results/bj FIXED_FRACTIONS=10,30 TDG_GAMMAS=50 IMPACT_WEIGHTS=30 RANDOM_SEED=0 > logs/bj_ablation_baseline_delayed_normal.log 2>&1 &
+nohup make run-ablation-baseline-delayed-normal ABLATION_CONFIG=config/config_bj_capacity2_cap10e8.yaml QUERY_DIR=data/BJ_Synthetic_query_sets RESULTS_DIR=python/results/bj FIXED_FRACTIONS=10,30 TDG_GAMMAS=50 IMPACT_WEIGHTS=30 RANDOM_SEED=0 RESULT_SUFFIX=capacity2_cap10e8 > logs/bj_ablation_baseline_delayed_normal_capacity2_cap10e8.log 2>&1 &
 
-nohup make run-ablation-baseline-random-tdg-reroute ABLATION_CONFIG=config/config_bj.yaml QUERY_DIR=data/BJ_Synthetic_query_sets RESULTS_DIR=python/results/bj FIXED_FRACTIONS=10,30 TDG_GAMMAS=50 IMPACT_WEIGHTS=30 RANDOM_SEED=0 > logs/bj_ablation_baseline_random_tdg_reroute.log 2>&1 &
+nohup make run-ablation-baseline-random-tdg-reroute ABLATION_CONFIG=config/config_bj_capacity2_cap10e8.yaml QUERY_DIR=data/BJ_Synthetic_query_sets RESULTS_DIR=python/results/bj FIXED_FRACTIONS=10,30 TDG_GAMMAS=50 IMPACT_WEIGHTS=30 RANDOM_SEED=0 RESULT_SUFFIX=capacity2_cap10e8 > logs/bj_ablation_baseline_random_tdg_reroute_capacity2_cap10e8.log 2>&1 &
 
-nohup make run-ablation-baseline-delayed-tdg-reroute ABLATION_CONFIG=config/config_bj.yaml QUERY_DIR=data/BJ_Synthetic_query_sets RESULTS_DIR=python/results/bj FIXED_FRACTIONS=10,30 TDG_GAMMAS=50 IMPACT_WEIGHTS=30 RANDOM_SEED=0 > logs/bj_ablation_baseline_delayed_tdg_reroute.log 2>&1 &
+nohup make run-ablation-baseline-delayed-tdg-reroute ABLATION_CONFIG=config/config_bj_capacity2_cap10e8.yaml QUERY_DIR=data/BJ_Synthetic_query_sets RESULTS_DIR=python/results/bj FIXED_FRACTIONS=10,30 TDG_GAMMAS=50 IMPACT_WEIGHTS=30 RANDOM_SEED=0 RESULT_SUFFIX=capacity2_cap10e8 > logs/bj_ablation_baseline_delayed_tdg_reroute_capacity2_cap10e8.log 2>&1 &
 
-nohup make run-ablation-tdg-anchor-normal ABLATION_CONFIG=config/config_bj.yaml QUERY_DIR=data/BJ_Synthetic_query_sets RESULTS_DIR=python/results/bj FIXED_FRACTIONS=10,30 TDG_GAMMAS=50 IMPACT_WEIGHTS=30 RANDOM_SEED=0 > logs/bj_ablation_tdg_anchor_normal.log 2>&1 &
+nohup make run-ablation-tdg-anchor-normal ABLATION_CONFIG=config/config_bj_capacity2_cap10e8.yaml QUERY_DIR=data/BJ_Synthetic_query_sets RESULTS_DIR=python/results/bj FIXED_FRACTIONS=10,30 TDG_GAMMAS=50 IMPACT_WEIGHTS=30 RANDOM_SEED=0 RESULT_SUFFIX=capacity2_cap10e8 > logs/bj_ablation_tdg_anchor_normal_capacity2_cap10e8.log 2>&1 &
 
-nohup make run-ablation-tdg-excess-normal ABLATION_CONFIG=config/config_bj.yaml QUERY_DIR=data/BJ_Synthetic_query_sets RESULTS_DIR=python/results/bj FIXED_FRACTIONS=10,30 TDG_GAMMAS=50 IMPACT_WEIGHTS=30 RANDOM_SEED=0 > logs/bj_ablation_tdg_excess_normal.log 2>&1 &
+nohup make run-ablation-tdg-excess-normal ABLATION_CONFIG=config/config_bj_capacity2_cap10e8.yaml QUERY_DIR=data/BJ_Synthetic_query_sets RESULTS_DIR=python/results/bj FIXED_FRACTIONS=10,30 TDG_GAMMAS=50 IMPACT_WEIGHTS=30 RANDOM_SEED=0 RESULT_SUFFIX=capacity2_cap10e8 > logs/bj_ablation_tdg_excess_normal_capacity2_cap10e8.log 2>&1 &
 
-nohup make run-ablation-tdg-anchor-full ABLATION_CONFIG=config/config_bj.yaml QUERY_DIR=data/BJ_Synthetic_query_sets RESULTS_DIR=python/results/bj FIXED_FRACTIONS=10,30 TDG_GAMMAS=50 IMPACT_WEIGHTS=30 RANDOM_SEED=0 > logs/bj_ablation_tdg_anchor_full.log 2>&1 &
+nohup make run-ablation-tdg-bpr-relief-normal ABLATION_CONFIG=config/config_bj_capacity2_cap10e8.yaml QUERY_DIR=data/BJ_Synthetic_query_sets RESULTS_DIR=python/results/bj FIXED_FRACTIONS=10,30 TDG_GAMMAS=50 IMPACT_WEIGHTS=30 RANDOM_SEED=0 RESULT_SUFFIX=capacity2_cap10e8 > logs/bj_ablation_tdg_bpr_relief_normal_capacity2_cap10e8.log 2>&1 &
 
-nohup make run-ablation-tdg-excess-full ABLATION_CONFIG=config/config_bj.yaml QUERY_DIR=data/BJ_Synthetic_query_sets RESULTS_DIR=python/results/bj FIXED_FRACTIONS=10,30 TDG_GAMMAS=50 IMPACT_WEIGHTS=30 RANDOM_SEED=0 > logs/bj_ablation_tdg_excess_full.log 2>&1 &
+nohup make run-ablation-tdg-anchor-full ABLATION_CONFIG=config/config_bj_capacity2_cap10e8.yaml QUERY_DIR=data/BJ_Synthetic_query_sets RESULTS_DIR=python/results/bj FIXED_FRACTIONS=10,30 TDG_GAMMAS=50 IMPACT_WEIGHTS=30 RANDOM_SEED=0 RESULT_SUFFIX=capacity2_cap10e8 > logs/bj_ablation_tdg_anchor_full_capacity2_cap10e8.log 2>&1 &
+
+nohup make run-ablation-tdg-excess-full ABLATION_CONFIG=config/config_bj_capacity2_cap10e8.yaml QUERY_DIR=data/BJ_Synthetic_query_sets RESULTS_DIR=python/results/bj FIXED_FRACTIONS=10,30 TDG_GAMMAS=50 IMPACT_WEIGHTS=30 RANDOM_SEED=0 RESULT_SUFFIX=capacity2_cap10e8 > logs/bj_ablation_tdg_excess_full_capacity2_cap10e8.log 2>&1 &
+
+nohup make run-ablation-tdg-bpr-relief-full ABLATION_CONFIG=config/config_bj_capacity2_cap10e8.yaml QUERY_DIR=data/BJ_Synthetic_query_sets RESULTS_DIR=python/results/bj FIXED_FRACTIONS=10,30 TDG_GAMMAS=50 IMPACT_WEIGHTS=30 RANDOM_SEED=0 RESULT_SUFFIX=capacity2_cap10e8 > logs/bj_ablation_tdg_bpr_relief_full_capacity2_cap10e8.log 2>&1 &
 ```
 
 If you only want to vary random-selection fraction 10% vs 30% with normal
@@ -233,6 +271,40 @@ nohup ./gro_reroute_debug_test config/config.yaml \
   --impact-weights 0,5,15,30,50,100 \
   --random-seed 0 \
   > gro_reroute_debug.log 2>&1 &
+```
+
+ContGRO-style slot TDG diagnostic:
+
+```bash
+make gro_slot_legacy_ablation_test
+
+nohup ./gro_slot_legacy_ablation_test config/config.yaml \
+  --query-dir data/MH_Synthetic_query_sets \
+  --output python/results/mh/gro_slot_legacy_all.csv \
+  --methods legacy_slot_normal,legacy_slot_tdg,random_normal \
+  --slot-width 1 \
+  --tau 90 \
+  --gamma 50 \
+  --lambda 80 \
+  --random-fraction 10 \
+  --random-seed 0 \
+  > logs/gro_slot_legacy_all.log 2>&1 &
+```
+
+BJ version:
+
+```bash
+nohup ./gro_slot_legacy_ablation_test config/config_bj.yaml \
+  --query-dir data/BJ_Synthetic_query_sets \
+  --output python/results/bj/gro_slot_legacy_all.csv \
+  --methods legacy_slot_normal,legacy_slot_tdg,random_normal \
+  --slot-width 1 \
+  --tau 90 \
+  --gamma 50 \
+  --lambda 80 \
+  --random-fraction 10 \
+  --random-seed 0 \
+  > logs/bj_slot_legacy_all.log 2>&1 &
 ```
 
 No-cap stability checks:

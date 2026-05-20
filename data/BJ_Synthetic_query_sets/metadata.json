@@ -10,7 +10,7 @@
   "central_node_count": 115143,
   "neighbor_radius_km": 0.8,
   "distance_relative_tolerance": 0.15,
-  "sets_per_distance": 15,
+  "sets_per_distance": 30,
   "queries_per_base_set": 100,
   "rep_values": [
     1,
@@ -155,6 +155,141 @@
       "base_query_count": 100
     },
     {
+      "distance_km": 5,
+      "set_id": 15,
+      "seed_origin": 178739,
+      "seed_destination": 205177,
+      "seed_shortest_distance_km": 5.4410177122825125,
+      "seed_haversine_distance_km": 3.6720244625095404,
+      "base_query_count": 100
+    },
+    {
+      "distance_km": 5,
+      "set_id": 16,
+      "seed_origin": 164843,
+      "seed_destination": 292904,
+      "seed_shortest_distance_km": 4.409593491780649,
+      "seed_haversine_distance_km": 2.420787717776243,
+      "base_query_count": 100
+    },
+    {
+      "distance_km": 5,
+      "set_id": 17,
+      "seed_origin": 233765,
+      "seed_destination": 235174,
+      "seed_shortest_distance_km": 5.545061502122661,
+      "seed_haversine_distance_km": 1.9534437833113734,
+      "base_query_count": 100
+    },
+    {
+      "distance_km": 5,
+      "set_id": 18,
+      "seed_origin": 81618,
+      "seed_destination": 187080,
+      "seed_shortest_distance_km": 5.518157124393637,
+      "seed_haversine_distance_km": 1.4467713901667543,
+      "base_query_count": 100
+    },
+    {
+      "distance_km": 5,
+      "set_id": 19,
+      "seed_origin": 195303,
+      "seed_destination": 240932,
+      "seed_shortest_distance_km": 5.566362074213188,
+      "seed_haversine_distance_km": 2.5030273104448497,
+      "base_query_count": 100
+    },
+    {
+      "distance_km": 5,
+      "set_id": 20,
+      "seed_origin": 126250,
+      "seed_destination": 153551,
+      "seed_shortest_distance_km": 4.620444619203943,
+      "seed_haversine_distance_km": 1.422035133799041,
+      "base_query_count": 100
+    },
+    {
+      "distance_km": 5,
+      "set_id": 21,
+      "seed_origin": 10523,
+      "seed_destination": 194906,
+      "seed_shortest_distance_km": 4.881041985542121,
+      "seed_haversine_distance_km": 3.4119484995836413,
+      "base_query_count": 100
+    },
+    {
+      "distance_km": 5,
+      "set_id": 22,
+      "seed_origin": 229486,
+      "seed_destination": 229417,
+      "seed_shortest_distance_km": 5.30788375967076,
+      "seed_haversine_distance_km": 1.662294803412913,
+      "base_query_count": 100
+    },
+    {
+      "distance_km": 5,
+      "set_id": 23,
+      "seed_origin": 286011,
+      "seed_destination": 292827,
+      "seed_shortest_distance_km": 4.943953155230504,
+      "seed_haversine_distance_km": 2.9999839810668973,
+      "base_query_count": 100
+    },
+    {
+      "distance_km": 5,
+      "set_id": 24,
+      "seed_origin": 105622,
+      "seed_destination": 275344,
+      "seed_shortest_distance_km": 4.282576638268927,
+      "seed_haversine_distance_km": 1.179982079509596,
+      "base_query_count": 100
+    },
+    {
+      "distance_km": 5,
+      "set_id": 25,
+      "seed_origin": 268449,
+      "seed_destination": 276602,
+      "seed_shortest_distance_km": 5.203668810608302,
+      "seed_haversine_distance_km": 0.5185475335747649,
+      "base_query_count": 100
+    },
+    {
+      "distance_km": 5,
+      "set_id": 26,
+      "seed_origin": 11054,
+      "seed_destination": 183713,
+      "seed_shortest_distance_km": 5.639760674687957,
+      "seed_haversine_distance_km": 1.59478666639016,
+      "base_query_count": 100
+    },
+    {
+      "distance_km": 5,
+      "set_id": 27,
+      "seed_origin": 221600,
+      "seed_destination": 224718,
+      "seed_shortest_distance_km": 5.552129136317693,
+      "seed_haversine_distance_km": 1.665937153156047,
+      "base_query_count": 100
+    },
+    {
+      "distance_km": 5,
+      "set_id": 28,
+      "seed_origin": 287404,
+      "seed_destination": 186763,
+      "seed_shortest_distance_km": 4.572589089356862,
+      "seed_haversine_distance_km": 3.3437685396511507,
+      "base_query_count": 100
+    },
+    {
+      "distance_km": 5,
+      "set_id": 29,
+      "seed_origin": 187416,
+      "seed_destination": 198074,
+      "seed_shortest_distance_km": 4.73460552964068,
+      "seed_haversine_distance_km": 2.1399850674051155,
+      "base_query_count": 100
+    },
+    {
       "distance_km": 10,
       "set_id": 0,
       "seed_origin": 292607,
@@ -287,6 +422,141 @@
       "seed_destination": 289635,
       "seed_shortest_distance_km": 10.263091588853452,
       "seed_haversine_distance_km": 5.088380443721654,
+      "base_query_count": 100
+    },
+    {
+      "distance_km": 10,
+      "set_id": 15,
+      "seed_origin": 200466,
+      "seed_destination": 286711,
+      "seed_shortest_distance_km": 10.35224331456714,
+      "seed_haversine_distance_km": 4.727331080377308,
+      "base_query_count": 100
+    },
+    {
+      "distance_km": 10,
+      "set_id": 16,
+      "seed_origin": 148533,
+      "seed_destination": 149936,
+      "seed_shortest_distance_km": 10.96278383663517,
+      "seed_haversine_distance_km": 4.325886303355929,
+      "base_query_count": 100
+    },
+    {
+      "distance_km": 10,
+      "set_id": 17,
+      "seed_origin": 193537,
+      "seed_destination": 246623,
+      "seed_shortest_distance_km": 8.65183985836648,
+      "seed_haversine_distance_km": 5.064219351071377,
+      "base_query_count": 100
+    },
+    {
+      "distance_km": 10,
+      "set_id": 18,
+      "seed_origin": 124906,
+      "seed_destination": 224051,
+      "seed_shortest_distance_km": 9.125720026250455,
+      "seed_haversine_distance_km": 4.837050211011962,
+      "base_query_count": 100
+    },
+    {
+      "distance_km": 10,
+      "set_id": 19,
+      "seed_origin": 206105,
+      "seed_destination": 227854,
+      "seed_shortest_distance_km": 10.088355873171903,
+      "seed_haversine_distance_km": 3.864803289754847,
+      "base_query_count": 100
+    },
+    {
+      "distance_km": 10,
+      "set_id": 20,
+      "seed_origin": 221088,
+      "seed_destination": 154443,
+      "seed_shortest_distance_km": 8.819110537242846,
+      "seed_haversine_distance_km": 3.4275440636556973,
+      "base_query_count": 100
+    },
+    {
+      "distance_km": 10,
+      "set_id": 21,
+      "seed_origin": 11331,
+      "seed_destination": 212389,
+      "seed_shortest_distance_km": 9.54697041186786,
+      "seed_haversine_distance_km": 3.7110022022232507,
+      "base_query_count": 100
+    },
+    {
+      "distance_km": 10,
+      "set_id": 22,
+      "seed_origin": 235118,
+      "seed_destination": 256707,
+      "seed_shortest_distance_km": 10.295820263150242,
+      "seed_haversine_distance_km": 6.793668594231087,
+      "base_query_count": 100
+    },
+    {
+      "distance_km": 10,
+      "set_id": 23,
+      "seed_origin": 178979,
+      "seed_destination": 212438,
+      "seed_shortest_distance_km": 9.021955318962616,
+      "seed_haversine_distance_km": 2.1417317336529678,
+      "base_query_count": 100
+    },
+    {
+      "distance_km": 10,
+      "set_id": 24,
+      "seed_origin": 214922,
+      "seed_destination": 203939,
+      "seed_shortest_distance_km": 10.512935175302015,
+      "seed_haversine_distance_km": 6.239116465699657,
+      "base_query_count": 100
+    },
+    {
+      "distance_km": 10,
+      "set_id": 25,
+      "seed_origin": 276045,
+      "seed_destination": 152530,
+      "seed_shortest_distance_km": 9.952062749940968,
+      "seed_haversine_distance_km": 6.328946504198447,
+      "base_query_count": 100
+    },
+    {
+      "distance_km": 10,
+      "set_id": 26,
+      "seed_origin": 293363,
+      "seed_destination": 186586,
+      "seed_shortest_distance_km": 10.487883800393181,
+      "seed_haversine_distance_km": 5.551352793136523,
+      "base_query_count": 100
+    },
+    {
+      "distance_km": 10,
+      "set_id": 27,
+      "seed_origin": 293141,
+      "seed_destination": 242702,
+      "seed_shortest_distance_km": 10.790922565901075,
+      "seed_haversine_distance_km": 7.1784372087431025,
+      "base_query_count": 100
+    },
+    {
+      "distance_km": 10,
+      "set_id": 28,
+      "seed_origin": 233623,
+      "seed_destination": 184472,
+      "seed_shortest_distance_km": 10.450989490775957,
+      "seed_haversine_distance_km": 5.432080112189843,
+      "base_query_count": 100
+    },
+    {
+      "distance_km": 10,
+      "set_id": 29,
+      "seed_origin": 90194,
+      "seed_destination": 95769,
+      "seed_shortest_distance_km": 11.32833868352982,
+      "seed_haversine_distance_km": 6.7461690040505315,
       "base_query_count": 100
     },
     {
@@ -423,6 +693,149 @@
       "seed_shortest_distance_km": 43.01535481647944,
       "seed_haversine_distance_km": 11.095074223573462,
       "base_query_count": 100
+    },
+    {
+      "distance_km": 40,
+      "set_id": 15,
+      "seed_origin": 107986,
+      "seed_destination": 241623,
+      "seed_shortest_distance_km": 37.95846922762495,
+      "seed_haversine_distance_km": 12.032178446968349,
+      "base_query_count": 100
+    },
+    {
+      "distance_km": 40,
+      "set_id": 16,
+      "seed_origin": 229706,
+      "seed_destination": 216462,
+      "seed_shortest_distance_km": 44.82814606571779,
+      "seed_haversine_distance_km": 23.914882354286966,
+      "base_query_count": 100
+    },
+    {
+      "distance_km": 40,
+      "set_id": 17,
+      "seed_origin": 152384,
+      "seed_destination": 70850,
+      "seed_shortest_distance_km": 44.2539866104256,
+      "seed_haversine_distance_km": 24.77882967220282,
+      "base_query_count": 100
+    },
+    {
+      "distance_km": 40,
+      "set_id": 18,
+      "seed_origin": 160418,
+      "seed_destination": 193894,
+      "seed_shortest_distance_km": 36.575422150731015,
+      "seed_haversine_distance_km": 5.161032084058385,
+      "base_query_count": 100
+    },
+    {
+      "distance_km": 40,
+      "set_id": 19,
+      "seed_origin": 274952,
+      "seed_destination": 167003,
+      "seed_shortest_distance_km": 40.89848278300486,
+      "seed_haversine_distance_km": 27.30169029553857,
+      "base_query_count": 100
+    },
+    {
+      "distance_km": 40,
+      "set_id": 20,
+      "seed_origin": 289413,
+      "seed_destination": 181560,
+      "seed_shortest_distance_km": 43.70736322910723,
+      "seed_haversine_distance_km": 11.140648684885434,
+      "base_query_count": 100
+    },
+    {
+      "distance_km": 40,
+      "set_id": 21,
+      "seed_origin": 238118,
+      "seed_destination": 177760,
+      "seed_shortest_distance_km": 45.75490955242865,
+      "seed_haversine_distance_km": 18.96851778172047,
+      "base_query_count": 100
+    },
+    {
+      "distance_km": 40,
+      "set_id": 22,
+      "seed_origin": 252667,
+      "seed_destination": 16678,
+      "seed_shortest_distance_km": 35.94449517115291,
+      "seed_haversine_distance_km": 12.282000503477946,
+      "base_query_count": 100
+    },
+    {
+      "distance_km": 40,
+      "set_id": 23,
+      "seed_origin": 143802,
+      "seed_destination": 185035,
+      "seed_shortest_distance_km": 42.4258716199384,
+      "seed_haversine_distance_km": 21.234041638770695,
+      "base_query_count": 100
+    },
+    {
+      "distance_km": 40,
+      "set_id": 24,
+      "seed_origin": 95580,
+      "seed_destination": 82283,
+      "seed_shortest_distance_km": 41.043690530488576,
+      "seed_haversine_distance_km": 20.25833018508616,
+      "base_query_count": 100
+    },
+    {
+      "distance_km": 40,
+      "set_id": 25,
+      "seed_origin": 284161,
+      "seed_destination": 180454,
+      "seed_shortest_distance_km": 36.730131872470466,
+      "seed_haversine_distance_km": 13.793424447882785,
+      "base_query_count": 100
+    },
+    {
+      "distance_km": 40,
+      "set_id": 26,
+      "seed_origin": 227999,
+      "seed_destination": 215413,
+      "seed_shortest_distance_km": 36.58809547028023,
+      "seed_haversine_distance_km": 14.409694027854483,
+      "base_query_count": 100
+    },
+    {
+      "distance_km": 40,
+      "set_id": 27,
+      "seed_origin": 192761,
+      "seed_destination": 276184,
+      "seed_shortest_distance_km": 34.10535424085397,
+      "seed_haversine_distance_km": 15.797084329022722,
+      "base_query_count": 100
+    },
+    {
+      "distance_km": 40,
+      "set_id": 28,
+      "seed_origin": 229136,
+      "seed_destination": 9620,
+      "seed_shortest_distance_km": 44.45755925087808,
+      "seed_haversine_distance_km": 16.6677145145632,
+      "base_query_count": 100
+    },
+    {
+      "distance_km": 40,
+      "set_id": 29,
+      "seed_origin": 252468,
+      "seed_destination": 209880,
+      "seed_shortest_distance_km": 45.652376289174356,
+      "seed_haversine_distance_km": 13.54907803837664,
+      "base_query_count": 100
+    }
+  ],
+  "generation_batches": [
+    {
+      "set_ids": "20-29",
+      "source_temp_dir": "/private/tmp/BJ_Synthetic_query_sets_30",
+      "sets_per_distance_used_for_generation": 30,
+      "random_seed": 0
     }
   ]
 }

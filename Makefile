@@ -48,10 +48,13 @@ RANDOM_SEED ?= 0
 FIXED_FRACTIONS ?= 10,30
 TDG_GAMMAS ?= 50
 IMPACT_WEIGHTS ?= 30
+RESULT_SUFFIX ?=
+RESULT_SUFFIX_PART = $(if $(strip $(RESULT_SUFFIX)),_$(RESULT_SUFFIX),)
 
 SOURCES_LIB = \
 	src/core.cpp \
 	src/gro.cpp \
+	src/gro_slot_legacy.cpp \
 	src/gro_baseline.cpp \
 	src/svp.cpp \
 	src/gor.cpp \
@@ -67,6 +70,7 @@ TARGETS = \
 	gro_selection_debug_test \
 	gro_reroute_debug_test \
 	gro_fixed_random_selection_test \
+	gro_slot_legacy_ablation_test \
 	gro_ablation_test \
 	mh_synthetic_experiment \
 	svp_test \
@@ -80,6 +84,7 @@ TEST_OBJECTS = \
 	tests/gro_selection_debug_test.o \
 	tests/gro_reroute_debug_test.o \
 	tests/gro_fixed_random_selection_test.o \
+	tests/gro_slot_legacy_ablation_test.o \
 	tests/gro_ablation_test.o \
 	tests/mh_synthetic_experiment.o \
 	tests/svp_test.o \
@@ -94,13 +99,16 @@ ABLATION_METHODS = \
 	baseline_delayed_tdg_reroute \
 	tdg_anchor_normal \
 	tdg_excess_normal \
+	tdg_bpr_relief_normal \
 	tdg_anchor_full \
-	tdg_excess_full
+	tdg_excess_full \
+	tdg_bpr_relief_full
 
 .PHONY: \
 	all build clean rebuild test help \
 	run-gro run-gro-baseline run-gro-selection-debug run-gro-reroute-debug \
 	run-gro-fixed-random-selection run-gro-ablation \
+	run-gro-slot-legacy-ablation \
 	run-svp run-gor run-sor run-fahl \
 	run-ablation-methods merge-ablation-methods check-ablation-methods \
 	run-ablation-baseline-random-normal \
@@ -109,8 +117,10 @@ ABLATION_METHODS = \
 	run-ablation-baseline-delayed-tdg-reroute \
 	run-ablation-tdg-anchor-normal \
 	run-ablation-tdg-excess-normal \
+	run-ablation-tdg-bpr-relief-normal \
 	run-ablation-tdg-anchor-full \
 	run-ablation-tdg-excess-full \
+	run-ablation-tdg-bpr-relief-full \
 	run-bj-ablation-methods check-bj-ablation-methods merge-bj-ablation-methods
 
 all: build
@@ -131,6 +141,9 @@ gro_reroute_debug_test: $(OBJECTS_LIB) tests/gro_reroute_debug_test.o Makefile
 	$(CXX) $(CXXFLAGS) $(OPENMP_FLAGS) -o $@ $(filter-out Makefile,$^) $(LIB_DIRS) $(LIBS)
 
 gro_fixed_random_selection_test: $(OBJECTS_LIB) tests/gro_fixed_random_selection_test.o Makefile
+	$(CXX) $(CXXFLAGS) $(OPENMP_FLAGS) -o $@ $(filter-out Makefile,$^) $(LIB_DIRS) $(LIBS)
+
+gro_slot_legacy_ablation_test: $(OBJECTS_LIB) tests/gro_slot_legacy_ablation_test.o Makefile
 	$(CXX) $(CXXFLAGS) $(OPENMP_FLAGS) -o $@ $(filter-out Makefile,$^) $(LIB_DIRS) $(LIBS)
 
 gro_ablation_test: $(OBJECTS_LIB) tests/gro_ablation_test.o Makefile
@@ -178,6 +191,9 @@ run-gro-reroute-debug: gro_reroute_debug_test
 run-gro-fixed-random-selection: gro_fixed_random_selection_test
 	./gro_fixed_random_selection_test $(TEST_CONFIG)
 
+run-gro-slot-legacy-ablation: gro_slot_legacy_ablation_test
+	./gro_slot_legacy_ablation_test $(TEST_CONFIG)
+
 run-gro-ablation: gro_ablation_test
 	./gro_ablation_test $(TEST_CONFIG)
 
@@ -199,7 +215,7 @@ $(RESULTS_DIR):
 define RUN_ABLATION
 ./gro_ablation_test $(ABLATION_CONFIG) \
   --query-dir $(QUERY_DIR) \
-  --output $(RESULTS_DIR)/gro_ablation_$(1).csv \
+  --output $(RESULTS_DIR)/gro_ablation_$(1)$(RESULT_SUFFIX_PART).csv \
   --selection-methods $(2) \
   --reroute-methods $(3) \
   --fixed-fractions $(FIXED_FRACTIONS) \
@@ -215,8 +231,10 @@ run-ablation-methods: \
 	run-ablation-baseline-delayed-tdg-reroute \
 	run-ablation-tdg-anchor-normal \
 	run-ablation-tdg-excess-normal \
+	run-ablation-tdg-bpr-relief-normal \
 	run-ablation-tdg-anchor-full \
-	run-ablation-tdg-excess-full
+	run-ablation-tdg-excess-full \
+	run-ablation-tdg-bpr-relief-full
 
 run-ablation-baseline-random-normal: gro_ablation_test | $(RESULTS_DIR)
 	$(call RUN_ABLATION,baseline_random_normal,random,normal)
@@ -236,11 +254,17 @@ run-ablation-tdg-anchor-normal: gro_ablation_test | $(RESULTS_DIR)
 run-ablation-tdg-excess-normal: gro_ablation_test | $(RESULTS_DIR)
 	$(call RUN_ABLATION,tdg_excess_normal,tdg_excess,normal)
 
+run-ablation-tdg-bpr-relief-normal: gro_ablation_test | $(RESULTS_DIR)
+	$(call RUN_ABLATION,tdg_bpr_relief_normal,tdg_bpr_relief,normal)
+
 run-ablation-tdg-anchor-full: gro_ablation_test | $(RESULTS_DIR)
 	$(call RUN_ABLATION,tdg_anchor_full,tdg_anchor,tdg)
 
 run-ablation-tdg-excess-full: gro_ablation_test | $(RESULTS_DIR)
 	$(call RUN_ABLATION,tdg_excess_full,tdg_excess,tdg)
+
+run-ablation-tdg-bpr-relief-full: gro_ablation_test | $(RESULTS_DIR)
+	$(call RUN_ABLATION,tdg_bpr_relief_full,tdg_bpr_relief,tdg)
 
 run-bj-ablation-methods:
 	$(MAKE) run-ablation-methods \
@@ -250,33 +274,34 @@ run-bj-ablation-methods:
 	  FIXED_FRACTIONS=$(FIXED_FRACTIONS) \
 	  TDG_GAMMAS=$(TDG_GAMMAS) \
 	  IMPACT_WEIGHTS=$(IMPACT_WEIGHTS) \
-	  RANDOM_SEED=$(RANDOM_SEED)
+	  RANDOM_SEED=$(RANDOM_SEED) \
+	  RESULT_SUFFIX=$(RESULT_SUFFIX)
 
 check-bj-ablation-methods:
-	$(MAKE) check-ablation-methods RESULTS_DIR=$(BJ_RESULTS_DIR)
+	$(MAKE) check-ablation-methods RESULTS_DIR=$(BJ_RESULTS_DIR) RESULT_SUFFIX=$(RESULT_SUFFIX)
 
 merge-bj-ablation-methods:
-	$(MAKE) merge-ablation-methods RESULTS_DIR=$(BJ_RESULTS_DIR)
+	$(MAKE) merge-ablation-methods RESULTS_DIR=$(BJ_RESULTS_DIR) RESULT_SUFFIX=$(RESULT_SUFFIX)
 
 merge-ablation-methods: | $(RESULTS_DIR)
 	@first=1; \
 	for method in $(ABLATION_METHODS); do \
-	  file="$(RESULTS_DIR)/gro_ablation_$$method.csv"; \
+	  file="$(RESULTS_DIR)/gro_ablation_$$method$(RESULT_SUFFIX_PART).csv"; \
 	  if [ ! -f "$$file" ]; then \
 	    echo "missing $$file"; \
 	    exit 1; \
 	  fi; \
 	  if [ $$first -eq 1 ]; then \
-	    head -1 "$$file" > "$(RESULTS_DIR)/gro_ablation.csv"; \
+	    head -1 "$$file" > "$(RESULTS_DIR)/gro_ablation$(RESULT_SUFFIX_PART).csv"; \
 	    first=0; \
 	  fi; \
-	  tail -n +2 "$$file" >> "$(RESULTS_DIR)/gro_ablation.csv"; \
+	  tail -n +2 "$$file" >> "$(RESULTS_DIR)/gro_ablation$(RESULT_SUFFIX_PART).csv"; \
 	done; \
-	echo "wrote $(RESULTS_DIR)/gro_ablation.csv"
+	echo "wrote $(RESULTS_DIR)/gro_ablation$(RESULT_SUFFIX_PART).csv"
 
 check-ablation-methods:
 	@for method in $(ABLATION_METHODS); do \
-	  file="$(RESULTS_DIR)/gro_ablation_$$method.csv"; \
+	  file="$(RESULTS_DIR)/gro_ablation_$$method$(RESULT_SUFFIX_PART).csv"; \
 	  if [ -f "$$file" ]; then \
 	    wc -l "$$file"; \
 	  else \
@@ -303,6 +328,7 @@ help:
 	@echo ""
 	@echo "Experiments:"
 	@echo "  make run-ablation-methods     - run all method-split ablations sequentially"
+	@echo "  make gro_slot_legacy_ablation_test - build ContGRO-style slot TDG diagnostic"
 	@echo "  make run-bj-ablation-methods  - run all method-split ablations on BJ synthetic sets"
 	@echo "  make merge-ablation-methods   - merge method CSVs into gro_ablation.csv"
 	@echo "  make check-ablation-methods   - show method CSV row counts"
@@ -313,5 +339,6 @@ help:
 	@echo "  BJ_CONFIG=config/config_bj.yaml BJ_QUERY_DIR=data/BJ_Synthetic_query_sets"
 	@echo "  RESULTS_DIR=python/results/mh BJ_RESULTS_DIR=python/results/bj"
 	@echo "  FIXED_FRACTIONS=10,30 TDG_GAMMAS=50 IMPACT_WEIGHTS=30 RANDOM_SEED=0"
+	@echo "  RESULT_SUFFIX=capacity2_cap10e8 - append suffix to ablation CSV names"
 	@echo "  Linux/server: make"
 	@echo "  macOS Homebrew GCC: make CXX=g++-14"

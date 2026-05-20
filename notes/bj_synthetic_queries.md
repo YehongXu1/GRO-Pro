@@ -9,7 +9,7 @@ as the paper setup:
 
 ```text
 target OD length: 5 km, 10 km, 40 km
-seed OD count per length: 15
+seed OD count per length: 30
 base query count per seed OD: 100
 density variants: Rep1, Rep2, Rep4
 departure time: 0
@@ -30,7 +30,7 @@ Hop5Rep1-0.txt
 Hop5Rep2-0.txt
 Hop5Rep4-0.txt
 Hop10Rep1-0.txt
-Hop40Rep4-14.txt
+Hop40Rep4-29.txt
 ```
 
 The naming keeps the existing experiment parser format:
@@ -48,6 +48,10 @@ Summary files:
 data/BJ_Synthetic_query_sets/metadata.json
 data/BJ_Synthetic_query_sets/seed_summary.csv
 ```
+
+The current directory was extended incrementally so that earlier experimental
+sets were preserved. Use `seed_summary.csv` / `metadata.json` as the exact
+record of the generated seed ODs.
 
 ## Central-Area Constraint
 
@@ -92,7 +96,7 @@ without running hundreds of Dijkstra searches for every set.
 /Users/xyh/opt/anaconda3/envs/plot/bin/python \
   python/generate_bj_synthetic_queries.py \
   --output-dir data/BJ_Synthetic_query_sets \
-  --sets-per-distance 15 \
+  --sets-per-distance 30 \
   --queries-per-set 100 \
   --rep-values 1,2,4 \
   --random-seed 0
