@@ -289,7 +289,22 @@ int main(int argc, char** argv) {
 
         std::cerr << "Graph loaded: " << graph.vertex_count << " vertices, "
                   << graph.edge_count << " edges.\n";
+        if (!options.query_file.empty()) {
+            std::cerr << "Query source: --query-file " << options.query_file
+                      << "\n";
+        } else if (!options.query_dir.empty()) {
+            std::cerr << "Query source: --query-dir " << options.query_dir
+                      << "\n";
+        } else {
+            std::cerr << "Query source: config queries_path parent "
+                      << std::filesystem::path(input.queries_path).parent_path()
+                      << "\n";
+        }
         std::cerr << "Datasets: " << datasets.size() << "\n";
+        std::cerr << "First dataset: " << datasets.front().info.dataset
+                  << " path=" << datasets.front().path << "\n";
+        std::cerr << "Last dataset: " << datasets.back().info.dataset
+                  << " path=" << datasets.back().path << "\n";
 
         gro::GROAlgorithm algorithm(graph, algorithm_options, traffic_options);
         for (const DatasetInput& dataset : datasets) {
