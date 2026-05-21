@@ -100,6 +100,7 @@ python/plot_baseline_fraction_ttt.py
 python/build_tdg_oracle_ablation.py
 python/generate_bj_synthetic_queries.py
 python/generate_bj_real_queries_from_tdrive.py
+python/rescale_query_departures.py
 ```
 
 Important notes:
@@ -137,10 +138,21 @@ Real BJ taxi-derived query sets:
 
 ```text
 data/BJ_Real_query_sets
+data/BJ_Real_query_sets_window6h
 ```
 
 The real sets are generated from T-Drive taxi trajectories, filtered around
 Tiananmen within an 8 km radius. See `notes/bj_real_queries.md`.
+
+`data/BJ_Real_query_sets` preserves the original relative departure span, which
+is about six days. This makes congestion weak for low amplification factors.
+`data/BJ_Real_query_sets_window6h` linearly rescales each query file's departure
+times into a six-hour window `[0, 21600]`. This is meant to be a controlled
+real-workload peak setting. It is not a modulo workload.
+
+The one-hour modulo real workload, if present locally, should be treated as too
+aggressive for paper results unless explicitly re-validated. It can create
+unrealistically huge congestion ratios.
 
 ## Current Experiment Layout
 
@@ -168,11 +180,27 @@ The preferred paper experiment order is:
   less than fixed 10% baselines while reducing TTT faster in many configurations.
 - Reroute improvement from TDG-impact rerouting is not yet strong. Do not claim
   rerouting is the main contribution unless later results improve.
+- Earlier observations suggested MH synthetic may show more reroute benefit,
+  while BJ synthetic shows stronger selection benefit. Do not present this as a
+  paper story. Reviewers are unlikely to accept a main result where different
+  datasets support different components. Use BJ synthetic as the main ablation
+  setting unless we later produce a unified, stable result.
 - `Rep=1, Hop=40` is odd: normal-reroute methods barely improve. One objective
   outlier under the diagnostic oracle plot is `Hop40Rep1-24`, but the larger
   issue seems configuration-level rather than one corrupted dataset.
 - The `best_param_by_iter` and `tdg_oracle` files are diagnostic lower envelopes.
   They are useful for debugging, but they are not final fair method results.
+- Real workload status: the six-hour query files have been generated, but the
+  full shortest-path congestion diagnostic was intentionally stopped by the
+  user. Do not assume the six-hour workload has been validated yet. Provide the
+  command and let the user run it, or ask before running.
+
+## Execution Rule For Future Chats
+
+Do not start long-running experiments unless the user explicitly asks you to run
+them. It is okay to build small scripts, inspect files, summarize existing CSVs,
+and provide commands. For expensive C++ experiments or diagnostics, prefer
+giving the exact command line first. If the user says to run it, then run it.
 
 ## Current Plotting Script
 
@@ -213,7 +241,8 @@ For a coding task, add:
 Before editing, inspect the relevant C++/Python files and existing notes. Keep
 changes scoped. Do not delete data or results unless I explicitly ask. If a
 result file is diagnostic, name it clearly as diagnostic and do not present it
-as the final fair method.
+as the final fair method. Do not start long-running C++ experiments unless I
+explicitly ask you to run them; otherwise give me the command.
 ```
 
 ## What A New Chat Should Avoid
@@ -227,3 +256,5 @@ as the final fair method.
 - Do not delete synthetic query sets or raw data.
 - Do not use Python to run experiments that should be C++ experiments; Python is
   for analysis, plotting, and data generation.
+- Do not start expensive experiments just because a command is available. Ask or
+  provide the command first.
