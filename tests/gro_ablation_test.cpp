@@ -59,6 +59,7 @@ struct Options {
     std::vector<std::string> reroute_methods = {"normal", "tdg"};
     std::vector<int> tdg_gammas = {50};
     std::vector<int> impact_weights = {30};
+    bool progress_log = true;
 };
 
 struct SelectionRun {
@@ -203,6 +204,8 @@ Options parse_args(int argc, char** argv) {
             options.impact_weights = parse_percent_list(require_value(arg));
         } else if (arg == "--max-files") {
             options.max_files = std::stoi(require_value(arg));
+        } else if (arg == "--no-progress-log") {
+            options.progress_log = false;
         } else if (arg == "--help") {
             std::cout
                 << "Usage: ./gro_ablation_test [config] "
@@ -213,7 +216,8 @@ Options parse_args(int argc, char** argv) {
                 << "[--impact-weights 30] "
                 << "[--hop 10] [--rep 1] "
                 << "[--datasets Hop10Rep1-0,BJRealRep10-0] "
-                << "[--dataset-list path] [--random-seed n] [--max-files n]\n";
+                << "[--dataset-list path] [--random-seed n] [--max-files n] "
+                << "[--no-progress-log]\n";
             std::exit(0);
         } else {
             throw std::runtime_error("Unknown argument: " + arg);
@@ -833,6 +837,16 @@ void ensure_parent_dir(const std::filesystem::path& path) {
     }
 }
 
+void log_progress(const Options& options, const std::string& message) {
+    if (options.progress_log) {
+        std::cerr << message << std::endl;
+    }
+}
+
+double seconds_from_us(long long elapsed_us) {
+    return static_cast<double>(elapsed_us) / 1000000.0;
+}
+
 std::string selection_label(const SelectionRun& selection) {
     if (selection.method == "tdg") {
         return "tdg_" +
@@ -984,24 +998,52 @@ int main(int argc, char** argv) {
         std::cout << "Ablation diagnostic written:\n"
                   << "  " << options.output_path << "\n"
                   << "datasets=" << datasets.size() << "\n";
+        log_progress(
+            options,
+            "[start] output=" + options.output_path.string() +
+                " datasets=" + std::to_string(datasets.size()) +
+                " max_iterations=" +
+                std::to_string(algorithm_options.max_iterations));
 
         std::size_t rows_written = 0;
+        std::size_t dataset_index = 0;
         for (const DatasetInput& dataset : datasets) {
+            ++dataset_index;
+            log_progress(
+                options,
+                "[dataset start] " + std::to_string(dataset_index) + "/" +
+                    std::to_string(datasets.size()) +
+                    " dataset=" + dataset.info.dataset +
+                    " path=" + dataset.path.string());
+
             std::vector<gro::Query> queries =
                 gro::read_queries(dataset.path.string());
             require(
                 !queries.empty(),
                 "queries should not be empty: " + dataset.path.string());
+            log_progress(
+                options,
+                "[dataset loaded] dataset=" + dataset.info.dataset +
+                    " queries=" + std::to_string(queries.size()));
 
             gro::GROAlgorithm base_algorithm(
                 graph,
                 algorithm_options,
                 traffic_options);
 
+            log_progress(
+                options,
+                "[stage start] dataset=" + dataset.info.dataset +
+                    " stage=initial_routes");
             auto initial_start = gro::Clock::now();
             std::vector<gro::Route> initial_routes =
                 base_algorithm.compute_initial_routes(queries);
             long long initial_routes_us = gro::elapsed_us(initial_start);
+            log_progress(
+                options,
+                "[stage done] dataset=" + dataset.info.dataset +
+                    " stage=initial_routes sec=" +
+                    std::to_string(seconds_from_us(initial_routes_us)));
 
             std::vector<gro::QueryId> all_query_ids(queries.size());
             std::iota(all_query_ids.begin(), all_query_ids.end(), 0);
@@ -1027,6 +1069,18 @@ int main(int argc, char** argv) {
                                     : std::vector<int>{0};
 
                             for (int impact_weight : weights) {
+                                std::string run_context =
+                                    "dataset=" + dataset.info.dataset +
+                                    " selection=" + selection_method +
+                                    " gamma=" + std::to_string(gamma) +
+                                    " fraction=" +
+                                    std::to_string(fixed_fraction) +
+                                    " reroute=" + reroute_method_option +
+                                    " impact=" + std::to_string(impact_weight);
+                                log_progress(
+                                    options,
+                                    "[run start] " + run_context);
+
                                 std::vector<gro::Route> routes = initial_routes;
                                 long long cumulative_us = 0;
 
@@ -1036,7 +1090,17 @@ int main(int argc, char** argv) {
                                     unsigned int iteration_seed =
                                         options.random_seed +
                                         static_cast<unsigned int>(iteration);
+                                    std::string iter_context =
+                                        run_context +
+                                        " iter=" +
+                                        std::to_string(iteration + 1) + "/" +
+                                        std::to_string(
+                                            algorithm_options.max_iterations);
 
+                                log_progress(
+                                    options,
+                                    "[stage start] " + iter_context +
+                                        " stage=evaluate_before");
                                 auto evaluate_before_start = gro::Clock::now();
                                 gro::TrafficResult traffic_result =
                                     gro::evaluate_traffic(
@@ -1048,13 +1112,42 @@ int main(int argc, char** argv) {
                                     gro::elapsed_us(evaluate_before_start);
                                 gro::Cost total_before =
                                     traffic_result.total_travel_time;
+                                log_progress(
+                                    options,
+                                    "[stage done] " + iter_context +
+                                        " stage=evaluate_before sec=" +
+                                        std::to_string(
+                                            seconds_from_us(
+                                                evaluate_before_us)) +
+                                        " total_before=" +
+                                        std::to_string(total_before));
 
+                                log_progress(
+                                    options,
+                                    "[stage start] " + iter_context +
+                                        " stage=build_tdg");
                                 auto tdg_start = gro::Clock::now();
                                 gro::TrafficDependencyGraph tdg =
                                     base_algorithm.build_tdg(traffic_result);
                                 long long build_tdg_us =
                                     gro::elapsed_us(tdg_start);
+                                std::size_t tdg_edges =
+                                    tdg_edge_timeline_count(tdg);
+                                log_progress(
+                                    options,
+                                    "[stage done] " + iter_context +
+                                        " stage=build_tdg sec=" +
+                                        std::to_string(
+                                            seconds_from_us(build_tdg_us)) +
+                                        " tdg_nodes=" +
+                                        std::to_string(tdg.nodes.size()) +
+                                        " tdg_edge_timelines=" +
+                                        std::to_string(tdg_edges));
 
+                                log_progress(
+                                    options,
+                                    "[stage start] " + iter_context +
+                                        " stage=compute_impact");
                                 auto impact_start = gro::Clock::now();
                                 std::vector<gro::Cost> raw_impacts =
                                     base_algorithm.compute_tdg_impact(tdg);
@@ -1062,7 +1155,18 @@ int main(int argc, char** argv) {
                                     gro::elapsed_us(impact_start);
                                 long long tdg_prepare_us =
                                     build_tdg_us + compute_impact_us;
+                                log_progress(
+                                    options,
+                                    "[stage done] " + iter_context +
+                                        " stage=compute_impact sec=" +
+                                        std::to_string(
+                                            seconds_from_us(
+                                                compute_impact_us)));
 
+                                log_progress(
+                                    options,
+                                    "[stage start] " + iter_context +
+                                        " stage=normalize_impacts");
                                 auto normalize_start = gro::Clock::now();
                                 std::vector<gro::Cost> reroute_impacts =
                                     base_algorithm
@@ -1071,6 +1175,12 @@ int main(int argc, char** argv) {
                                             raw_impacts);
                                 long long normalize_us =
                                     gro::elapsed_us(normalize_start);
+                                log_progress(
+                                    options,
+                                    "[stage done] " + iter_context +
+                                        " stage=normalize_impacts sec=" +
+                                        std::to_string(
+                                            seconds_from_us(normalize_us)));
 
                                 ScoreStats all_scores =
                                     score_stats(
@@ -1090,6 +1200,10 @@ int main(int argc, char** argv) {
                                     selection_options.tdg_gammas = {gamma};
                                 }
 
+                                log_progress(
+                                    options,
+                                    "[stage start] " + iter_context +
+                                        " stage=selection");
                                 std::vector<SelectionRun> selection_runs =
                                     build_selection_runs(
                                         selection_options,
@@ -1106,6 +1220,24 @@ int main(int argc, char** argv) {
                                     "Expected exactly one selection run");
                                 SelectionRun selection =
                                     std::move(selection_runs.front());
+                                log_progress(
+                                    options,
+                                    "[stage done] " + iter_context +
+                                        " stage=selection selected=" +
+                                        std::to_string(
+                                            selection.selected_ids.size()) +
+                                        " important_nodes=" +
+                                        std::to_string(
+                                            selection.important_node_count) +
+                                        " important_sec=" +
+                                        std::to_string(
+                                            seconds_from_us(
+                                                selection
+                                                    .important_nodes_us)) +
+                                        " select_sec=" +
+                                        std::to_string(
+                                            seconds_from_us(
+                                                selection.select_us)));
 
                                 ScoreStats selected_scores =
                                     score_stats(
@@ -1123,6 +1255,12 @@ int main(int argc, char** argv) {
                                 if (reroute_method_option == "normal") {
                                     reroute_method_name =
                                         "normal_td_dijkstra";
+                                    log_progress(
+                                        options,
+                                        "[stage start] " + iter_context +
+                                            " stage=normal_reroute selected=" +
+                                            std::to_string(
+                                                selection.selected_ids.size()));
                                     auto reroute_start = gro::Clock::now();
                                     new_routes =
                                         base_algorithm.baseline_reroute_queries(
@@ -1131,6 +1269,12 @@ int main(int argc, char** argv) {
                                             traffic_result);
                                     reroute_us =
                                         gro::elapsed_us(reroute_start);
+                                    log_progress(
+                                        options,
+                                        "[stage done] " + iter_context +
+                                            " stage=normal_reroute sec=" +
+                                            std::to_string(
+                                                seconds_from_us(reroute_us)));
                                 } else if (reroute_method_option == "tdg") {
                                     reroute_method_name =
                                         "tdg_impact_reroute";
@@ -1145,6 +1289,12 @@ int main(int argc, char** argv) {
                                         run_options,
                                         traffic_options);
 
+                                    log_progress(
+                                        options,
+                                        "[stage start] " + iter_context +
+                                            " stage=batch_queries selected=" +
+                                            std::to_string(
+                                                selection.selected_ids.size()));
                                     auto batch_start = gro::Clock::now();
                                     std::vector<std::vector<gro::QueryId>>
                                         batches =
@@ -1154,7 +1304,20 @@ int main(int argc, char** argv) {
                                                 traffic_result);
                                     batch_us = gro::elapsed_us(batch_start);
                                     batch_count = batches.size();
+                                    log_progress(
+                                        options,
+                                        "[stage done] " + iter_context +
+                                            " stage=batch_queries sec=" +
+                                            std::to_string(
+                                                seconds_from_us(batch_us)) +
+                                            " batches=" +
+                                            std::to_string(batch_count));
 
+                                    log_progress(
+                                        options,
+                                        "[stage start] " + iter_context +
+                                            " stage=tdg_impact_reroute batches=" +
+                                            std::to_string(batch_count));
                                     auto reroute_start = gro::Clock::now();
                                     new_routes =
                                         rerouter.reroute_queries(
@@ -1165,12 +1328,22 @@ int main(int argc, char** argv) {
                                             reroute_impacts);
                                     reroute_us =
                                         gro::elapsed_us(reroute_start);
+                                    log_progress(
+                                        options,
+                                        "[stage done] " + iter_context +
+                                            " stage=tdg_impact_reroute sec=" +
+                                            std::to_string(
+                                                seconds_from_us(reroute_us)));
                                 } else {
                                     throw std::runtime_error(
                                         "Unknown reroute method: " +
                                         reroute_method_option);
                                 }
 
+                                log_progress(
+                                    options,
+                                    "[stage start] " + iter_context +
+                                        " stage=evaluate_after");
                                 long long evaluate_after_us = 0;
                                 gro::Cost total_after =
                                     evaluate_total_after(
@@ -1180,6 +1353,18 @@ int main(int argc, char** argv) {
                                         new_routes,
                                         traffic_options,
                                         evaluate_after_us);
+                                log_progress(
+                                    options,
+                                    "[stage done] " + iter_context +
+                                        " stage=evaluate_after sec=" +
+                                        std::to_string(
+                                            seconds_from_us(
+                                                evaluate_after_us)) +
+                                        " total_after=" +
+                                        std::to_string(total_after) +
+                                        " reduction=" +
+                                        std::to_string(
+                                            total_before - total_after));
 
                                 bool uses_tdg_selection =
                                     is_tdg_selection_method(selection.method);
@@ -1240,12 +1425,29 @@ int main(int argc, char** argv) {
                                     selected_scores,
                                     all_scores,
                                     tdg.nodes.size(),
-                                    tdg_edge_timeline_count(tdg),
+                                    tdg_edges,
                                     cumulative_us);
                                 ++rows_written;
+                                log_progress(
+                                    options,
+                                    "[iteration done] " + iter_context +
+                                        " rows_written=" +
+                                        std::to_string(rows_written) +
+                                        " method_sec=" +
+                                        std::to_string(
+                                            seconds_from_us(method_total_us)) +
+                                        " cumulative_sec=" +
+                                        std::to_string(
+                                            seconds_from_us(cumulative_us)));
 
                                 replace_routes(routes, new_routes);
                             }
+                                log_progress(
+                                    options,
+                                    "[run done] " + run_context +
+                                        " cumulative_sec=" +
+                                        std::to_string(
+                                            seconds_from_us(cumulative_us)));
                         }
                     }
                 }

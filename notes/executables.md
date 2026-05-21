@@ -258,6 +258,41 @@ Expected complete output size:
 72901 lines = header + 270 query sets * 10 iterations * 3 gammas * 9 impact weights
 ```
 
+BJ real one-hour-window Rep1 full method for the compression/scalability
+section. This runs our `tdg_excess` selection with TDG-impact reroute on the
+five `BJRealRep1-*` query sets. Current `gro_ablation_test` records TDG size
+and runtime columns, but its ablation path builds the uncompressed TDG.
+
+```bash
+make gro_ablation_test
+
+mkdir -p python/results/bj_real_window1h/scalability logs
+
+nohup ./gro_ablation_test config/config_bj_capacity2_cap10e8.yaml \
+  --query-dir data/BJ_Real_query_sets_window1h \
+  --rep 1 \
+  --output python/results/bj_real_window1h/scalability/gro_ablation_tdg_excess_full_window1h_rep1_gamma25_impact15_capacity2_cap10e8.csv \
+  --selection-methods tdg_excess \
+  --reroute-methods tdg \
+  --tdg-gammas 25 \
+  --impact-weights 15 \
+  --random-seed 0 \
+  > logs/bj_real_window1h_rep1_tdg_excess_full_gamma25_impact15_capacity2_cap10e8.log 2>&1 &
+
+tail -f logs/bj_real_window1h_rep1_tdg_excess_full_gamma25_impact15_capacity2_cap10e8.log
+wc -l python/results/bj_real_window1h/scalability/gro_ablation_tdg_excess_full_window1h_rep1_gamma25_impact15_capacity2_cap10e8.csv
+```
+
+Progress logging is on by default and prints each dataset, run, iteration, and
+major stage to the log. Add `--no-progress-log` only for very large sweeps where
+the detailed log is too noisy.
+
+Expected complete output size:
+
+```text
+51 lines = header + 5 query sets * 10 iterations * 1 gamma * 1 impact weight
+```
+
 Shortest-path congestion diagnostic. This computes free-flow shortest paths,
 then compares their no-flow total travel time against the same routes evaluated
 with the project congestion evaluator.
