@@ -72,6 +72,7 @@ TARGETS = \
 	gro_fixed_random_selection_test \
 	gro_slot_legacy_ablation_test \
 	gro_ablation_test \
+	paper_baseline_test \
 	mh_synthetic_experiment \
 	shortest_path_congestion_diagnostic \
 	svp_test \
@@ -87,6 +88,7 @@ TEST_OBJECTS = \
 	tests/gro_fixed_random_selection_test.o \
 	tests/gro_slot_legacy_ablation_test.o \
 	tests/gro_ablation_test.o \
+	tests/paper_baseline_test.o \
 	tests/mh_synthetic_experiment.o \
 	tests/shortest_path_congestion_diagnostic.o \
 	tests/svp_test.o \
@@ -111,6 +113,7 @@ ABLATION_METHODS = \
 	run-gro run-gro-baseline run-gro-selection-debug run-gro-reroute-debug \
 	run-gro-fixed-random-selection run-gro-ablation \
 	run-gro-slot-legacy-ablation \
+	run-paper-baseline \
 	run-shortest-path-congestion-diagnostic \
 	run-svp run-gor run-sor run-fahl \
 	run-ablation-methods merge-ablation-methods check-ablation-methods \
@@ -150,6 +153,9 @@ gro_slot_legacy_ablation_test: $(OBJECTS_LIB) tests/gro_slot_legacy_ablation_tes
 	$(CXX) $(CXXFLAGS) $(OPENMP_FLAGS) -o $@ $(filter-out Makefile,$^) $(LIB_DIRS) $(LIBS)
 
 gro_ablation_test: $(OBJECTS_LIB) tests/gro_ablation_test.o Makefile
+	$(CXX) $(CXXFLAGS) $(OPENMP_FLAGS) -o $@ $(filter-out Makefile,$^) $(LIB_DIRS) $(LIBS)
+
+paper_baseline_test: $(OBJECTS_LIB) tests/paper_baseline_test.o Makefile
 	$(CXX) $(CXXFLAGS) $(OPENMP_FLAGS) -o $@ $(filter-out Makefile,$^) $(LIB_DIRS) $(LIBS)
 
 mh_synthetic_experiment: $(OBJECTS_LIB) tests/mh_synthetic_experiment.o Makefile
@@ -205,6 +211,9 @@ run-shortest-path-congestion-diagnostic: shortest_path_congestion_diagnostic
 
 run-gro-ablation: gro_ablation_test
 	./gro_ablation_test $(TEST_CONFIG)
+
+run-paper-baseline: paper_baseline_test
+	./paper_baseline_test $(ABLATION_CONFIG)
 
 run-svp: svp_test
 	./svp_test $(TEST_CONFIG)

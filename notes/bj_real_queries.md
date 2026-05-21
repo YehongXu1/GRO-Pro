@@ -109,6 +109,25 @@ data/BJ_Real_query_sets/metadata.json
 data/BJ_Real_query_sets/query_set_summary.csv
 ```
 
+## Six-Hour Peak Workload
+
+The original T-Drive-derived query sets span about six days, which makes
+congestion too weak for low amplification factors. A one-hour modulo workload
+is too aggressive because it folds all trips into one artificial peak. The
+current controlled real workload therefore uses a six-hour departure window:
+
+```bash
+/Users/xyh/opt/anaconda3/envs/plot/bin/python \
+  python/rescale_query_departures.py \
+  --input-dir data/BJ_Real_query_sets \
+  --output-dir data/BJ_Real_query_sets_window6h \
+  --window-sec 21600
+```
+
+This linearly rescales departures within each query file to `[0, 21600]`
+seconds. It preserves the OD pairs and relative temporal order, unlike modulo
+folding.
+
 ## Ablation Test
 
 The C++ ablation parser recognizes `BJRealRep{rep}-{id}.txt` files. For real
