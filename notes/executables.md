@@ -228,6 +228,70 @@ nohup make run-ablation-tdg-excess-full ABLATION_CONFIG=config/config_bj_capacit
 nohup make run-ablation-tdg-bpr-relief-full ABLATION_CONFIG=config/config_bj_capacity2_cap10e8.yaml QUERY_DIR=data/BJ_Synthetic_query_sets RESULTS_DIR=python/results/bj FIXED_FRACTIONS=10,30 TDG_GAMMAS=50 IMPACT_WEIGHTS=30 RANDOM_SEED=0 RESULT_SUFFIX=capacity2_cap10e8 > logs/bj_ablation_tdg_bpr_relief_full_capacity2_cap10e8.log 2>&1 &
 ```
 
+BJ TDG-reroute impact-weight sweep. This keeps our `tdg_excess` selection and
+TDG-impact reroute, then varies the reroute impact penalty. `impact_weight=0`
+is a useful control because it keeps the TDG reroute path and batching machinery
+but removes the TDG-impact penalty from the path score.
+
+```bash
+make gro_ablation_test
+
+mkdir -p python/results/bj/sweeps/tdg_reroute_impact logs
+
+nohup ./gro_ablation_test config/config_bj_capacity2_cap10e8.yaml \
+  --query-dir data/BJ_Synthetic_query_sets \
+  --output python/results/bj/sweeps/tdg_reroute_impact/gro_ablation_tdg_excess_full_impact_sweep_capacity2_cap10e8.csv \
+  --selection-methods tdg_excess \
+  --reroute-methods tdg \
+  --tdg-gammas 25,50,90 \
+  --impact-weights 0,5,10,15,20,30,50,75,100 \
+  --random-seed 0 \
+  > logs/bj_ablation_tdg_excess_full_impact_sweep_capacity2_cap10e8.log 2>&1 &
+
+tail -f logs/bj_ablation_tdg_excess_full_impact_sweep_capacity2_cap10e8.log
+wc -l python/results/bj/sweeps/tdg_reroute_impact/gro_ablation_tdg_excess_full_impact_sweep_capacity2_cap10e8.csv
+```
+
+Expected complete output size:
+
+```text
+72901 lines = header + 270 query sets * 10 iterations * 3 gammas * 9 impact weights
+```
+
+Shortest-path congestion diagnostic. This computes free-flow shortest paths,
+then compares their no-flow total travel time against the same routes evaluated
+with the project congestion evaluator.
+
+BJ real query sets:
+
+```bash
+make shortest_path_congestion_diagnostic
+
+mkdir -p python/results/bj_real logs
+
+nohup ./shortest_path_congestion_diagnostic config/config_bj_capacity2_cap10e8.yaml \
+  --query-dir data/BJ_Real_query_sets \
+  --output python/results/bj_real/shortest_path_congestion_bj_real_capacity2_cap10e8.csv \
+  > logs/shortest_path_congestion_bj_real_capacity2_cap10e8.log 2>&1 &
+
+tail -f logs/shortest_path_congestion_bj_real_capacity2_cap10e8.log
+```
+
+BJ synthetic query sets, for a same-graph density reference:
+
+```bash
+make shortest_path_congestion_diagnostic
+
+mkdir -p python/results/bj/analysis/congestion logs
+
+nohup ./shortest_path_congestion_diagnostic config/config_bj_capacity2_cap10e8.yaml \
+  --query-dir data/BJ_Synthetic_query_sets \
+  --output python/results/bj/analysis/congestion/shortest_path_congestion_bj_synthetic_capacity2_cap10e8.csv \
+  > logs/shortest_path_congestion_bj_synthetic_capacity2_cap10e8.log 2>&1 &
+
+tail -f logs/shortest_path_congestion_bj_synthetic_capacity2_cap10e8.log
+```
+
 If you only want to vary random-selection fraction 10% vs 30% with normal
 TD-Dijkstra first, run just:
 
@@ -331,6 +395,26 @@ Use the existing plot environment directly:
   --tdg-selection python/results/mh/gro_selection_debug_removal_modes.csv \
   --simple-baselines python/results/mh/gro_simple_selection_baselines_10_30.csv \
   --output-dir python/results/mh
+```
+
+BJ best-param component ablation plot. This compares the baseline curves against
+the oracle/best-parameter `tdg_excess` CSVs and uses the second y-axis for the
+selected-query fraction of `TDG-guided + TDG-impact reroute`.
+
+```bash
+cd /Users/xyh/Desktop/GRO-Pro
+
+/Users/xyh/opt/anaconda3/envs/plot/bin/python python/plot_gro_component_ablation.py \
+  --random-normal python/results/bj/gro_ablation_baseline_random_normal_capacity2_cap10e8.csv \
+  --delayed-normal python/results/bj/gro_ablation_baseline_delayed_normal_capacity2_cap10e8.csv \
+  --delayed-tdg-reroute python/results/bj/gro_ablation_baseline_delayed_tdg_reroute_capacity2_cap10e8.csv \
+  --tdg-excess-normal python/results/bj/oracle/gro_ablation_tdg_excess_normal_best_param_by_iter_capacity2_cap10e8.csv \
+  --tdg-excess-full python/results/bj/oracle/gro_ablation_tdg_excess_full_best_param_by_iter_capacity2_cap10e8.csv \
+  --show-selection-fraction \
+  --selection-fraction-label TDG-guided \
+  --selection-fraction-reroute "TDG-impact reroute" \
+  --baseline-fraction 10 \
+  --output python/results/bj/plots/bj_component_ablation_best_param_capacity2_cap10e8_with_selection_fraction.png
 ```
 
 ## Unit Tests

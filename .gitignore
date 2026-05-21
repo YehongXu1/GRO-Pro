@@ -56,7 +56,9 @@ __pycache__/
 python/results/
 python/figures/
 *.log
+*.zip
  
 .data/BJ_Real_query_sets/release/
 python/results/*.csv
 data/BJ_Real_query_sets/release/
+data/BJ_Real_query_sets/*.zip

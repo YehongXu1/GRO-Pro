@@ -42,6 +42,7 @@ def load_method(
     reroute_method: str,
     selection_fraction: Optional[int] = None,
     gamma: Optional[int] = None,
+    impact_weight: Optional[int] = None,
     removal_mode: Optional[str] = None,
 ) -> pd.DataFrame:
     if not path:
@@ -55,7 +56,11 @@ def load_method(
     if selection_fraction is not None:
         mask &= df["selection_fraction"] == selection_fraction
     if gamma is not None:
-        mask &= df["gamma"] == gamma
+        mask &= pd.to_numeric(df["gamma"], errors="coerce") == gamma
+    if impact_weight is not None:
+        if "impact_weight" not in df.columns:
+            raise ValueError(f"Cannot filter impact_weight for {path}; column is missing")
+        mask &= pd.to_numeric(df["impact_weight"], errors="coerce") == impact_weight
     if removal_mode is not None:
         if "removal_mode" not in df.columns:
             raise ValueError(f"Cannot filter removal_mode for {path}; column is missing")
@@ -64,10 +69,71 @@ def load_method(
     df = df[mask].copy()
     if df.empty:
         raise ValueError(f"No rows matched expected filters for {path}")
+    validate_unique_iterations(df, path, selection_label, reroute_label)
 
     df["selection_label"] = selection_label
     df["reroute_label"] = reroute_label
     return df
+
+
+def parse_dataset_names(text: Optional[str]) -> set[str]:
+    if not text:
+        return set()
+    return {name.strip() for name in text.split(",") if name.strip()}
+
+
+def load_dataset_names(path: Optional[str]) -> set[str]:
+    if not path:
+        return set()
+    names = set()
+    with open(path) as file:
+        for line in file:
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            names.add(line)
+    return names
+
+
+def exclude_datasets(
+    frames: list[pd.DataFrame],
+    excluded: set[str],
+) -> list[pd.DataFrame]:
+    if not excluded:
+        return frames
+    filtered = []
+    for frame in frames:
+        if frame.empty:
+            filtered.append(frame)
+            continue
+        filtered.append(frame[~frame["dataset"].isin(excluded)].copy())
+    return filtered
+
+
+def validate_unique_iterations(
+    df: pd.DataFrame,
+    path: str,
+    selection_label: str,
+    reroute_label: str,
+) -> None:
+    group_keys = ["dataset", "hop", "rep", "seed", "iteration"]
+    missing_keys = [key for key in group_keys if key not in df.columns]
+    if missing_keys:
+        raise ValueError(f"Cannot validate {path}; missing columns: {missing_keys}")
+
+    duplicate_counts = df.groupby(group_keys).size()
+    duplicate_counts = duplicate_counts[duplicate_counts > 1]
+    if duplicate_counts.empty:
+        return
+
+    example = duplicate_counts.index[0]
+    example_dict = dict(zip(group_keys, example))
+    raise ValueError(
+        f"{path} matched multiple parameter rows for {selection_label} / "
+        f"{reroute_label}. Example duplicate key: {example_dict}. "
+        "Pass --tdg-gamma/--tdg-impact-weight for raw sweeps, or use a "
+        "best-param CSV."
+    )
 
 
 def build_curve(group: pd.DataFrame) -> pd.DataFrame:
@@ -251,6 +317,7 @@ def plot_component_ablation(
         ax.set_xlim(0, int(plot_df["plot_iteration"].max()))
         ax.set_xticks(range(0, int(plot_df["plot_iteration"].max()) + 1, 2))
         ax.grid(False)
+        ax.ticklabel_format(axis="y", style="plain", useOffset=False)
         ax.tick_params(axis="both", labelsize=10, pad=2)
 
         if col == 0:
@@ -310,7 +377,9 @@ def plot_component_ablation(
         if text.get_text().endswith(":"):
             text.set_weight("semibold")
 
-    os.makedirs(os.path.dirname(output), exist_ok=True)
+    output_dir = os.path.dirname(output)
+    if output_dir:
+        os.makedirs(output_dir, exist_ok=True)
     fig.tight_layout(rect=(0.035, 0.035, 0.995, 0.915), h_pad=1.5, w_pad=1.4)
     fig.savefig(output, dpi=300, bbox_inches="tight")
     plt.close(fig)
@@ -326,10 +395,24 @@ def main() -> None:
     parser.add_argument("--tdg-selection-method", default="tdg_excess")
     parser.add_argument("--tdg-removal-mode")
     parser.add_argument("--baseline-fraction", type=int, default=10)
-    parser.add_argument("--tdg-gamma", type=int, default=25)
+    parser.add_argument(
+        "--tdg-gamma",
+        type=int,
+        help=(
+            "Optional TDG gamma filter. Omit this for best-param/oracle CSVs "
+            "that already contain one row per dataset and iteration."
+        ),
+    )
+    parser.add_argument(
+        "--tdg-impact-weight",
+        type=int,
+        help="Optional impact-weight filter for TDG-impact reroute CSVs.",
+    )
     parser.add_argument("--show-selection-fraction", action="store_true")
     parser.add_argument("--selection-fraction-label", default="TDG-guided")
     parser.add_argument("--selection-fraction-reroute", default="Normal TD-Dijkstra")
+    parser.add_argument("--exclude-datasets")
+    parser.add_argument("--exclude-dataset-file")
     parser.add_argument("--output", required=True)
     args = parser.parse_args()
 
@@ -374,9 +457,13 @@ def main() -> None:
             args.tdg_selection_method,
             "tdg_impact_reroute",
             gamma=args.tdg_gamma,
+            impact_weight=args.tdg_impact_weight,
             removal_mode=args.tdg_removal_mode,
         ),
     ]
+    excluded_datasets = parse_dataset_names(args.exclude_datasets)
+    excluded_datasets |= load_dataset_names(args.exclude_dataset_file)
+    frames = exclude_datasets(frames, excluded_datasets)
 
     plot_df = build_plot_dataframe(frames)
     plot_component_ablation(

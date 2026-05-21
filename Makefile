@@ -73,6 +73,7 @@ TARGETS = \
 	gro_slot_legacy_ablation_test \
 	gro_ablation_test \
 	mh_synthetic_experiment \
+	shortest_path_congestion_diagnostic \
 	svp_test \
 	gor_test \
 	sor_test \
@@ -87,6 +88,7 @@ TEST_OBJECTS = \
 	tests/gro_slot_legacy_ablation_test.o \
 	tests/gro_ablation_test.o \
 	tests/mh_synthetic_experiment.o \
+	tests/shortest_path_congestion_diagnostic.o \
 	tests/svp_test.o \
 	tests/gor_test.o \
 	tests/sor_test.o \
@@ -109,6 +111,7 @@ ABLATION_METHODS = \
 	run-gro run-gro-baseline run-gro-selection-debug run-gro-reroute-debug \
 	run-gro-fixed-random-selection run-gro-ablation \
 	run-gro-slot-legacy-ablation \
+	run-shortest-path-congestion-diagnostic \
 	run-svp run-gor run-sor run-fahl \
 	run-ablation-methods merge-ablation-methods check-ablation-methods \
 	run-ablation-baseline-random-normal \
@@ -152,6 +155,9 @@ gro_ablation_test: $(OBJECTS_LIB) tests/gro_ablation_test.o Makefile
 mh_synthetic_experiment: $(OBJECTS_LIB) tests/mh_synthetic_experiment.o Makefile
 	$(CXX) $(CXXFLAGS) $(OPENMP_FLAGS) -o $@ $(filter-out Makefile,$^) $(LIB_DIRS) $(LIBS)
 
+shortest_path_congestion_diagnostic: $(OBJECTS_LIB) tests/shortest_path_congestion_diagnostic.o Makefile
+	$(CXX) $(CXXFLAGS) $(OPENMP_FLAGS) -o $@ $(filter-out Makefile,$^) $(LIB_DIRS) $(LIBS)
+
 svp_test: $(OBJECTS_LIB) tests/svp_test.o Makefile
 	$(CXX) $(CXXFLAGS) $(OPENMP_FLAGS) -o $@ $(filter-out Makefile,$^) $(LIB_DIRS) $(LIBS)
 
@@ -193,6 +199,9 @@ run-gro-fixed-random-selection: gro_fixed_random_selection_test
 
 run-gro-slot-legacy-ablation: gro_slot_legacy_ablation_test
 	./gro_slot_legacy_ablation_test $(TEST_CONFIG)
+
+run-shortest-path-congestion-diagnostic: shortest_path_congestion_diagnostic
+	./shortest_path_congestion_diagnostic $(ABLATION_CONFIG)
 
 run-gro-ablation: gro_ablation_test
 	./gro_ablation_test $(TEST_CONFIG)
@@ -329,6 +338,7 @@ help:
 	@echo "Experiments:"
 	@echo "  make run-ablation-methods     - run all method-split ablations sequentially"
 	@echo "  make gro_slot_legacy_ablation_test - build ContGRO-style slot TDG diagnostic"
+	@echo "  make shortest_path_congestion_diagnostic - build shortest-path congestion diagnostic"
 	@echo "  make run-bj-ablation-methods  - run all method-split ablations on BJ synthetic sets"
 	@echo "  make merge-ablation-methods   - merge method CSVs into gro_ablation.csv"
 	@echo "  make check-ablation-methods   - show method CSV row counts"
