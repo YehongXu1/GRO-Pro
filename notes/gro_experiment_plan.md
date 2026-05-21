@@ -1,413 +1,324 @@
 # GRO Experiment Plan
 
-This note records the experiment plan for validating the TDG/TIE idea in GRO.
-The purpose is not only to show that the final method works, but also to show
-which component is responsible for the improvement.
+This note records the current paper-level experiment design. The order is
+intentional: first isolate the major components, then compare the complete
+method against baselines.
 
-## Main Question
+## Main Claim
 
-The paper's core claim should be:
+GRO builds a traffic dependency graph over massive route trajectories and uses
+the dependency signal to guide iterative global rerouting. The experiments
+should show three things:
 
-```text
-TDG/TIE captures spatiotemporal dependencies among massive route trajectories,
-and this dependency information helps iterative global rerouting select better
-queries and construct less harmful replacement routes.
-```
-
-Therefore, the experiments must answer three questions:
-
-1. Does TDG-based selection choose more system-impactful queries than simple
-   selection heuristics?
-2. Does impact-aware rerouting produce better replacement routes than normal
-   time-dependent Dijkstra?
-3. In the full iterative paradigm, do TDG selection and TDG rerouting improve
-   total travel time faster and more consistently than the baselines?
+1. TDG-based selection chooses a better set of queries to reroute.
+2. TDG-aware rerouting can improve replacement routes once queries are selected.
+3. TDG compression makes the method scalable without destroying route quality.
 
 ## Dataset Roles
 
-Use the MH synthetic datasets as the main ablation dataset.
-
-Reason:
-
-- `hop` controls query distance.
-- `rep` controls demand density.
-- The 3 x 3 grid, `Hop10/20/40 x Rep1/2/4`, lets us explain when TDG/TIE is
-  useful instead of only reporting one averaged number.
-
-Use real-world taxi request samples, including amplified query sets, as the
-final realism evaluation.
-
-Reason:
-
-- Real taxi OD and departure-time distributions show that the method is not
-  only effective on controlled synthetic data.
-- Amplification gives a way to test scalability and congestion strength under
-  realistic spatial-temporal demand patterns.
+| Dataset | Role |
+| --- | --- |
+| BJ Synthetic 3 x 3 x 30 | Main ablation dataset. It controls query length and density, so it is the cleanest setting for explaining why each component works. |
+| Real-world taxi workloads | Main scalability and practical-effectiveness dataset. Use varying query counts, e.g. 10k, 30k, 50k, 100k. |
+| MH Synthetic | Robustness or appendix only unless it becomes necessary for a specific comparison. |
 
 ## Method Names
 
-Use these names consistently in result files and figures.
+| Name | Selection | Reroute | Role |
+| --- | --- | --- | --- |
+| `baseline_random_normal` | random fixed fraction | normal TD-Dijkstra | simple iterative baseline |
+| `baseline_delayed_normal` | most-delayed fixed fraction | normal TD-Dijkstra | strongest simple iterative baseline |
+| `baseline_delayed_tdg_reroute` | most-delayed fixed fraction | TDG impact reroute | reroute ablation only |
+| `tdg_anchor_normal` | TDG anchor selection | normal TD-Dijkstra | selection ablation |
+| `tdg_excess_normal` | TDG excess-relief selection | normal TD-Dijkstra | main selection variant |
+| `tdg_excess_full` | TDG excess-relief selection | TDG impact reroute | complete GRO variant |
+| `SVP` | one-shot diversified routing | one-shot | paper baseline |
+| `GOR` | one-shot greedy congestion-aware routing | one-shot | paper baseline |
+| `SOR` | one-shot spatiotemporal congestion mitigation | one-shot | paper baseline |
+| `FAHL` | indexed flow-aware individual routing | one-shot query processing | paper baseline |
 
-| Name | Selection | Reroute |
-| --- | --- | --- |
-| `baseline_random_normal` | random fixed fraction | normal TD-Dijkstra |
-| `baseline_delayed_normal` | most delayed fixed fraction | normal TD-Dijkstra |
-| `baseline_random_tdg_reroute` | random fixed fraction | TDG impact-aware reroute |
-| `baseline_delayed_tdg_reroute` | most delayed fixed fraction | TDG impact-aware reroute |
-| `tdg_selection_normal` | TDG anchor selection | normal TD-Dijkstra |
-| `tdg_excess_normal` | TDG excess-relief selection | normal TD-Dijkstra |
-| `tdg_full` | TDG anchor selection | TDG impact-aware reroute |
-| `tdg_excess_full` | TDG excess-relief selection | TDG impact-aware reroute |
+Only `baseline_random_normal`, `baseline_delayed_normal`, and GRO variants are
+iterative methods. SVP, GOR, SOR, and FAHL should not be plotted as
+over-iteration curves.
 
-In the current `gro_ablation_test` CSV, these are represented by:
+## Subsection 1: Selection Ablation
 
-```text
-selection_method = random, most_delayed, tdg, tdg_excess
-removal_mode     = none, anchor_important
-reroute_method   = normal_td_dijkstra, tdg_impact_reroute
-selection_fraction = 10, 30, or -1 for TDG selection
-gamma = -1 for simple selection, 50 for TDG selection
-impact_weight = 0 for normal_td_dijkstra, 30 for tdg_impact_reroute
-```
+Purpose:
 
-## Experiment 1: Selection-Only Quality
-
-Goal:
-
-```text
-Test whether TDG selection chooses queries whose removal gives more congestion
-relief than simple selection methods.
-```
-
-Protocol:
-
-- Use current routes before rerouting.
-- Do not reroute selected queries.
-- Remove selected queries from the current route set.
-- Re-evaluate the remaining queries only.
-- Compare remaining-query average travel time.
-
-Primary metric:
-
-```text
-remaining_avg_query_tt =
-    remaining_total_travel_time / remaining_query_count
-```
-
-A better selection method should leave a lower `remaining_avg_query_tt` after
-the selected queries are removed.
-
-Baselines:
-
-- random 10%
-- random 30%
-- most_delayed 10%
-- most_delayed 30%
-
-TDG settings:
-
-- `removal_mode = anchor_important`
-- `gamma = 25, 50, 75`
-
-Main output to report:
-
-- value over random
-- percentage over random
-- value over most_delayed
-- percentage over most_delayed
-- selection running time
-- selected query count or selected fraction
-- TDG node count and important node count
-
-Current evidence:
-
-```text
-TDG selection is clearly better than random on average.
-TDG selection is only moderately better than most_delayed.
-The selection evidence is positive but not yet the strongest part of the paper.
-```
-
-Selection methods to include in the next ablation:
-
-- `tdg_anchor`: the original TDG selection method.
-- `tdg_excess`: the new excess-relief TDG selection method.
-
-Algorithm details for `tdg_excess` are recorded separately in
-`notes/gro_algorithm_changes.md`.
-
-Decision rule:
-
-```text
-If TDG selection only beats random but not most_delayed, do not overclaim the
-selection contribution. Frame it as a useful dependency-aware component whose
-main value is strongest in the full iterative setting.
-```
-
-## Experiment 2: Reroute-Only Quality
-
-Goal:
-
-```text
-Test whether TDG impact-aware rerouting creates better replacement routes than
-normal TD-Dijkstra when the selected queries are fixed.
-```
-
-Protocol:
-
-- Use random selection to avoid mixing selection quality into this experiment.
-- Select the same fraction of queries for every reroute method.
-- Compare normal TD-Dijkstra against TDG impact-aware reroute.
-- Vary `impact_weight`.
-
-Settings:
-
-- selected fraction from `config/config.yaml`
-- `impact_weight = 0, 5, 15, 30, 50, 100`
-- `impact_weight = 0` means normal TD-Dijkstra
-
-Primary metric:
-
-```text
-total_after = total travel time after rerouting and re-evaluation
-gain_vs_normal = normal_total_after - tdg_total_after
-```
-
-Main output to report:
-
-- average gain over normal TD-Dijkstra
-- win rate over normal TD-Dijkstra
-- reroute running time
-- extra running time over normal TD-Dijkstra
-- best or default impact weight
-
-Current evidence:
-
-```text
-impact_weight = 30 is currently the best default.
-TDG reroute has stronger evidence than TDG selection.
-The improvement is stable and the extra time is moderate.
-```
-
-Decision rule:
-
-```text
-If impact-aware reroute consistently wins for weights near 15/30/50, then the
-reroute component can be presented as strong evidence that TDG impact scores
-are meaningful.
-```
-
-## Experiment 3: Iterative Component Ablation
-
-Goal:
-
-```text
-Test whether TDG selection and TDG reroute help inside the actual iterative GRO
-paradigm.
-```
-
-This is the most important ablation for the paper.
+Show that TDG-based query selection is better than simple fixed-fraction
+selection when rerouting is held fixed.
 
 Dataset:
 
 ```text
-MH synthetic, all Hop10/20/40 x Rep1/2/4 configurations.
-```
-
-Run split by configuration:
-
-```text
-Hop10Rep1, Hop10Rep2, Hop10Rep4,
-Hop20Rep1, Hop20Rep2, Hop20Rep4,
-Hop40Rep1, Hop40Rep2, Hop40Rep4.
+BJ Synthetic 3 x 3 x 30
 ```
 
 Methods:
 
-- `baseline_random_normal`
-- `baseline_delayed_normal`
-- `baseline_random_tdg_reroute`
-- `baseline_delayed_tdg_reroute`
-- `tdg_selection_normal`
-- `tdg_excess_normal`
-- `tdg_full`
-- `tdg_excess_full`
+```text
+baseline_random_normal
+baseline_delayed_normal
+tdg_anchor_normal
+tdg_excess_normal
+```
 
-Default parameters:
+Default plotting setting:
 
 ```text
-fixed_fractions = 10, 30
-tdg_gamma = 50
-tdg_removal_mode = anchor_important
+baseline fraction = 10%
+TDG gamma = 25
+reroute method = normal_td_dijkstra
+```
+
+Additional settings such as baseline fraction 30% and gamma 50 can be reported
+in a compact table or appendix if needed.
+
+Metrics:
+
+```text
+TTT over iterations
+final TTT
+average query travel time
+selected_count
+selected_fraction
+select_sec
+tdg_prepare_sec
+```
+
+Expected interpretation:
+
+If `tdg_excess_normal` beats `baseline_delayed_normal` under the same iteration
+budget, the gain is attributable to selection because rerouting is fixed to
+normal TD-Dijkstra.
+
+## Subsection 2: Rerouting Ablation
+
+Purpose:
+
+Show whether TDG impact-aware rerouting improves route replacement quality once
+the selected query set is fixed.
+
+Dataset:
+
+```text
+BJ Synthetic 3 x 3 x 30
+```
+
+Methods:
+
+```text
+baseline_delayed_normal
+baseline_delayed_tdg_reroute
+tdg_excess_normal
+tdg_excess_full
+```
+
+Controlled comparisons:
+
+```text
+baseline_delayed_normal vs baseline_delayed_tdg_reroute
+tdg_excess_normal vs tdg_excess_full
+```
+
+Default setting:
+
+```text
+baseline fraction = 10%
+TDG gamma = 25
 impact_weight = 30
-max_iterations = config/config.yaml
 ```
-
-Primary metrics:
-
-- total travel time per iteration
-- total reduction after each iteration
-- final total travel time
-- convergence speed
-- per-iteration selected count
-- per-iteration reroute time
-- per-iteration TDG preparation and selection time
-- method total time
-
-Required comparisons:
-
-1. `tdg_selection_normal` vs `baseline_random_normal`
-2. `tdg_selection_normal` vs `baseline_delayed_normal`
-3. `tdg_excess_normal` vs `tdg_selection_normal`
-4. `tdg_excess_normal` vs `baseline_random_normal`
-5. `tdg_excess_normal` vs `baseline_delayed_normal`
-6. `baseline_random_tdg_reroute` vs `baseline_random_normal`
-7. `baseline_delayed_tdg_reroute` vs `baseline_delayed_normal`
-8. `tdg_full` and `tdg_excess_full` vs all non-TDG baselines
-
-Interpretation:
-
-```text
-Selection is useful if TDG selection + normal reroute beats simple selection +
-normal reroute under the same iteration budget.
-
-Reroute is useful if simple selection + TDG reroute beats the same simple
-selection + normal reroute.
-
-The full method is strong if TDG selection + TDG reroute gives the fastest and
-largest total travel time reduction.
-```
-
-Decision rule:
-
-```text
-For a strong VLDB-style claim, tdg_full should not only beat random. It should
-also beat or clearly match most_delayed while giving better final total travel
-time or faster convergence.
-```
-
-## Experiment 4: TDG Compression Ablation
-
-Goal:
-
-```text
-Show that TDG compression improves efficiency while preserving enough
-dependency information for selection and reroute quality.
-```
-
-Settings:
-
-- fine TDG or original TDG
-- compressed TDG
-- several dependency representation thresholds, if supported
 
 Metrics:
 
-- TDG node count
-- TDG arc count
-- important node count
-- compression time
-- impact computation time
-- selection time
-- reroute time
-- total travel time after each iteration
-
-Main claim to support:
-
 ```text
-Compression reduces TDG cost substantially, while preserving the quality trend
-of the uncompressed dependency graph.
+TTT over iterations
+final TTT
+average query travel time
+reroute_sec
+batch_sec
+batch_count
+selected_count
+method_total_sec
 ```
 
-## Experiment 5: End-to-End Baseline Comparison
+Expected interpretation:
 
-Goal:
+`baseline_delayed_tdg_reroute` is not an overall-effectiveness baseline. It is
+a diagnostic method showing what happens when only the reroute component is
+changed while selection stays simple.
+
+## Subsection 3: Compression And Scalability
+
+Purpose:
+
+Show that compression is the scalability component of GRO: it reduces TDG size
+and runtime enough for large query workloads while preserving route quality.
+
+Dataset:
 
 ```text
-Compare the final GRO method against external baselines under the same
-evaluation pipeline.
+Real-world taxi workloads with varying query count:
+10k, 30k, 50k, 100k
 ```
 
-Baselines:
+Methods:
 
-- shortest path initialization
-- iterative baseline without TDG
-- SVP
-- GOR greedy
-- SOR
-- FAHL
+```text
+tdg_excess_normal without compression
+tdg_excess_normal with compression
+tdg_excess_full without compression
+tdg_excess_full with compression
+```
 
-Datasets:
-
-- MH synthetic, summarized by hop/rep
-- real taxi amplified query sets
+If the uncompressed method cannot finish at larger sizes, report timeout or
+memory failure as part of the scalability result.
 
 Metrics:
 
-- final total travel time
-- average query travel time
-- congestion/load metrics if available
-- algorithm runtime
-- preprocessing/index construction time for FAHL
-- query/routing time for FAHL
-- memory or index size if available
+```text
+TDG node count
+TDG edge/timeline count
+compression ratio
+build/compress time
+impact computation time
+selection time
+reroute time
+method_total_sec
+memory usage
+final TTT
+TTT difference from uncompressed, when uncompressed is available
+```
 
-Fairness notes:
+Compression parameter experiment:
 
-- All methods should output routes and be evaluated by the same traffic
-  evaluator.
-- FAHL index construction time should be separated from query time.
-- FAHL uses a fixed flow distribution derived from a reference route set.
-- SOR/GOR use route-induced flow during route construction.
-- GRO uses iterative feedback and should be evaluated by convergence and final
-  total travel time.
+Use one representative real-world workload, e.g. 30k or 50k queries, and vary
+`delta_compress`. Report TDG size, runtime, and final TTT. Do not make
+compression a large synthetic-data experiment.
 
-## Experiment 6: Parameter Sensitivity
+## Subsection 4: Parameter Sensitivity
 
-Goal:
+Purpose:
+
+Show that the default parameters are reasonable and that the method is not
+fragile.
+
+Dataset:
 
 ```text
-Show that the method does not rely on one fragile parameter setting.
+BJ Synthetic 3 x 3 x 30 for gamma and impact_weight
+One representative real-world workload for delta_compress
 ```
 
 Parameters:
 
-- `gamma` for TDG selection
-- `impact_weight` for TDG reroute
-- selected fraction for simple baselines
-- compression threshold, if applicable
-
-Recommended reporting:
-
-- keep one default setting for main experiments
-- use one compact sensitivity figure or table
-- avoid tuning each dataset separately
-
-Current default:
-
 ```text
-gamma = 50
-removal_mode = anchor_important
-impact_weight = 30
-simple baseline fractions = 10, 30
+gamma: 25, 50
+impact_weight: 0, 30, optionally 50
+delta_compress: small/default/large
 ```
 
-## Result Files
-
-Current relevant files:
+Metrics:
 
 ```text
-python/results/mh/gro_selection_debug_removal_modes.csv
-python/results/mh/gro_simple_selection_baselines_10_30.csv
-python/results/mh/gro_reroute_debug.csv
-python/results/mh/gro_ablation_baseline_random_normal.csv
-python/results/mh/gro_ablation_baseline_delayed_normal.csv
-python/results/mh/gro_ablation_baseline_random_tdg_reroute.csv
-python/results/mh/gro_ablation_baseline_delayed_tdg_reroute.csv
-python/results/mh/gro_ablation_tdg_anchor_normal.csv
-python/results/mh/gro_ablation_tdg_excess_normal.csv
-python/results/mh/gro_ablation_tdg_anchor_full.csv
-python/results/mh/gro_ablation_tdg_excess_full.csv
-python/results/mh/gro_ablation.csv
+final TTT
+average query travel time
+selected_fraction
+runtime
+TDG size for delta_compress
+```
+
+Keep this subsection compact. It should justify defaults, not become a second
+main evaluation.
+
+## Subsection 5: Overall Effectiveness
+
+Purpose:
+
+Compare the complete GRO method against simple iterative baselines and
+literature baselines under the same traffic evaluation pipeline.
+
+Datasets:
+
+```text
+BJ Synthetic 3 x 3 x 30
+Real-world taxi workload, large setting such as 100k queries
+```
+
+Iterative convergence figure:
+
+Only include iterative methods:
+
+```text
+baseline_random_normal
+baseline_delayed_normal
+tdg_excess_normal
+tdg_excess_full
+```
+
+Metrics for the convergence figure:
+
+```text
+TTT over iterations
+average query travel time over iterations
+runtime per iteration, if space allows
+```
+
+Final comparison table:
+
+Include both iterative and one-shot methods:
+
+```text
+shortest-path initialization
+baseline_delayed_normal, final iteration
+tdg_excess_normal, final iteration
+tdg_excess_full, final iteration
+SVP
+GOR
+SOR
+FAHL
+```
+
+Metrics for the final table:
+
+```text
+final TTT
+average query travel time
+improvement over shortest-path initialization
+total runtime
+preprocessing/index construction time for FAHL
+query/routing time for FAHL
+memory/index size, if available
+```
+
+Fairness notes:
+
+- All methods output routes and are evaluated by the same traffic simulator.
+- Iterative methods are allowed multiple rerouting iterations; report their
+  final-iteration result and total runtime.
+- SVP, GOR, SOR, and FAHL are one-shot or independent-routing baselines; compare
+  their final route set, not convergence.
+- FAHL uses a fixed flow distribution derived from a specified reference route
+  set. Report index construction separately from query time.
+- `baseline_delayed_tdg_reroute` belongs in rerouting ablation, not the overall
+  baseline table.
+
+## Current Result Files
+
+BJ capacity2/cap10e8 iterative files:
+
+```text
+python/results/bj/gro_ablation_baseline_delayed_normal_capacity2_cap10e8.csv
+python/results/bj/gro_ablation_baseline_delayed_tdg_reroute_capacity2_cap10e8.csv
+python/results/bj/gro_ablation_tdg_anchor_normal_capacity2_cap10e8.csv
+python/results/bj/gro_ablation_tdg_excess_normal_capacity2_cap10e8.csv
+```
+
+Current comparison plots:
+
+```text
+python/results/bj/bj_delayed_vs_tdg_anchor_normal_capacity2_cap10e8_ttt.png
+python/results/bj/bj_delayed_vs_tdg_anchor_normal_capacity2_cap10e8_log_ttt.png
 ```
 
 Command records are kept in:
@@ -416,46 +327,24 @@ Command records are kept in:
 notes/executables.md
 ```
 
-Selection result summary is kept in:
+Algorithm-change notes are kept in:
 
 ```text
-notes/gro_selection_debug_results.md
+notes/gro_algorithm_changes.md
+notes/tdg_compression.md
+notes/tdg_impact_normalization.md
 ```
 
-## Paper-Level Expected Story
+## Paper-Level Story
 
-The strongest paper story is not:
+The experimental narrative should be:
 
-```text
-We propose another heuristic routing algorithm.
-```
-
-The stronger story is:
-
-```text
-We introduce a traffic-dependency graph over massive route trajectories and use
-it to estimate system-level impact of route modifications. This enables an
-iterative optimizer to select and reroute queries using dependency-aware
-signals instead of purely local delay or random choices.
-```
-
-The experiments should support this story in order:
-
-1. TDG impact scores contain useful selection/reroute signal.
-2. TDG reroute avoids recreating congestion better than normal TD-Dijkstra.
-3. TDG selection and TDG reroute together improve iterative optimization.
-4. The method scales under synthetic and real amplified workloads.
-
-## Open Risks
-
-The current risk is that selection-only improvement over `most_delayed` may be
-modest. If this remains true, the paper should avoid overclaiming selection as
-the only major contribution.
-
-The likely stronger claim is:
-
-```text
-TDG/TIE is a shared dependency-aware mechanism. Its reroute signal is strong,
-and its selection signal becomes most useful when evaluated inside the full
-iterative optimization loop.
-```
+1. Selection ablation: TDG selection gives a better set of queries to reroute.
+2. Rerouting ablation: TDG impact helps replacement routes avoid harmful
+   congestion feedback.
+3. Compression/scalability: compressed TDG keeps the dependency signal usable at
+   large scale.
+4. Parameter sensitivity: the chosen defaults are stable enough.
+5. Overall effectiveness: complete GRO beats simple iterative baselines and is
+   competitive with or better than literature baselines under the same
+   simulation-based evaluation.

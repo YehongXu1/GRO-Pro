@@ -212,7 +212,7 @@ Options parse_args(int argc, char** argv) {
                 << "[--fixed-fractions 10,30] [--tdg-gammas 50] "
                 << "[--impact-weights 30] "
                 << "[--hop 10] [--rep 1] "
-                << "[--datasets Hop10Rep1-0,Hop10Rep1-1] "
+                << "[--datasets Hop10Rep1-0,BJRealRep10-0] "
                 << "[--dataset-list path] [--random-seed n] [--max-files n]\n";
             std::exit(0);
         } else {
@@ -234,12 +234,17 @@ DatasetInfo dataset_info_from_path(const std::filesystem::path& path) {
         info.dataset = path.stem().string();
     }
 
-    std::regex pattern(R"(Hop([0-9]+)Rep([0-9]+)-([0-9]+))");
+    std::regex synthetic_pattern(R"(Hop([0-9]+)Rep([0-9]+)-([0-9]+))");
+    std::regex bj_real_pattern(R"(BJRealRep([0-9]+)-([0-9]+))");
     std::smatch match;
-    if (std::regex_match(info.dataset, match, pattern)) {
+    if (std::regex_match(info.dataset, match, synthetic_pattern)) {
         info.hop = std::stoi(match[1].str());
         info.rep = std::stoi(match[2].str());
         info.seed = std::stoi(match[3].str());
+    } else if (std::regex_match(info.dataset, match, bj_real_pattern)) {
+        info.hop = -1;
+        info.rep = std::stoi(match[1].str());
+        info.seed = std::stoi(match[2].str());
     }
     return info;
 }
@@ -247,7 +252,8 @@ DatasetInfo dataset_info_from_path(const std::filesystem::path& path) {
 std::vector<DatasetInput> discover_datasets(
     const std::filesystem::path& query_dir) {
     std::vector<DatasetInput> datasets;
-    std::regex pattern(R"(Hop([0-9]+)Rep([0-9]+)-([0-9]+)\.txt)");
+    std::regex pattern(
+        R"((Hop([0-9]+)Rep([0-9]+)-([0-9]+)|BJRealRep([0-9]+)-([0-9]+))\.txt)");
 
     for (const auto& entry : std::filesystem::directory_iterator(query_dir)) {
         if (!entry.is_regular_file()) {

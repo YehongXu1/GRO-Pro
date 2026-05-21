@@ -57,3 +57,6 @@ python/results/
 python/figures/
 *.log
  
+.data/BJ_Real_query_sets/release/
+python/results/*.csv
+data/BJ_Real_query_sets/release/

@@ -1,0 +1,43 @@
+{
+  "source": "T-Drive Beijing taxi GPS trajectories",
+  "graph": "data/BJ.txt",
+  "coordinates": "data/BJ_NodeIDLonLat.txt",
+  "tdrive_dir": "data/BJ_Real_query_sets/T-drive Taxi Trajectories.zip",
+  "output_dir": "data/BJ_Real_query_sets",
+  "naming": "BJRealRep{amplification_factor}-{set_id}.txt",
+  "center": {
+    "lon": 116.3975,
+    "lat": 39.9087
+  },
+  "region_radius_km": 8.0,
+  "region_description": "8 km Tiananmen-centered third-ring proxy",
+  "road_nodes_inside_region": 49782,
+  "usable_road_nodes_inside_region": 44565,
+  "usable_internal_directed_edges": 78624,
+  "sets": 5,
+  "queries_per_base_set": 10000,
+  "rep_values": [
+    1,
+    5,
+    10
+  ],
+  "max_snap_distance_m": 500.0,
+  "min_duration_min": 5.0,
+  "max_duration_min": 60.0,
+  "min_distance_km": 0.8,
+  "max_distance_km": 16.0,
+  "start_time": null,
+  "end_time": null,
+  "start_stride": 1,
+  "max_end_points_per_start": 40,
+  "amplify_time_jitter_sec": 0,
+  "max_files": 500,
+  "shuffle_files": true,
+  "random_seed": 0,
+  "files_processed": 500,
+  "gps_points_parsed": 761549,
+  "gps_points_inside_region": 320493,
+  "gps_points_snapped": 320472,
+  "candidate_segments_seen": 232093,
+  "time_origin_seconds": 1201959070
+}
