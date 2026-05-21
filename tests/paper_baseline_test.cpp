@@ -1,4 +1,5 @@
 #include "fahl.hpp"
+#include "gor.hpp"
 #include "sor.hpp"
 #include "svp.hpp"
 
@@ -35,7 +36,7 @@ struct Options {
     std::filesystem::path query_file;
     std::filesystem::path output_path =
         "python/results/paper_baselines.csv";
-    std::vector<std::string> methods = {"svp", "sor", "fahl"};
+    std::vector<std::string> methods = {"svp", "gor", "sor", "fahl"};
     int max_files = 0;
     int max_queries = 0;
     int rep_filter = -1;
@@ -58,6 +59,10 @@ struct RunStats {
     gro::Cost final_total_travel_time = 0;
     std::size_t unreachable_count = 0;
 };
+
+double seconds(long long microseconds) {
+    return static_cast<double>(microseconds) / 1000000.0;
+}
 
 void require(bool condition, const std::string& message) {
     if (!condition) {
@@ -151,7 +156,7 @@ Options parse_args(int argc, char** argv) {
             std::cout
                 << "Usage: ./paper_baseline_test [config] "
                 << "[--query-dir path | --query-file path] "
-                << "[--output path] [--methods svp,sor,fahl] "
+                << "[--output path] [--methods svp,gor,sor,fahl] "
                 << "[--rep n] [--max-files n] [--max-queries n]\n";
             std::exit(0);
         } else {
@@ -282,15 +287,45 @@ RunStats run_svp(
     const gro::TrafficOptions& traffic_options,
     const Options& options) {
     RunStats stats;
+    std::cerr << "  [phase] svp route_start queries=" << queries.size()
+              << " k=" << options.svp_k
+              << " theta=" << options.svp_theta << "\n";
     auto start = gro::Clock::now();
     std::vector<gro::Route> routes = gro::compute_svp_baseline_routes(
         graph,
         queries,
         gro::SVPOptions{options.svp_k, options.svp_theta});
     stats.route_us = gro::elapsed_us(start);
+    std::cerr << "  [phase] svp route_done sec=" << seconds(stats.route_us)
+              << "\n";
     stats.unreachable_count = count_unreachable(queries, routes);
+    std::cerr << "  [phase] svp evaluate_start\n";
     stats.final_total_travel_time =
         evaluate_total(graph, queries, routes, traffic_options, stats.evaluate_us);
+    std::cerr << "  [phase] svp evaluate_done sec="
+              << seconds(stats.evaluate_us) << "\n";
+    return stats;
+}
+
+RunStats run_gor(
+    const gro::Graph& graph,
+    const std::vector<gro::Query>& queries,
+    const gro::TrafficOptions& traffic_options) {
+    RunStats stats;
+    std::cerr << "  [phase] gor route_start queries=" << queries.size()
+              << "\n";
+    auto start = gro::Clock::now();
+    std::vector<gro::Route> routes =
+        gro::compute_gor_greedy_routes(graph, queries, traffic_options);
+    stats.route_us = gro::elapsed_us(start);
+    std::cerr << "  [phase] gor route_done sec=" << seconds(stats.route_us)
+              << "\n";
+    stats.unreachable_count = count_unreachable(queries, routes);
+    std::cerr << "  [phase] gor evaluate_start\n";
+    stats.final_total_travel_time =
+        evaluate_total(graph, queries, routes, traffic_options, stats.evaluate_us);
+    std::cerr << "  [phase] gor evaluate_done sec="
+              << seconds(stats.evaluate_us) << "\n";
     return stats;
 }
 
@@ -306,13 +341,24 @@ RunStats run_sor(
     sor_options.max_time_steps = options.sor_max_time_steps;
     sor_options.max_labels_per_query = options.sor_max_labels_per_query;
 
+    std::cerr << "  [phase] sor route_start queries=" << queries.size()
+              << " detour_percent=" << sor_options.detour_percent
+              << " time_step=" << sor_options.time_step
+              << " max_time_steps=" << sor_options.max_time_steps
+              << " max_labels_per_query=" << sor_options.max_labels_per_query
+              << "\n";
     auto start = gro::Clock::now();
     std::vector<gro::Route> routes =
         gro::compute_sor_routes(graph, queries, sor_options);
     stats.route_us = gro::elapsed_us(start);
+    std::cerr << "  [phase] sor route_done sec=" << seconds(stats.route_us)
+              << "\n";
     stats.unreachable_count = count_unreachable(queries, routes);
+    std::cerr << "  [phase] sor evaluate_start\n";
     stats.final_total_travel_time =
         evaluate_total(graph, queries, routes, traffic_options, stats.evaluate_us);
+    std::cerr << "  [phase] sor evaluate_done sec="
+              << seconds(stats.evaluate_us) << "\n";
     return stats;
 }
 
@@ -327,10 +373,17 @@ RunStats run_fahl(
     fahl_options.alpha_percent = options.fahl_alpha_percent;
     fahl_options.time_step = options.fahl_time_step;
 
+    std::cerr << "  [phase] fahl profile_start reference_routes="
+              << reference_routes.size()
+              << " alpha_percent=" << fahl_options.alpha_percent
+              << " time_step=" << fahl_options.time_step << "\n";
     auto profile_start = gro::Clock::now();
     gro::FAHLFlowProfile profile =
         gro::build_fahl_flow_profile(graph, reference_routes, fahl_options.time_step);
     stats.profile_us = gro::elapsed_us(profile_start);
+    std::cerr << "  [phase] fahl profile_done sec="
+              << seconds(stats.profile_us)
+              << " profile_buckets=" << profile.size() << "\n";
 
     gro::Time safe_step = fahl_options.time_step > 0 ? fahl_options.time_step : 1;
     std::map<int, std::vector<const gro::Query*>> queries_by_bucket;
@@ -338,23 +391,42 @@ RunStats run_fahl(
         queries_by_bucket[static_cast<int>(query.departure_time / safe_step)]
             .push_back(&query);
     }
+    std::cerr << "  [phase] fahl buckets=" << queries_by_bucket.size()
+              << " query_start queries=" << queries.size() << "\n";
 
     std::vector<gro::Route> routes(queries.size());
+    std::size_t bucket_index = 0;
     for (const auto& [bucket, bucket_queries] : queries_by_bucket) {
+        ++bucket_index;
+        std::cerr << "  [phase] fahl bucket_start " << bucket_index
+                  << "/" << queries_by_bucket.size()
+                  << " bucket=" << bucket
+                  << " queries=" << bucket_queries.size() << "\n";
         auto index_start = gro::Clock::now();
         gro::FAHLIndex index(graph, profile, bucket, fahl_options);
-        stats.index_us += gro::elapsed_us(index_start);
+        long long index_us = gro::elapsed_us(index_start);
+        stats.index_us += index_us;
+        std::cerr << "  [phase] fahl bucket_index_done " << bucket_index
+                  << "/" << queries_by_bucket.size()
+                  << " sec=" << seconds(index_us) << "\n";
 
         auto query_start = gro::Clock::now();
         for (const gro::Query* query : bucket_queries) {
             routes[query->id] = index.query(*query);
         }
-        stats.route_us += gro::elapsed_us(query_start);
+        long long route_us = gro::elapsed_us(query_start);
+        stats.route_us += route_us;
+        std::cerr << "  [phase] fahl bucket_query_done " << bucket_index
+                  << "/" << queries_by_bucket.size()
+                  << " sec=" << seconds(route_us) << "\n";
     }
 
     stats.unreachable_count = count_unreachable(queries, routes);
+    std::cerr << "  [phase] fahl evaluate_start\n";
     stats.final_total_travel_time =
         evaluate_total(graph, queries, routes, traffic_options, stats.evaluate_us);
+    std::cerr << "  [phase] fahl evaluate_done sec="
+              << seconds(stats.evaluate_us) << "\n";
     return stats;
 }
 
@@ -362,6 +434,8 @@ std::string params_for_method(const std::string& method, const Options& options)
     std::ostringstream out;
     if (method == "svp") {
         out << "k=" << options.svp_k << ";theta=" << options.svp_theta;
+    } else if (method == "gor") {
+        out << "variant=greedy;require_remaining_progress=true";
     } else if (method == "sor") {
         out << "detour_percent=" << options.sor_detour_percent
             << ";time_step=" << options.sor_time_step
@@ -381,10 +455,6 @@ void write_header(std::ofstream& out) {
         << "avg_initial_travel_time,avg_final_travel_time,"
         << "reference_sec,profile_sec,index_sec,route_sec,evaluate_sec,total_sec,"
         << "parameters\n";
-}
-
-double seconds(long long microseconds) {
-    return static_cast<double>(microseconds) / 1000000.0;
 }
 
 void write_row(
@@ -465,9 +535,17 @@ int main(int argc, char** argv) {
             }
 
             auto reference_start = gro::Clock::now();
+            std::cerr << "[phase] reference_shortest_path_start "
+                      << dataset.info.dataset
+                      << " queries=" << queries.size() << "\n";
             std::vector<gro::Route> reference_routes =
                 compute_shortest_path_routes(graph, queries);
             long long reference_us = gro::elapsed_us(reference_start);
+            std::cerr << "[phase] reference_shortest_path_done "
+                      << dataset.info.dataset
+                      << " sec=" << seconds(reference_us) << "\n";
+            std::cerr << "[phase] reference_evaluate_start "
+                      << dataset.info.dataset << "\n";
             long long initial_evaluate_us = 0;
             gro::Cost initial_total_travel_time = evaluate_total(
                 graph,
@@ -475,6 +553,9 @@ int main(int argc, char** argv) {
                 reference_routes,
                 traffic_options,
                 initial_evaluate_us);
+            std::cerr << "[phase] reference_evaluate_done "
+                      << dataset.info.dataset
+                      << " sec=" << seconds(initial_evaluate_us) << "\n";
 
             std::cerr << "[dataset] " << dataset.info.dataset
                       << " queries=" << queries.size()
@@ -487,6 +568,8 @@ int main(int argc, char** argv) {
                 RunStats stats;
                 if (method == "svp") {
                     stats = run_svp(graph, queries, traffic_options, options);
+                } else if (method == "gor") {
+                    stats = run_gor(graph, queries, traffic_options);
                 } else if (method == "sor") {
                     stats = run_sor(graph, queries, traffic_options, options);
                 } else if (method == "fahl") {
