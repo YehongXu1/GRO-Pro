@@ -292,6 +292,15 @@ nohup ./shortest_path_congestion_diagnostic config/config_bj_capacity2_cap10e8.y
 tail -f logs/shortest_path_congestion_bj_synthetic_capacity2_cap10e8.log
 ```
 
+List-only summary for the synthetic diagnostic:
+
+```bash
+/Users/xyh/opt/anaconda3/envs/plot/bin/python \
+  python/summarize_shortest_path_congestion.py \
+  --input python/results/bj/analysis/congestion/shortest_path_congestion_bj_synthetic_capacity2_cap10e8.csv \
+  --summary-output python/results/bj/analysis/congestion/shortest_path_congestion_bj_synthetic_capacity2_cap10e8_summary.csv
+```
+
 If you only want to vary random-selection fraction 10% vs 30% with normal
 TD-Dijkstra first, run just:
 
