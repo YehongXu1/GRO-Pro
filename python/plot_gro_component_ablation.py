@@ -205,6 +205,29 @@ def format_panel_title(index: int, rep: int, hop: int) -> str:
     return f"({letter}) Rep #: {rep}, {hop_label}"
 
 
+def selection_fraction_axis_top(
+    fraction_curve: pd.DataFrame,
+    baseline_fraction: Optional[int],
+) -> float:
+    local_max = fraction_curve["selected_fraction"].dropna().max() * 100.0
+    if math.isnan(local_max):
+        local_max = 0.0
+    reference = max(local_max, float(baseline_fraction or 0))
+    if reference <= 0:
+        return 1.0
+
+    padded = reference * 1.12
+    if padded <= 5.0:
+        step = 1.0
+    elif padded <= 20.0:
+        step = 5.0
+    elif padded <= 50.0:
+        step = 10.0
+    else:
+        step = 20.0
+    return min(100.0, math.ceil(padded / step) * step)
+
+
 def plot_component_ablation(
     plot_df: pd.DataFrame,
     output: str,
@@ -265,16 +288,10 @@ def plot_component_ablation(
                         alpha=0.75,
                         zorder=1,
                     )
-                max_fraction = (
-                    plot_df[
-                        (plot_df["selection_label"] == selection_fraction_label)
-                        & (plot_df["reroute_label"] == selection_fraction_reroute)
-                    ]["selected_fraction"]
-                    .dropna()
-                    .max()
+                ax2.set_ylim(
+                    0,
+                    selection_fraction_axis_top(fraction_curve, baseline_fraction),
                 )
-                top = max(10.0, math.ceil((max_fraction * 100.0) / 10.0) * 10.0)
-                ax2.set_ylim(0, min(100.0, top))
                 ax2.grid(False)
                 ax2.tick_params(axis="y", labelsize=9, pad=2, colors="#666666")
                 if col == n_cols - 1:

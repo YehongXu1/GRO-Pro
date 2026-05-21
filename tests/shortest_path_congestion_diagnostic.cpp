@@ -183,8 +183,13 @@ bool keep_dataset(const DatasetInput& dataset, const Options& options) {
 std::vector<DatasetInput> discover_datasets(
     const std::filesystem::path& query_dir) {
     std::vector<DatasetInput> datasets;
+    std::regex query_pattern(
+        R"((Hop([0-9]+)Rep([0-9]+)-([0-9]+)|BJRealRep([0-9]+)-([0-9]+))\.txt)");
     for (const auto& entry : std::filesystem::directory_iterator(query_dir)) {
         if (!entry.is_regular_file() || entry.path().extension() != ".txt") {
+            continue;
+        }
+        if (!std::regex_match(entry.path().filename().string(), query_pattern)) {
             continue;
         }
         DatasetInput input;
