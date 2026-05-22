@@ -6,20 +6,27 @@ if [[ -n "${LOG:-}" ]]; then
   exec > "$LOG" 2>&1
 fi
 
-export OMP_NUM_THREADS="${OMP_NUM_THREADS:-24}"
+if [[ ! ${OMP_NUM_THREADS+x} || -z "$OMP_NUM_THREADS" ]]; then OMP_NUM_THREADS=24; fi
+export OMP_NUM_THREADS
 
-CONFIG="${CONFIG:-config/config_bj_capacity2_cap10e8.yaml}"
-QUERY_DIR="${QUERY_DIR:?Set QUERY_DIR to a scalability query directory}"
-LABEL="${LABEL:?Set LABEL for output filenames, e.g. original or window6h}"
-RESULTS_DIR="${RESULTS_DIR:-python/results/experiments/exp3_compression_scalability}"
-REPS="${REPS:-1,2,3,5,7,10}"
-TDG_GAMMAS="${TDG_GAMMAS:-90}"
-IMPACT_WEIGHTS="${IMPACT_WEIGHTS:-20}"
-RANDOM_SEED="${RANDOM_SEED:-0}"
-SELECTION_METHODS="${SELECTION_METHODS:-tdg_excess}"
-REROUTE_METHODS="${REROUTE_METHODS:-tdg}"
-FIXED_FRACTIONS="${FIXED_FRACTIONS:-10}"
-SUFFIX="${SUFFIX:-capacity2_cap10e8}"
+if [[ ! ${CONFIG+x} || -z "$CONFIG" ]]; then CONFIG=config/config_bj_capacity2_cap10e8.yaml; fi
+if [[ ! ${QUERY_DIR+x} || -z "$QUERY_DIR" ]]; then
+  echo "Set QUERY_DIR to a scalability query directory" >&2
+  exit 2
+fi
+if [[ ! ${LABEL+x} || -z "$LABEL" ]]; then
+  echo "Set LABEL for output filenames, e.g. original or window6h" >&2
+  exit 2
+fi
+if [[ ! ${RESULTS_DIR+x} || -z "$RESULTS_DIR" ]]; then RESULTS_DIR=python/results/experiments/exp3_compression_scalability; fi
+if [[ ! ${REPS+x} || -z "$REPS" ]]; then REPS=1,2,3,5,7,10; fi
+if [[ ! ${TDG_GAMMAS+x} || -z "$TDG_GAMMAS" ]]; then TDG_GAMMAS=90; fi
+if [[ ! ${IMPACT_WEIGHTS+x} || -z "$IMPACT_WEIGHTS" ]]; then IMPACT_WEIGHTS=20; fi
+if [[ ! ${RANDOM_SEED+x} || -z "$RANDOM_SEED" ]]; then RANDOM_SEED=0; fi
+if [[ ! ${SELECTION_METHODS+x} || -z "$SELECTION_METHODS" ]]; then SELECTION_METHODS=tdg_excess; fi
+if [[ ! ${REROUTE_METHODS+x} || -z "$REROUTE_METHODS" ]]; then REROUTE_METHODS=tdg; fi
+if [[ ! ${FIXED_FRACTIONS+x} || -z "$FIXED_FRACTIONS" ]]; then FIXED_FRACTIONS=10; fi
+if [[ ! ${SUFFIX+x} || -z "$SUFFIX" ]]; then SUFFIX=capacity2_cap10e8; fi
 
 TMPDIR="$RESULTS_DIR/tmp_gro_scalability_${LABEL}_tdg_excess_full_${SUFFIX}"
 OUT="$RESULTS_DIR/gro_scalability_${LABEL}_tdg_excess_full_${SUFFIX}.csv"
