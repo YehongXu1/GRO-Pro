@@ -10,7 +10,7 @@ struct SOROptions {
     int detour_percent = 10;
     Time time_step = 60;
     int max_time_steps = 1440;
-    int max_labels_per_query = 200000;
+    int max_labels_per_query = 3;
 };
 
 std::vector<Route> compute_sor_routes(

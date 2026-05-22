@@ -238,6 +238,40 @@ nohup make run-ablation-tdg-excess-full ABLATION_CONFIG=config/config_bj_capacit
 nohup make run-ablation-tdg-bpr-relief-full ABLATION_CONFIG=config/config_bj_capacity2_cap10e8.yaml QUERY_DIR=data/BJ_Synthetic_query_sets RESULTS_DIR=python/results/experiments/exp1_component_ablation/bj_synthetic_capacity2_cap10e8/raw FIXED_FRACTIONS=10,30 TDG_GAMMAS=50 IMPACT_WEIGHTS=30 RANDOM_SEED=0 RESULT_SUFFIX=capacity2_cap10e8 > logs/bj_ablation_tdg_bpr_relief_full_capacity2_cap10e8.log 2>&1 &
 ```
 
+BJ Synthetic Rep1 baseline-selection ablation with 1% reroute fraction. This
+runs random and latency-based selection with both normal TD-Dijkstra reroute and
+TDG-impact reroute. Use `--fixed-fractions 0.01` for 1%; passing `1` means
+100% because the parser treats values in `[0, 1]` as proportions. `--tdg-gammas`
+is ignored by the baseline selection methods but is still passed because the
+ablation parser requires it.
+
+```bash
+make gro_ablation_test
+
+mkdir -p python/results/experiments/exp1_component_ablation/bj_synthetic_capacity2_cap10e8/raw logs
+
+nohup ./gro_ablation_test config/config_bj_capacity2_cap10e8.yaml \
+  --query-dir data/BJ_Synthetic_query_sets \
+  --rep 1 \
+  --output python/results/experiments/exp1_component_ablation/bj_synthetic_capacity2_cap10e8/raw/gro_ablation_baseline_random_delayed_fraction001_rep1_normal_tdgimpact15_capacity2_cap10e8.csv \
+  --selection-methods random,most_delayed \
+  --reroute-methods normal,tdg \
+  --fixed-fractions 0.01 \
+  --tdg-gammas 25 \
+  --impact-weights 15 \
+  --random-seed 0 \
+  > logs/bj_ablation_baseline_random_delayed_fraction001_rep1_normal_tdgimpact15_capacity2_cap10e8.log 2>&1 &
+
+tail -f logs/bj_ablation_baseline_random_delayed_fraction001_rep1_normal_tdgimpact15_capacity2_cap10e8.log
+wc -l python/results/experiments/exp1_component_ablation/bj_synthetic_capacity2_cap10e8/raw/gro_ablation_baseline_random_delayed_fraction001_rep1_normal_tdgimpact15_capacity2_cap10e8.csv
+```
+
+Expected complete output size:
+
+```text
+3601 lines = header + 90 Rep1 query sets * 2 selection methods * 2 reroute methods * 10 iterations
+```
+
 BJ TDG-reroute impact-weight sweep. This keeps our `tdg_excess` selection and
 TDG-impact reroute, then varies the reroute impact penalty. `impact_weight=0`
 is a useful control because it keeps the TDG reroute path and batching machinery
