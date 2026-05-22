@@ -1,0 +1,30 @@
+{
+  "source_label": "bj_real_window6h",
+  "input_dir": "data/BJ_Real_query_sets_window6h",
+  "output_dir": "data/BJ_Real_query_sets_scalability_window6h",
+  "derivation": "Each BJRealRep1 seed file is used as the 10k base set. Every base query is repeated exactly rep times; OD and departure time are unchanged.",
+  "rep_values": [
+    1,
+    2,
+    3,
+    5,
+    7,
+    10
+  ],
+  "seeds": [
+    0,
+    1,
+    2,
+    3,
+    4
+  ],
+  "query_counts": {
+    "Rep1": 10000,
+    "Rep2": 20000,
+    "Rep3": 30000,
+    "Rep5": 50000,
+    "Rep7": 70000,
+    "Rep10": 100000
+  },
+  "intended_role": "GRO/TDG scalability experiment datasets"
+}
