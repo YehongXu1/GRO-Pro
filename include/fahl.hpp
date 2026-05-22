@@ -13,7 +13,7 @@ using FAHLFlowProfile = std::unordered_map<std::pair<EdgeId, int>, Flow, PairHas
 struct FAHLOptions {
     int alpha_percent = 50;
     Time time_step = 60;
-    int order_flow_weight = 1;
+    int order_beta_percent = 70;
 };
 
 FAHLFlowProfile build_fahl_flow_profile(

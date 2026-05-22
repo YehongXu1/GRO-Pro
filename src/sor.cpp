@@ -2,6 +2,7 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <numeric>
 #include <queue>
 #include <unordered_map>
 #include <utility>
@@ -267,7 +268,20 @@ std::vector<Route> compute_sor_routes(
         return it->second;
     };
 
-    for (const Query& query : queries) {
+    std::vector<QueryId> query_order(queries.size());
+    std::iota(query_order.begin(), query_order.end(), 0);
+    std::sort(
+        query_order.begin(),
+        query_order.end(),
+        [&](QueryId lhs, QueryId rhs) {
+            if (queries[lhs].departure_time != queries[rhs].departure_time) {
+                return queries[lhs].departure_time < queries[rhs].departure_time;
+            }
+            return lhs < rhs;
+        });
+
+    for (QueryId query_id : query_order) {
+        const Query& query = queries[query_id];
         const std::vector<Cost>& remaining = remaining_distances(query.destination);
         Route route = find_min_metric_route(
             graph,

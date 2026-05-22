@@ -53,7 +53,8 @@ tmp/
 .python
 __pycache__/
 *.pyc
-python/results/
+python/results/*
+!python/results/README.md
 python/figures/
 *.log
 *.zip

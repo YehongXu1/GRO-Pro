@@ -4,6 +4,7 @@
 #include <limits>
 #include <map>
 #include <queue>
+#include <tuple>
 #include <vector>
 
 namespace gro {
@@ -15,6 +16,7 @@ struct Label {
     Time arrival_time = 0;
     Cost travel_time = 0;
     std::vector<EdgeId> edge_ids;
+    std::vector<std::tuple<EdgeId, Time, Time>> flow_intervals;
     std::vector<char> visited;
 };
 
@@ -46,9 +48,92 @@ Flow flow_at(const std::map<Time, int>& timeline, Time time) {
 void add_flow_interval(
     std::map<Time, int>& timeline,
     Time enter_time,
-    Time exit_time) {
-    timeline[enter_time] += 1;
-    timeline[exit_time] -= 1;
+    Time exit_time,
+    int delta) {
+    timeline[enter_time] += delta;
+    timeline[exit_time] -= delta;
+}
+
+void rollback_flow_intervals(
+    std::vector<std::map<Time, int>>& edge_flow_events,
+    const Label& label) {
+    for (const auto& [edge_id, enter_time, exit_time] : label.flow_intervals) {
+        if (edge_id >= 0 &&
+            edge_id < static_cast<EdgeId>(edge_flow_events.size())) {
+            add_flow_interval(edge_flow_events[edge_id], enter_time, exit_time, -1);
+        }
+    }
+}
+
+bool append_edge(
+    const Graph& graph,
+    const TrafficOptions& traffic_options,
+    std::vector<std::map<Time, int>>& edge_flow_events,
+    Label& label,
+    EdgeId edge_id,
+    Cost planned_travel_time = -1) {
+    if (edge_id < 0 || edge_id >= static_cast<EdgeId>(graph.edges.size())) {
+        return false;
+    }
+    const Edge& edge = graph.edges[edge_id];
+    if (edge.from != label.current_node ||
+        edge.to < 0 ||
+        edge.to >= graph.vertex_count) {
+        return false;
+    }
+
+    Time depart_time = label.arrival_time;
+    Cost travel_time = planned_travel_time >= 0
+        ? planned_travel_time
+        : bpr_travel_time(
+              edge,
+              flow_at(edge_flow_events[edge_id], depart_time),
+              traffic_options);
+    Time next_arrival_time = depart_time + static_cast<Time>(travel_time);
+    add_flow_interval(edge_flow_events[edge_id], depart_time, next_arrival_time, 1);
+
+    label.edge_ids.push_back(edge_id);
+    label.flow_intervals.push_back({edge_id, depart_time, next_arrival_time});
+    label.current_node = edge.to;
+    label.arrival_time = next_arrival_time;
+    label.travel_time += travel_time;
+    if (edge.to >= 0 && edge.to < static_cast<NodeId>(label.visited.size())) {
+        label.visited[edge.to] = 1;
+    }
+    return true;
+}
+
+bool append_shortest_suffix(
+    const Graph& graph,
+    const TrafficOptions& traffic_options,
+    std::vector<std::map<Time, int>>& edge_flow_events,
+    const Query& query,
+    Label& label) {
+    if (label.current_node == query.destination) {
+        return true;
+    }
+
+    Query suffix_query;
+    suffix_query.id = query.id;
+    suffix_query.origin = label.current_node;
+    suffix_query.destination = query.destination;
+    suffix_query.departure_time = label.arrival_time;
+    Route suffix = shortest_path(graph, suffix_query);
+    if (suffix.edge_ids.empty()) {
+        return false;
+    }
+
+    for (EdgeId edge_id : suffix.edge_ids) {
+        if (!append_edge(
+                graph,
+                traffic_options,
+                edge_flow_events,
+                label,
+                edge_id)) {
+            return false;
+        }
+    }
+    return label.current_node == query.destination;
 }
 
 Route make_route(const Query& query, const Label& label) {
@@ -140,7 +225,7 @@ std::vector<Route> compute_gor_greedy_routes(
 
                 Flow current_flow = flow_at(edge_flow_events[edge_id], label.arrival_time);
                 Cost edge_travel_time =
-                    bpr_travel_time(edge, current_flow + 1, traffic_options);
+                    bpr_travel_time(edge, current_flow, traffic_options);
                 Cost score = label.travel_time + edge_travel_time + remaining[edge.to];
                 if (score < best_score ||
                     (score == best_score && edge_id < best_edge)) {
@@ -157,27 +242,45 @@ std::vector<Route> compute_gor_greedy_routes(
         }
 
         if (best_edge == kInvalidId) {
-            routes[query.id] = make_route(query, label);
+            if (append_shortest_suffix(
+                    graph,
+                    traffic_options,
+                    edge_flow_events,
+                    query,
+                    label)) {
+                routes[query.id] = make_route(query, label);
+            } else {
+                rollback_flow_intervals(edge_flow_events, label);
+                routes[query.id] = Route{query.id, {}, query.departure_time, 0};
+            }
             finished[query.id] = 1;
             continue;
         }
 
-        const Edge& best = graph.edges[best_edge];
-        Time depart_time = label.arrival_time;
-        Time next_arrival_time = depart_time + best_travel_time;
-        add_flow_interval(edge_flow_events[best_edge], depart_time, next_arrival_time);
-
-        label.edge_ids.push_back(best_edge);
-        label.current_node = best.to;
-        label.arrival_time = next_arrival_time;
-        label.travel_time += best_travel_time;
-        label.visited[best.to] = 1;
+        append_edge(
+            graph,
+            traffic_options,
+            edge_flow_events,
+            label,
+            best_edge,
+            best_travel_time);
         queue.push(QueueItem{label.arrival_time, label.query_id});
     }
 
     for (const Query& query : queries) {
         if (!finished[query.id]) {
-            routes[query.id] = make_route(query, labels[query.id]);
+            Label& label = labels[query.id];
+            if (append_shortest_suffix(
+                    graph,
+                    traffic_options,
+                    edge_flow_events,
+                    query,
+                    label)) {
+                routes[query.id] = make_route(query, label);
+            } else {
+                rollback_flow_intervals(edge_flow_events, label);
+                routes[query.id] = Route{query.id, {}, query.departure_time, 0};
+            }
         }
     }
     return routes;

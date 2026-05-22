@@ -160,7 +160,7 @@ struct FAHLIndex::Impl {
     int time_bucket = 0;
     std::vector<Cost> edge_scores;
     std::vector<Flow> edge_flows;
-    std::vector<Flow> incident_flow;
+    std::vector<Flow> vertex_flows;
     std::vector<NodeId> order;
     std::vector<std::vector<NeighborLabel>> contracted_neighbors;
     std::vector<std::unordered_map<NodeId, Arc>> working;
@@ -177,7 +177,7 @@ struct FAHLIndex::Impl {
     void build_edge_scores(const FAHLFlowProfile& flow_profile) {
         edge_scores.assign(graph.edges.size(), 1);
         edge_flows.assign(graph.edges.size(), 0);
-        incident_flow.assign(graph.vertex_count, 0);
+        vertex_flows.assign(graph.vertex_count, 0);
 
         Cost max_time = 1;
         Flow max_flow = 0;
@@ -187,10 +187,10 @@ struct FAHLIndex::Impl {
             edge_flows[edge.id] = flow;
             max_flow = std::max(max_flow, flow);
             if (edge.from >= 0 && edge.from < graph.vertex_count) {
-                incident_flow[edge.from] += flow;
+                vertex_flows[edge.from] += flow;
             }
             if (edge.to >= 0 && edge.to < graph.vertex_count) {
-                incident_flow[edge.to] += flow;
+                vertex_flows[edge.to] += flow;
             }
         }
 
@@ -261,23 +261,60 @@ struct FAHLIndex::Impl {
 
     NodeId choose_next_vertex(const std::vector<char>& active) const {
         NodeId best = kInvalidId;
+        double best_score = std::numeric_limits<double>::infinity();
         int best_degree = std::numeric_limits<int>::max();
         Flow best_flow = std::numeric_limits<Flow>::max();
-        int flow_weight = std::max(0, options.order_flow_weight);
+        int max_degree = 1;
+        Flow min_flow = std::numeric_limits<Flow>::max();
+        Flow max_flow = 0;
 
+        std::vector<int> degrees(graph.vertex_count, 0);
         for (NodeId node = 0; node < graph.vertex_count; ++node) {
             if (!active[node]) {
                 continue;
             }
             int degree = active_degree(node, active);
-            Flow weighted_flow = incident_flow[node] * flow_weight;
+            degrees[node] = degree;
+            max_degree = std::max(max_degree, degree);
+            Flow flow = node < static_cast<NodeId>(vertex_flows.size())
+                ? vertex_flows[node]
+                : 0;
+            min_flow = std::min(min_flow, flow);
+            max_flow = std::max(max_flow, flow);
+        }
+        if (min_flow == std::numeric_limits<Flow>::max()) {
+            min_flow = 0;
+        }
+
+        double beta =
+            static_cast<double>(std::clamp(options.order_beta_percent, 0, 100)) /
+            100.0;
+
+        for (NodeId node = 0; node < graph.vertex_count; ++node) {
+            if (!active[node]) {
+                continue;
+            }
+            int degree = degrees[node];
+            Flow flow = node < static_cast<NodeId>(vertex_flows.size())
+                ? vertex_flows[node]
+                : 0;
+            double degree_norm =
+                static_cast<double>(degree) / static_cast<double>(max_degree);
+            double flow_norm = max_flow > min_flow
+                ? static_cast<double>(flow - min_flow) /
+                      static_cast<double>(max_flow - min_flow)
+                : 0.0;
+            double score = beta * flow_norm + (1.0 - beta) * degree_norm;
             if (best == kInvalidId ||
-                degree < best_degree ||
-                (degree == best_degree && weighted_flow < best_flow) ||
-                (degree == best_degree && weighted_flow == best_flow && node < best)) {
+                score < best_score ||
+                (score == best_score && degree < best_degree) ||
+                (score == best_score && degree == best_degree && flow < best_flow) ||
+                (score == best_score && degree == best_degree && flow == best_flow &&
+                 node < best)) {
                 best = node;
+                best_score = score;
                 best_degree = degree;
-                best_flow = weighted_flow;
+                best_flow = flow;
             }
         }
         return best;

@@ -48,6 +48,7 @@ struct Options {
     int sor_max_labels_per_query = 200000;
     int fahl_alpha_percent = 50;
     gro::Time fahl_time_step = 60;
+    int fahl_order_beta_percent = 70;
 };
 
 struct RunStats {
@@ -58,6 +59,8 @@ struct RunStats {
     long long evaluate_us = 0;
     gro::Cost final_total_travel_time = 0;
     std::size_t unreachable_count = 0;
+    gro::Time fahl_effective_time_step = 0;
+    std::size_t fahl_query_buckets = 0;
 };
 
 double seconds(long long microseconds) {
@@ -152,18 +155,25 @@ Options parse_args(int argc, char** argv) {
         } else if (arg == "--fahl-time-step") {
             options.fahl_time_step =
                 static_cast<gro::Time>(std::stoll(require_value(arg)));
+        } else if (arg == "--fahl-order-beta-percent") {
+            options.fahl_order_beta_percent = std::stoi(require_value(arg));
         } else if (arg == "--help") {
             std::cout
                 << "Usage: ./paper_baseline_test [config] "
                 << "[--query-dir path | --query-file path] "
                 << "[--output path] [--methods svp,gor,sor,fahl] "
-                << "[--rep n] [--max-files n] [--max-queries n]\n";
+                << "[--rep n] [--max-files n] [--max-queries n] "
+                << "[--fahl-time-step sec] [--fahl-order-beta-percent n]\n";
             std::exit(0);
         } else {
             throw std::runtime_error("Unknown argument: " + arg);
         }
     }
     require(!options.methods.empty(), "At least one method is required");
+    require(
+        options.fahl_order_beta_percent >= 0 &&
+            options.fahl_order_beta_percent <= 100,
+        "--fahl-order-beta-percent must be in [0, 100]");
     return options;
 }
 
@@ -245,12 +255,28 @@ std::vector<DatasetInput> build_dataset_list(
 }
 
 std::size_t count_unreachable(
+    const gro::Graph& graph,
     const std::vector<gro::Query>& queries,
     const std::vector<gro::Route>& routes) {
+    auto reaches_destination = [&](const gro::Query& query, const gro::Route& route) {
+        gro::NodeId current = query.origin;
+        for (gro::EdgeId edge_id : route.edge_ids) {
+            if (edge_id < 0 ||
+                edge_id >= static_cast<gro::EdgeId>(graph.edges.size())) {
+                return false;
+            }
+            const gro::Edge& edge = graph.edges[edge_id];
+            if (edge.from != current) {
+                return false;
+            }
+            current = edge.to;
+        }
+        return current == query.destination;
+    };
+
     std::size_t count = 0;
     for (std::size_t i = 0; i < queries.size() && i < routes.size(); ++i) {
-        if (queries[i].origin != queries[i].destination &&
-            routes[i].edge_ids.empty()) {
+        if (!reaches_destination(queries[i], routes[i])) {
             ++count;
         }
     }
@@ -266,6 +292,14 @@ std::vector<gro::Route> compute_shortest_path_routes(
         routes.push_back(gro::shortest_path(graph, query));
     }
     return routes;
+}
+
+std::size_t unique_od_count(const std::vector<gro::Query>& queries) {
+    std::unordered_map<std::pair<gro::NodeId, gro::NodeId>, char, gro::PairHash> seen;
+    for (const gro::Query& query : queries) {
+        seen[{query.origin, query.destination}] = 1;
+    }
+    return seen.size();
 }
 
 gro::Cost evaluate_total(
@@ -288,6 +322,7 @@ RunStats run_svp(
     const Options& options) {
     RunStats stats;
     std::cerr << "  [phase] svp route_start queries=" << queries.size()
+              << " unique_od=" << unique_od_count(queries)
               << " k=" << options.svp_k
               << " theta=" << options.svp_theta << "\n";
     auto start = gro::Clock::now();
@@ -298,7 +333,7 @@ RunStats run_svp(
     stats.route_us = gro::elapsed_us(start);
     std::cerr << "  [phase] svp route_done sec=" << seconds(stats.route_us)
               << "\n";
-    stats.unreachable_count = count_unreachable(queries, routes);
+    stats.unreachable_count = count_unreachable(graph, queries, routes);
     std::cerr << "  [phase] svp evaluate_start\n";
     stats.final_total_travel_time =
         evaluate_total(graph, queries, routes, traffic_options, stats.evaluate_us);
@@ -320,7 +355,7 @@ RunStats run_gor(
     stats.route_us = gro::elapsed_us(start);
     std::cerr << "  [phase] gor route_done sec=" << seconds(stats.route_us)
               << "\n";
-    stats.unreachable_count = count_unreachable(queries, routes);
+    stats.unreachable_count = count_unreachable(graph, queries, routes);
     std::cerr << "  [phase] gor evaluate_start\n";
     stats.final_total_travel_time =
         evaluate_total(graph, queries, routes, traffic_options, stats.evaluate_us);
@@ -353,7 +388,7 @@ RunStats run_sor(
     stats.route_us = gro::elapsed_us(start);
     std::cerr << "  [phase] sor route_done sec=" << seconds(stats.route_us)
               << "\n";
-    stats.unreachable_count = count_unreachable(queries, routes);
+    stats.unreachable_count = count_unreachable(graph, queries, routes);
     std::cerr << "  [phase] sor evaluate_start\n";
     stats.final_total_travel_time =
         evaluate_total(graph, queries, routes, traffic_options, stats.evaluate_us);
@@ -371,11 +406,17 @@ RunStats run_fahl(
     RunStats stats;
     gro::FAHLOptions fahl_options;
     fahl_options.alpha_percent = options.fahl_alpha_percent;
-    fahl_options.time_step = options.fahl_time_step;
+    fahl_options.order_beta_percent = options.fahl_order_beta_percent;
+    fahl_options.time_step = options.fahl_time_step > 0 ? options.fahl_time_step : 1;
+    stats.fahl_effective_time_step = fahl_options.time_step;
+    std::cerr << "  [phase] fahl single_bucket enabled"
+              << " profile_time_step=" << fahl_options.time_step
+              << "\n";
 
     std::cerr << "  [phase] fahl profile_start reference_routes="
               << reference_routes.size()
               << " alpha_percent=" << fahl_options.alpha_percent
+              << " order_beta_percent=" << fahl_options.order_beta_percent
               << " time_step=" << fahl_options.time_step << "\n";
     auto profile_start = gro::Clock::now();
     gro::FAHLFlowProfile profile =
@@ -385,12 +426,11 @@ RunStats run_fahl(
               << seconds(stats.profile_us)
               << " profile_buckets=" << profile.size() << "\n";
 
-    gro::Time safe_step = fahl_options.time_step > 0 ? fahl_options.time_step : 1;
     std::map<int, std::vector<const gro::Query*>> queries_by_bucket;
     for (const gro::Query& query : queries) {
-        queries_by_bucket[static_cast<int>(query.departure_time / safe_step)]
-            .push_back(&query);
+        queries_by_bucket[0].push_back(&query);
     }
+    stats.fahl_query_buckets = queries_by_bucket.size();
     std::cerr << "  [phase] fahl buckets=" << queries_by_bucket.size()
               << " query_start queries=" << queries.size() << "\n";
 
@@ -421,7 +461,7 @@ RunStats run_fahl(
                   << " sec=" << seconds(route_us) << "\n";
     }
 
-    stats.unreachable_count = count_unreachable(queries, routes);
+    stats.unreachable_count = count_unreachable(graph, queries, routes);
     std::cerr << "  [phase] fahl evaluate_start\n";
     stats.final_total_travel_time =
         evaluate_total(graph, queries, routes, traffic_options, stats.evaluate_us);
@@ -430,7 +470,10 @@ RunStats run_fahl(
     return stats;
 }
 
-std::string params_for_method(const std::string& method, const Options& options) {
+std::string params_for_method(
+    const std::string& method,
+    const Options& options,
+    const RunStats& stats) {
     std::ostringstream out;
     if (method == "svp") {
         out << "k=" << options.svp_k << ";theta=" << options.svp_theta;
@@ -443,7 +486,11 @@ std::string params_for_method(const std::string& method, const Options& options)
             << ";max_labels_per_query=" << options.sor_max_labels_per_query;
     } else if (method == "fahl") {
         out << "alpha_percent=" << options.fahl_alpha_percent
+            << ";order_beta_percent=" << options.fahl_order_beta_percent
             << ";time_step=" << options.fahl_time_step
+            << ";effective_time_step=" << stats.fahl_effective_time_step
+            << ";query_buckets=" << stats.fahl_query_buckets
+            << ";single_bucket=true"
             << ";flow_reference=shortest_path";
     }
     return out.str();
@@ -493,7 +540,7 @@ void write_row(
         << seconds(stats.route_us) << ','
         << seconds(stats.evaluate_us) << ','
         << seconds(total_us) << ','
-        << params_for_method(method, options) << '\n';
+        << params_for_method(method, options, stats) << '\n';
 }
 
 }  // namespace

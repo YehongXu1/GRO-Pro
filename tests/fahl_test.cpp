@@ -28,6 +28,25 @@ bool follows_graph(const gro::Graph& graph, gro::NodeId origin, const gro::Route
     return true;
 }
 
+bool reaches_destination(
+    const gro::Graph& graph,
+    const gro::Query& query,
+    const gro::Route& route) {
+    gro::NodeId current = query.origin;
+    for (gro::EdgeId edge_id : route.edge_ids) {
+        if (edge_id < 0 ||
+            edge_id >= static_cast<gro::EdgeId>(graph.edges.size())) {
+            return false;
+        }
+        const gro::Edge& edge = graph.edges[edge_id];
+        if (edge.from != current) {
+            return false;
+        }
+        current = edge.to;
+    }
+    return current == query.destination;
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -59,6 +78,30 @@ int main(int argc, char** argv) {
     require(index.contraction_order().size() == static_cast<std::size_t>(graph.vertex_count),
             "FAHL index should assign one contraction order position per vertex");
 
+    gro::FAHLOptions degree_order_options = options;
+    degree_order_options.order_beta_percent = 0;
+    gro::FAHLOptions flow_order_options = options;
+    flow_order_options.order_beta_percent = 100;
+    gro::FAHLFlowProfile flow_skewed_profile;
+    for (const gro::Edge& edge : graph.edges) {
+        if (edge.from == 4 || edge.to == 4) {
+            flow_skewed_profile[{edge.id, 0}] = 100;
+        }
+    }
+    gro::FAHLIndex degree_order_index(
+        graph,
+        flow_skewed_profile,
+        0,
+        degree_order_options);
+    gro::FAHLIndex flow_order_index(
+        graph,
+        flow_skewed_profile,
+        0,
+        flow_order_options);
+    require(
+        degree_order_index.contraction_order() != flow_order_index.contraction_order(),
+        "FAHL construction order should respond to degree-flow beta");
+
     gro::Route route = index.query(queries.front());
     require(route.query_id == queries.front().id, "FAHL route query id should match");
     require(route.departure_time == queries.front().departure_time,
@@ -66,6 +109,8 @@ int main(int argc, char** argv) {
     require(!route.edge_ids.empty(), "FAHL should find a route for connected test queries");
     require(follows_graph(graph, queries.front().origin, route),
             "FAHL route should follow directed graph edges");
+    require(reaches_destination(graph, queries.front(), route),
+            "FAHL route should reach the query destination");
 
     gro::Query reverse_query;
     reverse_query.id = 0;
@@ -87,6 +132,8 @@ int main(int argc, char** argv) {
                 "FAHL should find non-empty routes for connected test queries");
         require(follows_graph(graph, queries[i].origin, routes[i]),
                 "FAHL route should follow directed graph edges");
+        require(reaches_destination(graph, queries[i], routes[i]),
+                "FAHL route should reach the query destination");
     }
 
     gro::TrafficResult traffic = gro::evaluate_traffic(graph, queries, routes, traffic_options);

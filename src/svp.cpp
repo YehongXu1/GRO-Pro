@@ -245,23 +245,39 @@ std::vector<Route> compute_svp_baseline_routes(
     const std::vector<Query>& queries,
     SVPOptions options) {
     std::vector<Route> routes(queries.size());
-    std::unordered_map<std::pair<NodeId, NodeId>, std::vector<Route>, PairHash> alternatives_by_od;
-    std::unordered_map<std::pair<NodeId, NodeId>, size_t, PairHash> next_alternative_by_od; // for round-robin selection among alternatives
+    std::vector<std::pair<NodeId, NodeId>> od_order;
+    std::unordered_map<std::pair<NodeId, NodeId>, std::size_t, PairHash> od_index;
 
     int k = std::max(1, options.k);
     int theta_percent = std::clamp(options.theta, 0, 100);
 
     for (const Query& query : queries) {
         std::pair<NodeId, NodeId> od = {query.origin, query.destination};
-        auto alternatives_it = alternatives_by_od.find(od);
-        if (alternatives_it == alternatives_by_od.end()) {
-            alternatives_it = alternatives_by_od.emplace(
-                od,
-                svp_routes(graph, query, k, theta_percent)).first;
+        if (od_index.find(od) == od_index.end()) {
+            od_index[od] = od_order.size();
+            od_order.push_back(od);
         }
+    }
 
-        const std::vector<Route>& alternatives = alternatives_it->second;
-        size_t& next_index = next_alternative_by_od[od];
+    std::vector<std::vector<Route>> alternatives_by_od(od_order.size());
+
+    #pragma omp parallel for schedule(dynamic)
+    for (long long index = 0; index < static_cast<long long>(od_order.size()); ++index) {
+        Query representative;
+        representative.id = 0;
+        representative.origin = od_order[static_cast<std::size_t>(index)].first;
+        representative.destination = od_order[static_cast<std::size_t>(index)].second;
+        representative.departure_time = 0;
+        alternatives_by_od[static_cast<std::size_t>(index)] =
+            svp_routes(graph, representative, k, theta_percent);
+    }
+
+    std::vector<std::size_t> next_alternative_by_od(od_order.size(), 0);
+    for (const Query& query : queries) {
+        std::pair<NodeId, NodeId> od = {query.origin, query.destination};
+        std::size_t index = od_index.at(od);
+        const std::vector<Route>& alternatives = alternatives_by_od[index];
+        size_t& next_index = next_alternative_by_od[index];
         const Route& selected = alternatives[next_index % alternatives.size()];
         ++next_index;
 
