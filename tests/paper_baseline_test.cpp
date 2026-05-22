@@ -436,7 +436,9 @@ RunStats run_fahl(
 
     std::vector<gro::Route> routes(queries.size());
     std::size_t bucket_index = 0;
-    for (const auto& [bucket, bucket_queries] : queries_by_bucket) {
+    for (const auto& bucket_entry : queries_by_bucket) {
+        int bucket = bucket_entry.first;
+        const std::vector<const gro::Query*>& bucket_queries = bucket_entry.second;
         ++bucket_index;
         std::cerr << "  [phase] fahl bucket_start " << bucket_index
                   << "/" << queries_by_bucket.size()
@@ -451,7 +453,9 @@ RunStats run_fahl(
                   << " sec=" << seconds(index_us) << "\n";
 
         auto query_start = gro::Clock::now();
-        for (const gro::Query* query : bucket_queries) {
+        #pragma omp parallel for schedule(static)
+        for (long long i = 0; i < static_cast<long long>(bucket_queries.size()); ++i) {
+            const gro::Query* query = bucket_queries[static_cast<std::size_t>(i)];
             routes[query->id] = index.query(*query);
         }
         long long route_us = gro::elapsed_us(query_start);
