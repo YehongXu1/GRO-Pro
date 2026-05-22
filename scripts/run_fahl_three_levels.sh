@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+if [[ -n "${LOG:-}" ]]; then
+  mkdir -p "$(dirname "$LOG")"
+  exec > "$LOG" 2>&1
+fi
+
 export OMP_NUM_THREADS="${OMP_NUM_THREADS:-32}"
 
 OUT=python/results/bj_real/overall_effectiveness/paper_baseline_fahl_100k_three_levels_capacity2_cap10e8.csv
