@@ -132,6 +132,7 @@ scripts/run_svp_three_levels.sh
 scripts/run_gro_scalability_one_dir.sh
 scripts/run_gro_scalability_original.sh
 scripts/run_gro_scalability_window6h.sh
+scripts/run_gro_scalability_peak1h.sh
 ```
 
 Important notes:
@@ -355,7 +356,8 @@ python/results/experiments/exp1_component_ablation/bj_synthetic_capacity2_cap10e
   processing; do not present a bucket-count sweep unless the code is changed
   again.
 - `scripts/run_gro_scalability_one_dir.sh` requires `QUERY_DIR` and `LABEL`
-  from the wrapper scripts. It has defaults for `REPS`, `TDG_GAMMAS`,
+  from the wrapper scripts. It writes to the short default results directory
+  `python/results/scalability`. It has defaults for `REPS`, `TDG_GAMMAS`,
   `IMPACT_WEIGHTS`, `OMP_NUM_THREADS`, etc. If a server exits with code `126`,
   first check executable permissions with `chmod +x scripts/*.sh`.
 
@@ -387,6 +389,7 @@ rather than treating the current baseline-only CSV as complete.
 Scalability wrappers:
 
 ```bash
+LOG=logs/gro_scalability_peak1h_tdg_excess_full_capacity2_cap10e8.log nohup scripts/run_gro_scalability_peak1h.sh &
 LOG=logs/gro_scalability_original_tdg_excess_full_capacity2_cap10e8.log nohup scripts/run_gro_scalability_original.sh &
 LOG=logs/gro_scalability_window6h_tdg_excess_full_capacity2_cap10e8.log nohup scripts/run_gro_scalability_window6h.sh &
 ```
@@ -396,9 +399,9 @@ To run only one scalability size, set `REPS`, e.g.:
 ```bash
 OMP_NUM_THREADS=24 \
 REPS=2 \
-RESULTS_DIR=python/results/experiments/exp3_compression_scalability/rep2_test \
-LOG=logs/gro_scalability_window6h_rep2_test.log \
-nohup ./scripts/run_gro_scalability_window6h.sh &
+RESULTS_DIR=python/results/scalability/rep2_test \
+LOG=logs/gro_scalability_peak1h_rep2_test.log \
+nohup ./scripts/run_gro_scalability_peak1h.sh &
 ```
 
 The current scalability runner uses uncompressed TDG through

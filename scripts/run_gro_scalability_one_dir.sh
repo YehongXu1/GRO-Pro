@@ -18,9 +18,9 @@ if [[ ! ${LABEL+x} || -z "$LABEL" ]]; then
   echo "Set LABEL for output filenames, e.g. original or window6h" >&2
   exit 2
 fi
-if [[ ! ${RESULTS_DIR+x} || -z "$RESULTS_DIR" ]]; then RESULTS_DIR=python/results/experiments/exp3_compression_scalability; fi
+if [[ ! ${RESULTS_DIR+x} || -z "$RESULTS_DIR" ]]; then RESULTS_DIR=python/results/scalability; fi
 if [[ ! ${REPS+x} || -z "$REPS" ]]; then REPS=1,2,3,5,7,10; fi
-if [[ ! ${TDG_GAMMAS+x} || -z "$TDG_GAMMAS" ]]; then TDG_GAMMAS=90; fi
+if [[ ! ${TDG_GAMMAS+x} || -z "$TDG_GAMMAS" ]]; then TDG_GAMMAS=50; fi
 if [[ ! ${IMPACT_WEIGHTS+x} || -z "$IMPACT_WEIGHTS" ]]; then IMPACT_WEIGHTS=20; fi
 if [[ ! ${RANDOM_SEED+x} || -z "$RANDOM_SEED" ]]; then RANDOM_SEED=0; fi
 if [[ ! ${SELECTION_METHODS+x} || -z "$SELECTION_METHODS" ]]; then SELECTION_METHODS=tdg_excess; fi

@@ -22,6 +22,7 @@ svp_test
 gor_test
 sor_test
 fahl_test
+shortest_path_congestion_diagnostic
 
 # CMake generated files
 CMakeCache.txt

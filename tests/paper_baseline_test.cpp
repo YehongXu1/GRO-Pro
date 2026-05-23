@@ -46,7 +46,7 @@ struct Options {
     int rep_filter = -1;
     int svp_k = 3;
     int svp_theta = 80;
-    int sor_detour_percent = 20;
+    int sor_detour_percent = 10;
     gro::Time sor_time_step = kSorDefaultTimeStep;
     int sor_max_time_steps = kSorDefaultMaxTimeSteps;
     int sor_max_labels_per_query = kSorDefaultMaxLabelsPerQuery;
