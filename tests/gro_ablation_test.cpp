@@ -59,6 +59,7 @@ struct Options {
     std::vector<std::string> reroute_methods = {"normal", "tdg"};
     std::vector<int> tdg_gammas = {50};
     std::vector<int> impact_weights = {30};
+    std::string candidate_filter = "all";
     bool progress_log = true;
 };
 
@@ -70,6 +71,9 @@ struct SelectionRun {
     std::vector<gro::QueryId> selected_ids;
     long long important_node_count = 0;
     long long important_nodes_us = 0;
+    std::string candidate_filter = "none";
+    long long candidate_count = -1;
+    long long candidate_us = 0;
     long long select_us = 0;
 };
 
@@ -202,6 +206,8 @@ Options parse_args(int argc, char** argv) {
             options.tdg_gammas = parse_percent_list(require_value(arg));
         } else if (arg == "--impact-weights") {
             options.impact_weights = parse_percent_list(require_value(arg));
+        } else if (arg == "--candidate-filter") {
+            options.candidate_filter = require_value(arg);
         } else if (arg == "--max-files") {
             options.max_files = std::stoi(require_value(arg));
         } else if (arg == "--no-progress-log") {
@@ -214,6 +220,7 @@ Options parse_args(int argc, char** argv) {
                 << "[--reroute-methods normal,tdg] "
                 << "[--fixed-fractions 10,30] [--tdg-gammas 50] "
                 << "[--impact-weights 30] "
+                << "[--candidate-filter all|source_congestion|score_top|component_balanced] "
                 << "[--hop 10] [--rep 1] "
                 << "[--datasets Hop10Rep1-0,BJRealRep10-0] "
                 << "[--dataset-list path] [--random-seed n] [--max-files n] "
@@ -229,6 +236,14 @@ Options parse_args(int argc, char** argv) {
     require(!options.fixed_fractions.empty(), "At least one fixed selection fraction is required");
     require(!options.tdg_gammas.empty(), "At least one TDG gamma is required");
     require(!options.impact_weights.empty(), "At least one impact weight is required");
+    require(
+        options.candidate_filter == "all" ||
+            options.candidate_filter == "source_congestion" ||
+            options.candidate_filter == "score_top" ||
+            options.candidate_filter == "global_score" ||
+            options.candidate_filter == "component_balanced",
+        "Unknown candidate filter: " + options.candidate_filter +
+            " (expected all, source_congestion, score_top, or component_balanced)");
     return options;
 }
 
@@ -673,6 +688,45 @@ std::vector<SelectionRun> build_selection_runs(
         all_query_set.insert(static_cast<gro::QueryId>(i));
     }
 
+    auto candidate_set_for_run = [&](
+                                     const gro::GROAlgorithm& selector,
+                                     SelectionRun& run) {
+        run.candidate_filter = options.candidate_filter;
+        if (options.candidate_filter == "all") {
+            run.candidate_count =
+                static_cast<long long>(all_query_set.size());
+            run.candidate_us = 0;
+            return all_query_set;
+        }
+
+        auto candidate_start = gro::Clock::now();
+        std::unordered_set<gro::QueryId> candidate_set;
+        if (options.candidate_filter == "source_congestion") {
+            candidate_set = selector.select_candidates(
+                queries,
+                initial_traffic,
+                tdg,
+                raw_impacts);
+        } else if (options.candidate_filter == "score_top" ||
+                   options.candidate_filter == "global_score") {
+            candidate_set = selector.select_candidates_by_score(
+                queries,
+                initial_traffic,
+                tdg,
+                raw_impacts);
+        } else if (options.candidate_filter == "component_balanced") {
+            candidate_set = selector.select_candidates_by_component_balance(
+                queries,
+                initial_traffic,
+                tdg,
+                raw_impacts);
+        }
+        run.candidate_us = gro::elapsed_us(candidate_start);
+        run.candidate_count =
+            static_cast<long long>(candidate_set.size());
+        return candidate_set;
+    };
+
     for (const std::string& method : options.selection_methods) {
         if (method == "random") {
             for (int fixed_fraction : options.fixed_fractions) {
@@ -714,10 +768,12 @@ std::vector<SelectionRun> build_selection_runs(
                 run.removal_mode = RemovalMode::BprRelief;
                 run.gamma = gamma;
 
+                std::unordered_set<gro::QueryId> candidate_set =
+                    candidate_set_for_run(selector, run);
                 auto select_start = gro::Clock::now();
                 run.selected_ids =
                     selector.select_queries_by_bpr_relief(
-                        all_query_set,
+                        candidate_set,
                         queries,
                         initial_traffic,
                         tdg,
@@ -736,10 +792,12 @@ std::vector<SelectionRun> build_selection_runs(
                 run.removal_mode = RemovalMode::AnchorImportant;
                 run.gamma = gamma;
 
+                std::unordered_set<gro::QueryId> candidate_set =
+                    candidate_set_for_run(selector, run);
                 auto select_start = gro::Clock::now();
                 run.selected_ids =
                     selector.select_queries_by_excess_relief(
-                        all_query_set,
+                        candidate_set,
                         queries,
                         initial_traffic,
                         tdg,
@@ -758,6 +816,8 @@ std::vector<SelectionRun> build_selection_runs(
                 run.method = "tdg";
                 run.removal_mode = mode;
                 run.gamma = gamma;
+                std::unordered_set<gro::QueryId> candidate_set =
+                    candidate_set_for_run(selector, run);
 
                 auto important_start = gro::Clock::now();
                 std::vector<char> important_nodes =
@@ -780,7 +840,7 @@ std::vector<SelectionRun> build_selection_runs(
                 run.selected_ids =
                     tdg_select_query_ids(
                         selector,
-                        all_query_set,
+                        candidate_set,
                         initial_traffic,
                         tdg,
                         important_nodes,
@@ -868,7 +928,9 @@ void write_header(std::ofstream& out) {
         << "iteration,"
         << "selection_method,removal_mode,selection_fraction,gamma,"
         << "reroute_method,impact_weight,random_seed,"
-        << "selected_count,selected_fraction,batch_count,"
+        << "selected_count,selected_fraction,"
+        << "candidate_filter,candidate_count,candidate_fraction,candidate_sec,"
+        << "batch_count,"
         << "total_before,total_after,reduction,"
         << "initial_routes_sec,evaluate_before_sec,"
         << "tdg_prepare_sec,important_nodes_sec,select_sec,"
@@ -911,6 +973,8 @@ void write_row(
         (uses_tdg_selection || uses_tdg_reroute) ? tdg_prepare_us : 0;
     long long included_important_us =
         uses_tdg_selection ? selection.important_nodes_us : 0;
+    long long included_candidate_us =
+        uses_tdg_selection ? selection.candidate_us : 0;
     long long included_normalize_us = uses_tdg_reroute ? normalize_us : 0;
     long long included_batch_us = uses_tdg_reroute ? batch_us : 0;
     long long method_total_us =
@@ -918,6 +982,7 @@ void write_row(
         evaluate_before_us +
         included_tdg_prepare_us +
         included_important_us +
+        included_candidate_us +
         selection.select_us +
         included_normalize_us +
         included_batch_us +
@@ -928,6 +993,11 @@ void write_row(
         ? 0.0L
         : static_cast<long double>(selection.selected_ids.size()) /
             static_cast<long double>(query_count);
+    long double candidate_fraction =
+        query_count == 0 || selection.candidate_count < 0
+            ? -1.0L
+            : static_cast<long double>(selection.candidate_count) /
+                static_cast<long double>(query_count);
 
     out << std::setprecision(12)
         << run_id << ','
@@ -946,6 +1016,10 @@ void write_row(
         << random_seed << ','
         << selection.selected_ids.size() << ','
         << static_cast<double>(selected_fraction) << ','
+        << selection.candidate_filter << ','
+        << selection.candidate_count << ','
+        << static_cast<double>(candidate_fraction) << ','
+        << static_cast<double>(included_candidate_us) / 1000000.0 << ','
         << batch_count << ','
         << total_before << ','
         << total_after << ','
@@ -1226,6 +1300,15 @@ int main(int argc, char** argv) {
                                         " stage=selection selected=" +
                                         std::to_string(
                                             selection.selected_ids.size()) +
+                                        " candidate_filter=" +
+                                        selection.candidate_filter +
+                                        " candidate_count=" +
+                                        std::to_string(
+                                            selection.candidate_count) +
+                                        " candidate_sec=" +
+                                        std::to_string(
+                                            seconds_from_us(
+                                                selection.candidate_us)) +
                                         " important_nodes=" +
                                         std::to_string(
                                             selection.important_node_count) +
@@ -1379,6 +1462,9 @@ int main(int argc, char** argv) {
                                          : 0) +
                                     (uses_tdg_selection
                                          ? selection.important_nodes_us
+                                         : 0) +
+                                    (uses_tdg_selection
+                                         ? selection.candidate_us
                                          : 0) +
                                     selection.select_us +
                                     (uses_tdg_reroute ? normalize_us : 0) +

@@ -63,6 +63,43 @@ Cost congestion_ratio_key(Flow flow, Flow capacity) {
     return static_cast<Cost>(flow) * 1000000 / safe_capacity;
 }
 
+class CandidateComponentDSU {
+public:
+    explicit CandidateComponentDSU(size_t size)
+        : parent_(size),
+          rank_(size, 0) {
+        for (size_t index = 0; index < size; ++index) {
+            parent_[index] = index;
+        }
+    }
+
+    size_t find(size_t index) {
+        if (parent_[index] != index) {
+            parent_[index] = find(parent_[index]);
+        }
+        return parent_[index];
+    }
+
+    void unite(size_t lhs, size_t rhs) {
+        lhs = find(lhs);
+        rhs = find(rhs);
+        if (lhs == rhs) {
+            return;
+        }
+        if (rank_[lhs] < rank_[rhs]) {
+            std::swap(lhs, rhs);
+        }
+        parent_[rhs] = lhs;
+        if (rank_[lhs] == rank_[rhs]) {
+            ++rank_[lhs];
+        }
+    }
+
+private:
+    std::vector<size_t> parent_;
+    std::vector<int> rank_;
+};
+
 size_t integer_sqrt(size_t value) {
     return static_cast<size_t>(std::sqrt(static_cast<long double>(value)));
 }
@@ -160,6 +197,117 @@ void log_candidate_summary(
               << "iteration=" << iteration << ','
               << "candidate_count=" << candidate_count << ','
               << "candidate_sec=" << seconds_text(candidate_us) << '\n';
+}
+
+std::vector<char> excess_relief_important_nodes(
+    const GROAlgorithm& algorithm,
+    const Graph& graph,
+    const TrafficResult& result,
+    const TrafficDependencyGraph& tdg) {
+    std::vector<std::map<Time, Cost>> anchor_scores =
+        algorithm.compute_anchor_scores(result);
+    std::vector<char> important =
+        algorithm.mark_anchor_tdg_nodes(tdg, anchor_scores);
+
+    bool has_important =
+        std::any_of(important.begin(), important.end(), [](char value) {
+            return value != 0;
+        });
+    if (has_important) {
+        return important;
+    }
+
+    for (TDGNodeId node_id = 0;
+         node_id < static_cast<TDGNodeId>(tdg.nodes.size());
+         ++node_id) {
+        const TDGNode& node = tdg.nodes[node_id];
+        if (node.edge_id < 0 ||
+            node.edge_id >= static_cast<EdgeId>(graph.edges.size())) {
+            continue;
+        }
+        Flow capacity = std::max<Flow>(1, graph.edges[node.edge_id].capacity);
+        if (node.flow > capacity) {
+            important[node_id] = 1;
+        }
+    }
+    return important;
+}
+
+std::vector<long double> excess_relief_values(
+    const Graph& graph,
+    const TrafficDependencyGraph& tdg,
+    const std::vector<double>& selection_impacts,
+    const std::vector<char>& important) {
+    std::vector<long double> relief(tdg.nodes.size(), 0.0L);
+    for (TDGNodeId node_id = 0;
+         node_id < static_cast<TDGNodeId>(tdg.nodes.size());
+         ++node_id) {
+        if (node_id >= static_cast<TDGNodeId>(important.size()) ||
+            node_id >= static_cast<TDGNodeId>(selection_impacts.size()) ||
+            !important[node_id] ||
+            selection_impacts[node_id] <= 0.0) {
+            continue;
+        }
+
+        const TDGNode& node = tdg.nodes[node_id];
+        if (node.edge_id < 0 ||
+            node.edge_id >= static_cast<EdgeId>(graph.edges.size())) {
+            continue;
+        }
+        Flow capacity = std::max<Flow>(1, graph.edges[node.edge_id].capacity);
+        if (node.flow <= capacity) {
+            continue;
+        }
+
+        long double excess =
+            static_cast<long double>(node.flow - capacity) /
+            static_cast<long double>(capacity);
+        relief[node_id] =
+            static_cast<long double>(selection_impacts[node_id]) * excess;
+    }
+    return relief;
+}
+
+long double route_relief_score(
+    const Trajectory& trajectory,
+    const std::vector<long double>& relief,
+    std::vector<int>& seen,
+    int& seen_epoch) {
+    ++seen_epoch;
+    if (seen_epoch == std::numeric_limits<int>::max()) {
+        std::fill(seen.begin(), seen.end(), 0);
+        seen_epoch = 1;
+    }
+
+    long double score = 0.0L;
+    for (TDGNodeId node_id : trajectory.tdg_node_ids) {
+        if (node_id < 0 ||
+            node_id >= static_cast<TDGNodeId>(relief.size()) ||
+            node_id >= static_cast<TDGNodeId>(seen.size()) ||
+            seen[node_id] == seen_epoch ||
+            relief[node_id] <= 0.0L) {
+            continue;
+        }
+        seen[node_id] = seen_epoch;
+        score += relief[node_id];
+    }
+    return score;
+}
+
+std::vector<long double> build_excess_relief_values(
+    const GROAlgorithm& algorithm,
+    const Graph& graph,
+    const TrafficResult& result,
+    const TrafficDependencyGraph& tdg,
+    const std::vector<Cost>& node_impacts) {
+    if (tdg.nodes.empty()) {
+        return {};
+    }
+    std::vector<double> selection_impacts =
+        algorithm.normalize_tdg_impacts_for_selection(node_impacts);
+    std::vector<char> important =
+        excess_relief_important_nodes(algorithm, graph, result, tdg);
+    return excess_relief_values(graph, tdg, selection_impacts, important);
 }
 
 void log_reroute_summary(
@@ -1120,6 +1268,269 @@ std::unordered_set<QueryId> GROAlgorithm::select_candidates(
         for (TDGNodeId node_id : trajectory.tdg_node_ids) {
             if (source_node[node_id]) {
                 candidate_ids.insert(trajectory.query_id);
+                break;
+            }
+        }
+    }
+
+    return candidate_ids;
+}
+
+std::unordered_set<QueryId> GROAlgorithm::select_candidates_by_score(
+    const std::vector<Query>& queries,
+    const TrafficResult& result,
+    const TrafficDependencyGraph& tdg,
+    const std::vector<Cost>& node_impacts) const {
+    std::unordered_set<QueryId> candidate_ids;
+    if (queries.empty() || result.trajectories.empty() || tdg.nodes.empty()) {
+        return candidate_ids;
+    }
+
+    std::vector<long double> relief =
+        build_excess_relief_values(*this, graph_, result, tdg, node_impacts);
+    if (relief.empty()) {
+        return candidate_ids;
+    }
+
+    std::vector<int> seen(tdg.nodes.size(), 0);
+    int seen_epoch = 0;
+    std::vector<std::pair<long double, QueryId>> ranking;
+    ranking.reserve(result.trajectories.size());
+    long double total_score = 0.0L;
+
+    for (const Trajectory& trajectory : result.trajectories) {
+        if (trajectory.query_id < 0 ||
+            trajectory.query_id >= static_cast<QueryId>(queries.size())) {
+            continue;
+        }
+        long double score =
+            route_relief_score(trajectory, relief, seen, seen_epoch);
+        if (score <= 0.0L) {
+            continue;
+        }
+        ranking.push_back({score, trajectory.query_id});
+        total_score += score;
+    }
+
+    if (ranking.empty() || total_score <= 0.0L) {
+        return candidate_ids;
+    }
+
+    std::sort(
+        ranking.begin(),
+        ranking.end(),
+        [](const auto& lhs, const auto& rhs) {
+            if (lhs.first != rhs.first) {
+                return lhs.first > rhs.first;
+            }
+            return lhs.second < rhs.second;
+        });
+
+    int clamped_gamma = std::clamp(options_.gamma, 0, 100);
+    if (clamped_gamma <= 0) {
+        return candidate_ids;
+    }
+
+    long double target_score =
+        total_score *
+        static_cast<long double>(clamped_gamma) /
+        100.0L;
+    long double covered_score = 0.0L;
+    for (const auto& item : ranking) {
+        candidate_ids.insert(item.second);
+        covered_score += item.first;
+        if (covered_score >= target_score) {
+            break;
+        }
+    }
+
+    return candidate_ids;
+}
+
+std::unordered_set<QueryId> GROAlgorithm::select_candidates_by_component_balance(
+    const std::vector<Query>& queries,
+    const TrafficResult& result,
+    const TrafficDependencyGraph& tdg,
+    const std::vector<Cost>& node_impacts) const {
+    std::unordered_set<QueryId> candidate_ids;
+    if (queries.empty() || result.trajectories.empty() || tdg.nodes.empty()) {
+        return candidate_ids;
+    }
+
+    std::vector<long double> relief =
+        build_excess_relief_values(*this, graph_, result, tdg, node_impacts);
+    if (relief.empty()) {
+        return candidate_ids;
+    }
+
+    std::vector<char> active(tdg.nodes.size(), 0);
+    long long active_count = 0;
+    for (TDGNodeId node_id = 0;
+         node_id < static_cast<TDGNodeId>(relief.size());
+         ++node_id) {
+        if (relief[node_id] > 0.0L) {
+            active[node_id] = 1;
+            ++active_count;
+        }
+    }
+    if (active_count == 0) {
+        return candidate_ids;
+    }
+
+    CandidateComponentDSU dsu(tdg.nodes.size());
+    for (TDGNodeId node_id = 0;
+         node_id < static_cast<TDGNodeId>(tdg.nodes.size());
+         ++node_id) {
+        if (!active[node_id]) {
+            continue;
+        }
+
+        for (TDGNodeId child_id : tdg.route_outgoing[node_id]) {
+            if (child_id >= 0 &&
+                child_id < static_cast<TDGNodeId>(active.size()) &&
+                active[child_id]) {
+                dsu.unite(
+                    static_cast<size_t>(node_id),
+                    static_cast<size_t>(child_id));
+            }
+        }
+
+        const TDGNode& node = tdg.nodes[node_id];
+        if (node.edge_id < 0 ||
+            node.edge_id >= static_cast<EdgeId>(tdg.edge_timelines.size())) {
+            continue;
+        }
+        const auto& timeline = tdg.edge_timelines[node.edge_id];
+        auto event_it = timeline.find(node.time);
+        if (event_it == timeline.end()) {
+            continue;
+        }
+        TDGNodeId child_id = event_it->second.same_edge_child;
+        if (child_id >= 0 &&
+            child_id < static_cast<TDGNodeId>(active.size()) &&
+            active[child_id]) {
+            dsu.unite(
+                static_cast<size_t>(node_id),
+                static_cast<size_t>(child_id));
+        }
+    }
+
+    std::unordered_map<size_t, int> root_to_component;
+    std::vector<int> node_component(tdg.nodes.size(), -1);
+    std::vector<long double> component_mass;
+    for (TDGNodeId node_id = 0;
+         node_id < static_cast<TDGNodeId>(tdg.nodes.size());
+         ++node_id) {
+        if (!active[node_id]) {
+            continue;
+        }
+
+        size_t root = dsu.find(static_cast<size_t>(node_id));
+        auto [it, inserted] =
+            root_to_component.emplace(root, static_cast<int>(component_mass.size()));
+        if (inserted) {
+            component_mass.push_back(0.0L);
+        }
+        int component_id = it->second;
+        node_component[node_id] = component_id;
+        component_mass[component_id] += relief[node_id];
+    }
+
+    if (component_mass.empty()) {
+        return candidate_ids;
+    }
+
+    std::vector<std::vector<std::pair<long double, QueryId>>> component_queries(
+        component_mass.size());
+    std::vector<long double> query_component_score(component_mass.size(), 0.0L);
+    std::vector<int> seen_component(component_mass.size(), 0);
+    int component_epoch = 0;
+    std::vector<int> seen_node(tdg.nodes.size(), 0);
+    int node_epoch = 0;
+
+    for (const Trajectory& trajectory : result.trajectories) {
+        QueryId query_id = trajectory.query_id;
+        if (query_id < 0 ||
+            query_id >= static_cast<QueryId>(queries.size())) {
+            continue;
+        }
+
+        ++component_epoch;
+        ++node_epoch;
+        if (component_epoch == std::numeric_limits<int>::max()) {
+            std::fill(seen_component.begin(), seen_component.end(), 0);
+            component_epoch = 1;
+        }
+        if (node_epoch == std::numeric_limits<int>::max()) {
+            std::fill(seen_node.begin(), seen_node.end(), 0);
+            node_epoch = 1;
+        }
+
+        std::vector<int> touched_components;
+        for (TDGNodeId node_id : trajectory.tdg_node_ids) {
+            if (node_id < 0 ||
+                node_id >= static_cast<TDGNodeId>(relief.size()) ||
+                node_id >= static_cast<TDGNodeId>(seen_node.size()) ||
+                seen_node[node_id] == node_epoch ||
+                relief[node_id] <= 0.0L) {
+                continue;
+            }
+            seen_node[node_id] = node_epoch;
+
+            int component_id = node_component[node_id];
+            if (component_id < 0 ||
+                component_id >= static_cast<int>(component_mass.size())) {
+                continue;
+            }
+            if (seen_component[component_id] != component_epoch) {
+                seen_component[component_id] = component_epoch;
+                query_component_score[component_id] = 0.0L;
+                touched_components.push_back(component_id);
+            }
+            query_component_score[component_id] += relief[node_id];
+        }
+
+        for (int component_id : touched_components) {
+            long double score = query_component_score[component_id];
+            if (score <= 0.0L) {
+                continue;
+            }
+            component_queries[component_id].push_back({score, query_id});
+        }
+    }
+
+    int clamped_gamma = std::clamp(options_.gamma, 0, 100);
+    if (clamped_gamma <= 0) {
+        return candidate_ids;
+    }
+
+    for (size_t component_id = 0;
+         component_id < component_queries.size();
+         ++component_id) {
+        auto& ranking = component_queries[component_id];
+        if (ranking.empty() || component_mass[component_id] <= 0.0L) {
+            continue;
+        }
+
+        std::sort(
+            ranking.begin(),
+            ranking.end(),
+            [](const auto& lhs, const auto& rhs) {
+                if (lhs.first != rhs.first) {
+                    return lhs.first > rhs.first;
+                }
+                return lhs.second < rhs.second;
+            });
+
+        long double target_score =
+            component_mass[component_id] *
+            static_cast<long double>(clamped_gamma) /
+            100.0L;
+        long double covered_score = 0.0L;
+        for (const auto& item : ranking) {
+            candidate_ids.insert(item.second);
+            covered_score += item.first;
+            if (covered_score >= target_score) {
                 break;
             }
         }

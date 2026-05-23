@@ -27,9 +27,16 @@ if [[ ! ${SELECTION_METHODS+x} || -z "$SELECTION_METHODS" ]]; then SELECTION_MET
 if [[ ! ${REROUTE_METHODS+x} || -z "$REROUTE_METHODS" ]]; then REROUTE_METHODS=tdg; fi
 if [[ ! ${FIXED_FRACTIONS+x} || -z "$FIXED_FRACTIONS" ]]; then FIXED_FRACTIONS=10; fi
 if [[ ! ${SUFFIX+x} || -z "$SUFFIX" ]]; then SUFFIX=capacity2_cap10e8; fi
+if [[ ! ${CANDIDATE_FILTER+x} || -z "$CANDIDATE_FILTER" ]]; then CANDIDATE_FILTER=all; fi
 
-TMPDIR="$RESULTS_DIR/tmp_gro_scalability_${LABEL}_tdg_excess_full_${SUFFIX}"
-OUT="$RESULTS_DIR/gro_scalability_${LABEL}_tdg_excess_full_${SUFFIX}.csv"
+if [[ "$CANDIDATE_FILTER" == "all" ]]; then
+  CANDIDATE_TAG=full
+else
+  CANDIDATE_TAG=candidate_${CANDIDATE_FILTER}
+fi
+
+TMPDIR="$RESULTS_DIR/tmp_gro_scalability_${LABEL}_tdg_excess_${CANDIDATE_TAG}_${SUFFIX}"
+OUT="$RESULTS_DIR/gro_scalability_${LABEL}_tdg_excess_${CANDIDATE_TAG}_${SUFFIX}.csv"
 
 mkdir -p "$TMPDIR" "$RESULTS_DIR"
 
@@ -43,7 +50,7 @@ for rep in "${REP_VALUES[@]}"; do
   fi
 
   REP_OUT="$TMPDIR/rep${rep}.csv"
-  echo "[run] label=$LABEL rep=$rep query_dir=$QUERY_DIR output=$REP_OUT"
+  echo "[run] label=$LABEL rep=$rep candidate_filter=$CANDIDATE_FILTER query_dir=$QUERY_DIR output=$REP_OUT"
   ./gro_ablation_test "$CONFIG" \
     --query-dir "$QUERY_DIR" \
     --rep "$rep" \
@@ -53,6 +60,7 @@ for rep in "${REP_VALUES[@]}"; do
     --fixed-fractions "$FIXED_FRACTIONS" \
     --tdg-gammas "$TDG_GAMMAS" \
     --impact-weights "$IMPACT_WEIGHTS" \
+    --candidate-filter "$CANDIDATE_FILTER" \
     --random-seed "$RANDOM_SEED"
 
   if [[ "$first" -eq 1 ]]; then

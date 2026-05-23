@@ -134,6 +134,18 @@ public:
         const TrafficDependencyGraph& tdg,
         const std::vector<Cost>& node_impacts) const;
 
+    std::unordered_set<QueryId> select_candidates_by_score(
+        const std::vector<Query>& queries,
+        const TrafficResult& result,
+        const TrafficDependencyGraph& tdg,
+        const std::vector<Cost>& node_impacts) const;
+
+    std::unordered_set<QueryId> select_candidates_by_component_balance(
+        const std::vector<Query>& queries,
+        const TrafficResult& result,
+        const TrafficDependencyGraph& tdg,
+        const std::vector<Cost>& node_impacts) const;
+
     std::vector<QueryId> select_queries(
         const std::unordered_set<QueryId>& candidate_query_ids,
         const std::vector<Query>& queries,
