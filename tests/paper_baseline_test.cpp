@@ -319,6 +319,24 @@ gro::Cost evaluate_total(
     return result.total_travel_time;
 }
 
+std::size_t distinct_fahl_time_buckets(const gro::FAHLFlowProfile& profile) {
+    std::map<int, char> buckets;
+    for (const auto& entry : profile) {
+        buckets[entry.first.second] = 1;
+    }
+    return buckets.size();
+}
+
+gro::FAHLFlowProfile collapse_fahl_profile_to_single_bucket(
+    const gro::FAHLFlowProfile& profile) {
+    gro::FAHLFlowProfile collapsed;
+    collapsed.reserve(profile.size());
+    for (const auto& entry : profile) {
+        collapsed[{entry.first.first, 0}] += entry.second;
+    }
+    return collapsed;
+}
+
 RunStats run_svp(
     const gro::Graph& graph,
     const std::vector<gro::Query>& queries,
@@ -417,6 +435,7 @@ RunStats run_fahl(
     stats.fahl_effective_time_step = fahl_options.time_step;
     std::cerr << "  [phase] fahl single_bucket enabled"
               << " profile_time_step=" << fahl_options.time_step
+              << " flow_aggregation=sum"
               << "\n";
 
     std::cerr << "  [phase] fahl profile_start reference_routes="
@@ -425,12 +444,18 @@ RunStats run_fahl(
               << " order_beta_percent=" << fahl_options.order_beta_percent
               << " time_step=" << fahl_options.time_step << "\n";
     auto profile_start = gro::Clock::now();
-    gro::FAHLFlowProfile profile =
+    gro::FAHLFlowProfile raw_profile =
         gro::build_fahl_flow_profile(graph, reference_routes, fahl_options.time_step);
+    std::size_t raw_time_buckets = distinct_fahl_time_buckets(raw_profile);
+    gro::FAHLFlowProfile profile =
+        collapse_fahl_profile_to_single_bucket(raw_profile);
     stats.profile_us = gro::elapsed_us(profile_start);
     std::cerr << "  [phase] fahl profile_done sec="
               << seconds(stats.profile_us)
-              << " profile_buckets=" << profile.size() << "\n";
+              << " raw_profile_entries=" << raw_profile.size()
+              << " raw_time_buckets=" << raw_time_buckets
+              << " collapsed_profile_entries=" << profile.size()
+              << " flow_aggregation=sum\n";
 
     std::map<int, std::vector<const gro::Query*>> queries_by_bucket;
     for (const gro::Query& query : queries) {
@@ -503,6 +528,7 @@ std::string params_for_method(
             << ";effective_time_step=" << stats.fahl_effective_time_step
             << ";query_buckets=" << stats.fahl_query_buckets
             << ";single_bucket=true"
+            << ";flow_aggregation=sum"
             << ";flow_reference=shortest_path";
     }
     return out.str();
