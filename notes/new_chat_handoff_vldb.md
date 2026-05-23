@@ -22,6 +22,22 @@ The intended paper story is:
 6. Iterate until the method converges or no useful queries are selected.
 7. Compress TDG for scalability on large workloads.
 
+## Paper First Principle
+
+The first principle of this project is to produce a publishable VLDB paper, not
+to accumulate small positive-looking numbers. Every experiment and claim should
+be judged by whether a skeptical reviewer would consider the result meaningful,
+fair, and worth publishing.
+
+In particular, a marginal real-world route-quality gain such as roughly 1-2%
+TTT reduction is not strong enough by itself to anchor the paper story. Such a
+number may still be useful as supporting evidence if it comes with a clear
+scalability win, a strong baseline comparison, or a convincing explanation of
+why the workload has little optimization headroom. Do not overstate small real
+data improvements. If the real-workload quality gains are weak, either improve
+the method/setting or frame that section around the defensible contribution:
+compression, scalability, runtime, memory, and quality preservation.
+
 ## Current Main Claim
 
 The main claim should be about TDG-guided iterative optimization:
@@ -189,6 +205,28 @@ They contain `Rep=1,2,3,5,7,10` for seeds `0..4`, giving
 workloads built by repeating each base Rep1 query. They are useful for
 scalability curves, but they should be described as derived scaling workloads,
 not as independent raw samples.
+
+For paper-facing scalability, each query-size workload should be highly
+congested. The current target gate is shortest-path congestion inflation in the
+`10x-100x` range. A workload below `10x` is too weak for evaluating route
+optimization; a workload above `100x` should be treated as an extreme stress
+test unless explicitly justified.
+
+The preferred new scalability workload candidate is:
+
+```text
+data/BJ_Real_query_sets_scalability_inner_progressive_peak1h
+```
+
+It is generated from T-Drive-derived real OD rows, but each query size uses a
+different source-OD count and central OD radius before controlled repetition:
+10k uses 800 source rows within 3 km; 20k uses 1400 within 4 km; 30k uses 1800
+within 4 km; 50k uses 3000 within 5 km; 70k uses 4500 within 6 km; and 100k
+uses 7000 within 8 km. Departures are linearly rescaled into a one-hour peak
+window. This is a controlled high-congestion peak workload, not an independent
+raw taxi sample. A smoke diagnostic on `BJRealRep1-0` gave shortest-path
+inflation `16.1589x`, which passes the `10x-100x` gate. Run the full
+shortest-path congestion diagnostic before treating all 30 files as final.
 
 For BJ real-world overall effectiveness, the current three 100k representative
 datasets are:
