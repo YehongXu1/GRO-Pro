@@ -9,7 +9,7 @@ fi
 if [[ ! ${OMP_NUM_THREADS+x} || -z "$OMP_NUM_THREADS" ]]; then OMP_NUM_THREADS=24; fi
 export OMP_NUM_THREADS
 
-if [[ ! ${CONFIG+x} || -z "$CONFIG" ]]; then CONFIG=config/config_bj_capacity2_cap10e8.yaml; fi
+if [[ ! ${CONFIG+x} || -z "$CONFIG" ]]; then CONFIG=config/config_bj_capacity2_cap10e8_iter5.yaml; fi
 if [[ ! ${QUERY_DIR+x} || -z "$QUERY_DIR" ]]; then
   echo "Set QUERY_DIR to a scalability query directory" >&2
   exit 2

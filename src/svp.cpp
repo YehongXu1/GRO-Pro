@@ -2,6 +2,7 @@
 #include "data_structures.hpp"
 
 #include <algorithm>
+#include <iostream>
 #include <limits>
 #include <set>
 #include <unordered_map>
@@ -10,6 +11,20 @@
 
 namespace gro {
 namespace {
+
+double seconds(long long microseconds) {
+    return static_cast<double>(microseconds) / 1000000.0;
+}
+
+struct SVPSearchStats {
+    long long reachable_vias = 0;
+    long long candidates_examined = 0;
+    long long duplicate_candidates = 0;
+    long long non_simple_candidates = 0;
+    long long overlap_rejected = 0;
+    long long accepted = 0;
+    bool fallback_used = false;
+};
 
 Cost shared_edge_length(
     const Graph& graph,
@@ -67,13 +82,16 @@ bool is_simple_route(const Graph& graph, NodeId origin, const std::vector<EdgeId
     return true;
 }
 
-}  // namespace
-
-std::vector<Route> svp_routes(
+std::vector<Route> svp_routes_impl(
     const Graph& graph,
     const Query& query,
     int k,
-    int theta_percent) {
+    int theta_percent,
+    SVPSearchStats* stats) {
+    if (stats != nullptr) {
+        *stats = SVPSearchStats{};
+    }
+
     Route empty_route;
     empty_route.query_id = query.id;
     empty_route.departure_time = query.departure_time;
@@ -89,6 +107,11 @@ std::vector<Route> svp_routes(
         Cost length = 0;
         NodeId via = kInvalidId;
         std::vector<EdgeId> edge_ids;
+    };
+
+    struct CandidateRef {
+        Cost length = 0;
+        NodeId via = kInvalidId;
     };
 
     const Cost infinity = std::numeric_limits<Cost>::max() / 4;
@@ -179,24 +202,24 @@ std::vector<Route> svp_routes(
         return candidate;
     };
 
-    std::vector<Candidate> candidates;
-    candidates.reserve(vertex_count);
+    std::vector<CandidateRef> candidate_order;
+    candidate_order.reserve(vertex_count);
     for (NodeId node_id = 0; node_id < vertex_count; ++node_id) {
         if (forward_dist[node_id] == infinity || backward_dist[node_id] == infinity) {
             continue;
         }
-        Candidate candidate = build_candidate(node_id);
-        if (candidate.edge_ids.empty() ||
-            !is_simple_route(graph, query.origin, candidate.edge_ids)) {
-            continue;
-        }
-        candidates.push_back(std::move(candidate));
+        candidate_order.push_back(CandidateRef{
+            forward_dist[node_id] + backward_dist[node_id],
+            node_id});
+    }
+    if (stats != nullptr) {
+        stats->reachable_vias = static_cast<long long>(candidate_order.size());
     }
 
     std::sort(
-        candidates.begin(),
-        candidates.end(),
-        [](const Candidate& lhs, const Candidate& rhs) {
+        candidate_order.begin(),
+        candidate_order.end(),
+        [](const CandidateRef& lhs, const CandidateRef& rhs) {
             if (lhs.length != rhs.length) {
                 return lhs.length < rhs.length;
             }
@@ -204,9 +227,27 @@ std::vector<Route> svp_routes(
         });
 
     std::vector<Route> accepted;
+    accepted.reserve(static_cast<std::size_t>(k));
     std::set<std::vector<EdgeId>> seen_edge_sets;
-    for (const Candidate& candidate : candidates) {
+    for (const CandidateRef& candidate_ref : candidate_order) {
+        Candidate candidate = build_candidate(candidate_ref.via);
+        candidate.length = candidate_ref.length;
+        if (stats != nullptr) {
+            ++stats->candidates_examined;
+        }
+
+        if (candidate.edge_ids.empty() ||
+            !is_simple_route(graph, query.origin, candidate.edge_ids)) {
+            if (stats != nullptr) {
+                ++stats->non_simple_candidates;
+            }
+            continue;
+        }
+
         if (seen_edge_sets.find(candidate.edge_ids) != seen_edge_sets.end()) {
+            if (stats != nullptr) {
+                ++stats->duplicate_candidates;
+            }
             continue;
         }
 
@@ -224,20 +265,39 @@ std::vector<Route> svp_routes(
             }
         }
         if (!diverse) {
+            if (stats != nullptr) {
+                ++stats->overlap_rejected;
+            }
             continue;
         }
 
         seen_edge_sets.insert(route.edge_ids);
         accepted.push_back(std::move(route));
+        if (stats != nullptr) {
+            stats->accepted = static_cast<long long>(accepted.size());
+        }
         if (accepted.size() == static_cast<size_t>(k)) {
             break;
         }
     }
 
     if (accepted.empty()) {
+        if (stats != nullptr) {
+            stats->fallback_used = true;
+        }
         accepted.push_back(shortest_path(graph, query));
     }
     return accepted;
+}
+
+}  // namespace
+
+std::vector<Route> svp_routes(
+    const Graph& graph,
+    const Query& query,
+    int k,
+    int theta_percent) {
+    return svp_routes_impl(graph, query, k, theta_percent, nullptr);
 }
 
 std::vector<Route> compute_svp_baseline_routes(
@@ -247,19 +307,42 @@ std::vector<Route> compute_svp_baseline_routes(
     std::vector<Route> routes(queries.size());
     std::vector<std::pair<NodeId, NodeId>> od_order;
     std::unordered_map<std::pair<NodeId, NodeId>, std::size_t, PairHash> od_index;
+    od_order.reserve(queries.size());
+    od_index.reserve(queries.size());
 
     int k = std::max(1, options.k);
     int theta_percent = std::clamp(options.theta, 0, 100);
 
+    std::unordered_set<NodeId> unique_origins;
+    std::unordered_set<NodeId> unique_destinations;
+    unique_origins.reserve(queries.size());
+    unique_destinations.reserve(queries.size());
     for (const Query& query : queries) {
         std::pair<NodeId, NodeId> od = {query.origin, query.destination};
         if (od_index.find(od) == od_index.end()) {
             od_index[od] = od_order.size();
             od_order.push_back(od);
         }
+        unique_origins.insert(query.origin);
+        unique_destinations.insert(query.destination);
     }
 
     std::vector<std::vector<Route>> alternatives_by_od(od_order.size());
+    std::vector<SVPSearchStats> stats_by_od(od_order.size());
+    auto total_start = Clock::now();
+    std::cerr << "[svp] route_start"
+              << " queries=" << queries.size()
+              << " unique_od=" << od_order.size()
+              << " unique_origins=" << unique_origins.size()
+              << " unique_destinations=" << unique_destinations.size()
+              << " k=" << k
+              << " theta=" << theta_percent
+              << " mode=lazy_single_via\n";
+
+    std::size_t progress_interval = od_order.empty()
+        ? 1
+        : std::max<std::size_t>(1, od_order.size() / 20);
+    std::size_t processed_ods = 0;
 
     #pragma omp parallel for schedule(dynamic)
     for (long long index = 0; index < static_cast<long long>(od_order.size()); ++index) {
@@ -269,8 +352,59 @@ std::vector<Route> compute_svp_baseline_routes(
         representative.destination = od_order[static_cast<std::size_t>(index)].second;
         representative.departure_time = 0;
         alternatives_by_od[static_cast<std::size_t>(index)] =
-            svp_routes(graph, representative, k, theta_percent);
+            svp_routes_impl(
+                graph,
+                representative,
+                k,
+                theta_percent,
+                &stats_by_od[static_cast<std::size_t>(index)]);
+
+        std::size_t done = 0;
+        #pragma omp atomic capture
+        done = ++processed_ods;
+        if (done == od_order.size() || done % progress_interval == 0) {
+            #pragma omp critical(svp_progress_log)
+            {
+                std::cerr << "[svp] od_progress"
+                          << " processed_od=" << done
+                          << "/" << od_order.size()
+                          << " elapsed_sec=" << seconds(elapsed_us(total_start))
+                          << "\n";
+            }
+        }
     }
+
+    long long reachable_vias = 0;
+    long long candidates_examined = 0;
+    long long duplicate_candidates = 0;
+    long long non_simple_candidates = 0;
+    long long overlap_rejected = 0;
+    long long accepted = 0;
+    long long fallback_od = 0;
+    long long max_candidates_examined = 0;
+    for (const SVPSearchStats& stats : stats_by_od) {
+        reachable_vias += stats.reachable_vias;
+        candidates_examined += stats.candidates_examined;
+        duplicate_candidates += stats.duplicate_candidates;
+        non_simple_candidates += stats.non_simple_candidates;
+        overlap_rejected += stats.overlap_rejected;
+        accepted += stats.accepted;
+        fallback_od += stats.fallback_used ? 1 : 0;
+        max_candidates_examined =
+            std::max(max_candidates_examined, stats.candidates_examined);
+    }
+    double divisor = od_order.empty() ? 1.0 : static_cast<double>(od_order.size());
+    std::cerr << "[svp] alternatives_done"
+              << " sec=" << seconds(elapsed_us(total_start))
+              << " avg_reachable_vias=" << (reachable_vias / divisor)
+              << " avg_candidates_examined=" << (candidates_examined / divisor)
+              << " max_candidates_examined=" << max_candidates_examined
+              << " accepted_routes=" << accepted
+              << " fallback_od=" << fallback_od
+              << " duplicate_candidates=" << duplicate_candidates
+              << " non_simple_candidates=" << non_simple_candidates
+              << " overlap_rejected=" << overlap_rejected
+              << "\n";
 
     std::vector<std::size_t> next_alternative_by_od(od_order.size(), 0);
     for (const Query& query : queries) {
@@ -288,6 +422,11 @@ std::vector<Route> compute_svp_baseline_routes(
         routes[query.id] = std::move(route);
     }
 
+    std::cerr << "[svp] route_done"
+              << " queries=" << queries.size()
+              << " unique_od=" << od_order.size()
+              << " sec=" << seconds(elapsed_us(total_start))
+              << "\n";
     return routes;
 }
 
