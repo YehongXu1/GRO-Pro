@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <limits>
 #include <memory>
+#include <queue>
 #include <utility>
 
 namespace gro {
@@ -168,6 +169,9 @@ struct FAHLIndex::Impl {
     std::unordered_map<std::pair<NodeId, NodeId>, NodeId, PairHash> shortcut_mid;
     std::vector<int> rank;
     std::vector<TreeNode> tree;
+    int order_max_degree = 1;
+    Flow order_min_flow = 0;
+    Flow order_max_flow = 0;
 
     Flow flow_for_edge(const FAHLFlowProfile& flow_profile, EdgeId edge_id) const {
         auto it = flow_profile.find({edge_id, time_bucket});
@@ -259,76 +263,103 @@ struct FAHLIndex::Impl {
         return degree;
     }
 
-    NodeId choose_next_vertex(const std::vector<char>& active) const {
-        NodeId best = kInvalidId;
-        double best_score = std::numeric_limits<double>::infinity();
-        int best_degree = std::numeric_limits<int>::max();
-        Flow best_flow = std::numeric_limits<Flow>::max();
-        int max_degree = 1;
-        Flow min_flow = std::numeric_limits<Flow>::max();
-        Flow max_flow = 0;
-
-        std::vector<int> degrees(graph.vertex_count, 0);
-        for (NodeId node = 0; node < graph.vertex_count; ++node) {
-            if (!active[node]) {
-                continue;
-            }
-            int degree = active_degree(node, active);
-            degrees[node] = degree;
-            max_degree = std::max(max_degree, degree);
-            Flow flow = node < static_cast<NodeId>(vertex_flows.size())
-                ? vertex_flows[node]
-                : 0;
-            min_flow = std::min(min_flow, flow);
-            max_flow = std::max(max_flow, flow);
-        }
-        if (min_flow == std::numeric_limits<Flow>::max()) {
-            min_flow = 0;
-        }
-
+    double ordering_score(NodeId node, int degree) const {
         double beta =
             static_cast<double>(std::clamp(options.order_beta_percent, 0, 100)) /
             100.0;
+        double degree_norm =
+            static_cast<double>(degree) / static_cast<double>(order_max_degree);
+        Flow flow = node < static_cast<NodeId>(vertex_flows.size())
+            ? vertex_flows[node]
+            : 0;
+        double flow_norm = order_max_flow > order_min_flow
+            ? static_cast<double>(flow - order_min_flow) /
+                  static_cast<double>(order_max_flow - order_min_flow)
+            : 0.0;
 
-        for (NodeId node = 0; node < graph.vertex_count; ++node) {
-            if (!active[node]) {
-                continue;
+        // FAHL places lower-flow vertices closer to the tree root, so high-flow
+        // vertices receive smaller elimination scores and are contracted earlier.
+        double high_flow_first = 1.0 - flow_norm;
+        return (1.0 - beta) * degree_norm + beta * high_flow_first;
+    }
+
+    struct QueueItem {
+        double score = 0.0;
+        int degree = 0;
+        int version = 0;
+        NodeId node = kInvalidId;
+    };
+
+    struct QueueCompare {
+        bool operator()(const QueueItem& lhs, const QueueItem& rhs) const {
+            if (lhs.score != rhs.score) {
+                return lhs.score > rhs.score;
             }
-            int degree = degrees[node];
+            if (lhs.degree != rhs.degree) {
+                return lhs.degree > rhs.degree;
+            }
+            return lhs.node > rhs.node;
+        }
+    };
+
+    void initialise_ordering_stats() {
+        order_max_degree = 1;
+        order_min_flow = std::numeric_limits<Flow>::max();
+        order_max_flow = 0;
+        for (NodeId node = 0; node < graph.vertex_count; ++node) {
+            order_max_degree =
+                std::max(order_max_degree, static_cast<int>(working[node].size()));
             Flow flow = node < static_cast<NodeId>(vertex_flows.size())
                 ? vertex_flows[node]
                 : 0;
-            double degree_norm =
-                static_cast<double>(degree) / static_cast<double>(max_degree);
-            double flow_norm = max_flow > min_flow
-                ? static_cast<double>(flow - min_flow) /
-                      static_cast<double>(max_flow - min_flow)
-                : 0.0;
-            double score = beta * flow_norm + (1.0 - beta) * degree_norm;
-            if (best == kInvalidId ||
-                score < best_score ||
-                (score == best_score && degree < best_degree) ||
-                (score == best_score && degree == best_degree && flow < best_flow) ||
-                (score == best_score && degree == best_degree && flow == best_flow &&
-                 node < best)) {
-                best = node;
-                best_score = score;
-                best_degree = degree;
-                best_flow = flow;
-            }
+            order_min_flow = std::min(order_min_flow, flow);
+            order_max_flow = std::max(order_max_flow, flow);
         }
-        return best;
+        if (order_min_flow == std::numeric_limits<Flow>::max()) {
+            order_min_flow = 0;
+        }
+    }
+
+    void push_queue_item(
+        std::priority_queue<QueueItem, std::vector<QueueItem>, QueueCompare>& queue,
+        const std::vector<char>& active,
+        std::vector<int>& versions,
+        NodeId node) {
+        if (node < 0 || node >= graph.vertex_count || !active[node]) {
+            return;
+        }
+        int degree = active_degree(node, active);
+        ++versions[node];
+        queue.push(QueueItem{
+            ordering_score(node, degree),
+            degree,
+            versions[node],
+            node});
     }
 
     void contract_graph() {
         contracted_neighbors.assign(graph.vertex_count, {});
-        std::vector<char> active(graph.vertex_count, 1);
-        order.reserve(graph.vertex_count);
+        initialise_ordering_stats();
 
-        for (int contracted = 0; contracted < graph.vertex_count; ++contracted) {
-            NodeId x = choose_next_vertex(active);
-            if (x == kInvalidId) {
-                break;
+        std::vector<char> active(graph.vertex_count, 1);
+        std::vector<int> versions(graph.vertex_count, 0);
+        std::priority_queue<QueueItem, std::vector<QueueItem>, QueueCompare> queue;
+        order.clear();
+        order.reserve(graph.vertex_count);
+        for (NodeId node = 0; node < graph.vertex_count; ++node) {
+            push_queue_item(queue, active, versions, node);
+        }
+
+        while (!queue.empty()) {
+            QueueItem item = queue.top();
+            queue.pop();
+            NodeId x = item.node;
+            if (x < 0 ||
+                x >= graph.vertex_count ||
+                !active[x] ||
+                item.version != versions[x] ||
+                item.degree != active_degree(x, active)) {
+                continue;
             }
 
             std::vector<NodeId> neighbors;
@@ -344,6 +375,9 @@ struct FAHLIndex::Impl {
                 Cost backward = working[neighbor][x].cost;
                 contracted_neighbors[x].push_back(NeighborLabel{neighbor, forward, backward});
             }
+
+            active[x] = 0;
+            order.push_back(x);
 
             for (NodeId from : neighbors) {
                 Cost from_to_x = working[from][x].cost;
@@ -362,12 +396,14 @@ struct FAHLIndex::Impl {
                 }
             }
 
-            active[x] = 0;
             for (NodeId neighbor : neighbors) {
                 working[neighbor].erase(x);
             }
             working[x].clear();
-            order.push_back(x);
+
+            for (NodeId neighbor : neighbors) {
+                push_queue_item(queue, active, versions, neighbor);
+            }
         }
     }
 

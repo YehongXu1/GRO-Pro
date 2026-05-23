@@ -10,7 +10,7 @@ is global route optimization for many simultaneous trip queries in a road
 network. The paper goal is to show that a traffic dependency graph (TDG) can
 identify which existing routes should be rerouted, and can help route
 replacement, more effectively than simple iterative baselines and prior
-one-shot route-planning baselines.
+one-shot route-planning baselines. The draft paper is can be find in /papers/GRO_Plus_Max.
 
 The intended paper story is:
 
@@ -87,6 +87,7 @@ Test/experiment runners:
 ```text
 tests/gro_ablation_test.cpp
 tests/gro_baseline_test.cpp
+tests/paper_baseline_test.cpp
 tests/gro_selection_debug_test.cpp
 tests/gro_reroute_debug_test.cpp
 tests/gro_slot_legacy_ablation_test.cpp
@@ -100,7 +101,21 @@ python/plot_baseline_fraction_ttt.py
 python/build_tdg_oracle_ablation.py
 python/generate_bj_synthetic_queries.py
 python/generate_bj_real_queries_from_tdrive.py
+python/build_bj_real_scalability_queries.py
 python/rescale_query_departures.py
+```
+
+Experiment scripts:
+
+```text
+scripts/run_gro_baseline_three_levels.sh
+scripts/run_gor_three_levels.sh
+scripts/run_fahl_three_levels.sh
+scripts/run_sor_three_levels.sh
+scripts/run_svp_three_levels.sh
+scripts/run_gro_scalability_one_dir.sh
+scripts/run_gro_scalability_original.sh
+scripts/run_gro_scalability_window6h.sh
 ```
 
 Important notes:
@@ -114,6 +129,12 @@ notes/tdg_impact_normalization.md
 notes/contgro_slot_legacy.md
 notes/bj_synthetic_queries.md
 notes/bj_real_queries.md
+```
+
+Current selected-dataset component-figure manifest:
+
+```text
+python/results/experiments/exp1_component_ablation/bj_synthetic_capacity2_cap10e8/analysis/selected_dataset_manifest.md
 ```
 
 ## Data Layout
@@ -139,6 +160,8 @@ Real BJ taxi-derived query sets:
 ```text
 data/BJ_Real_query_sets
 data/BJ_Real_query_sets_window6h
+data/BJ_Real_query_sets_scalability_original
+data/BJ_Real_query_sets_scalability_window6h
 ```
 
 The real sets are generated from T-Drive taxi trajectories, filtered around
@@ -154,6 +177,32 @@ The one-hour modulo real workload, if present locally, should be treated as too
 aggressive for paper results unless explicitly re-validated. It can create
 unrealistically huge congestion ratios.
 
+The controlled scalability query sets are derived from the real Rep1 files:
+
+```text
+data/BJ_Real_query_sets_scalability_original
+data/BJ_Real_query_sets_scalability_window6h
+```
+
+They contain `Rep=1,2,3,5,7,10` for seeds `0..4`, giving
+`10k,20k,30k,50k,70k,100k` queries per file. These are controlled scaling
+workloads built by repeating each base Rep1 query. They are useful for
+scalability curves, but they should be described as derived scaling workloads,
+not as independent raw samples.
+
+For BJ real-world overall effectiveness, the current three 100k representative
+datasets are:
+
+| Level | Query file | Shortest-path congestion ratio | Role |
+| --- | --- | --- | --- |
+| lower | `data/BJ_Real_query_sets/BJRealRep10-2.txt` | `4.1618` | lowest-congestion 100k representative |
+| middle | `data/BJ_Real_query_sets_window6h/BJRealRep10-2.txt` | `31.2855` | moderate/high six-hour peak representative |
+| extreme | `data/BJ_Real_query_sets_window6h/BJRealRep10-4.txt` | `83.6263` | extreme six-hour peak representative |
+
+Do not use `BJRealRep5-*` for overall effectiveness, because those files have
+only 50k queries. For Subsection 5, use the three 100k datasets above unless
+the user explicitly changes the selection.
+
 ## Current Experiment Layout
 
 The preferred paper experiment order is:
@@ -163,6 +212,10 @@ The preferred paper experiment order is:
    - Use lines for TTT over iterations.
    - Use second y-axis bars for TDG selected fraction.
    - Compare fixed-fraction random/latency baselines against TDG-guided.
+   - Current presentation/exploration figures use selected datasets per panel.
+     They are useful for shaping the ablation story, but they are not a fair
+     all-dataset benchmark. The selected seeds and source files are recorded in
+     `selected_dataset_manifest.md`.
 2. Compression and scalability on real-world workloads.
    - Vary query count.
    - Report TDG size, runtime, memory, and TTT preservation.
@@ -173,6 +226,23 @@ The preferred paper experiment order is:
 4. Overall effectiveness against paper baselines.
    - Compare final route quality/runtime against SVP, GOR, SOR, FAHL.
    - Be explicit that their paradigms differ from iterative GRO.
+   - Current real-world setting uses the three 100k BJ real representatives:
+     lower original `BJRealRep10-2`, middle window6h `BJRealRep10-2`, and
+     extreme window6h `BJRealRep10-4`.
+
+For overall effectiveness, distinguish these groups:
+
+- `GRO_BASELINE`: random or most-delayed selection plus normal TD-Dijkstra. It
+  is an iterative no-TDG baseline. Any `--tdg-gammas` or `--impact-weights`
+  arguments passed to `gro_ablation_test` for this group are CLI placeholders,
+  not meaningful tuned parameters.
+- Proposed GRO variants: currently `tdg_excess_normal`, `tdg_excess_full`, and
+  possibly `tdg_anchor_full` if the user asks to keep it in the comparison.
+  Parameter sweeps over gamma and impact weight are sensitivity/diagnostic
+  runs unless a single default is fixed in advance for the fair comparison.
+- Paper baselines: `SVP`, `GOR`, `SOR`, and `FAHL`. These are one-shot route-set
+  producers. Compare their final route sets under the common evaluator; do not
+  plot them as iterative methods.
 
 ## Current Important Results And Caveats
 
@@ -190,10 +260,112 @@ The preferred paper experiment order is:
   issue seems configuration-level rather than one corrupted dataset.
 - The `best_param_by_iter` and `tdg_oracle` files are diagnostic lower envelopes.
   They are useful for debugging, but they are not final fair method results.
-- Real workload status: the six-hour query files have been generated, but the
-  full shortest-path congestion diagnostic was intentionally stopped by the
-  user. Do not assume the six-hour workload has been validated yet. Provide the
-  command and let the user run it, or ask before running.
+- Current 3 x 3 BJ synthetic component-ablation presentation figures are
+  selected-dataset figures, not all-270-dataset aggregate results. The current
+  files are:
+
+```text
+python/results/experiments/exp1_component_ablation/bj_synthetic_capacity2_cap10e8/plots/selected_dataset_reroute_component/bj_component_reroute_selected_top10_per_panel_impact_w30.png
+python/results/experiments/exp1_component_ablation/bj_synthetic_capacity2_cap10e8/plots/selected_dataset_reroute_component/bj_component_reroute_selected_top10_per_panel_impact_w30.pdf
+python/results/experiments/exp1_component_ablation/bj_synthetic_capacity2_cap10e8/plots/selected_dataset_reroute_component/bj_component_reroute_selected_top10_per_panel_impact_oracle.png
+python/results/experiments/exp1_component_ablation/bj_synthetic_capacity2_cap10e8/plots/selected_dataset_reroute_component/bj_component_reroute_selected_top10_per_panel_impact_oracle.pdf
+```
+
+- For those selected-dataset figures, all methods use the same selected seeds
+  within each panel. Seed selection is guided first by `tdg_excess_full`
+  (`TDG-guided + TDG-impact reroute`) and second by `tdg_excess_normal`
+  (`TDG-guided + normal TD-Dijkstra`); baselines are evaluated on the selected
+  seeds but are not used to choose them.
+- Current selected-dataset baseline fractions are Rep1 `1%`, Rep2 `10%`, and
+  Rep4 `30%`. TDG methods use their adaptive selected fractions from the TDG
+  result CSVs. Rep1 second y-axis is fixed to `0-3%` in the current figure.
+- Rep2 was intentionally restored to the previous relaxed-but-strong selected
+  window because TDG looks genuinely strong there. Rep4 Medium was deliberately
+  relaxed so panel `(h)` is not unrealistically perfect in the first iteration.
+- The selected seeds, raw input files, generated plot-data CSVs, and caveats
+  are documented in:
+
+```text
+python/results/experiments/exp1_component_ablation/bj_synthetic_capacity2_cap10e8/analysis/selected_dataset_manifest.md
+```
+
+- Real workload status: shortest-path congestion diagnostics have been used to
+  choose three 100k BJ real representatives for overall effectiveness: lower
+  original `BJRealRep10-2`, middle window6h `BJRealRep10-2`, and extreme
+  window6h `BJRealRep10-4`. Keep those labels attached to the exact files.
+- A small scalability probe on window6h Rep1 showed low-load real workloads may
+  slightly worsen after rerouting; that is useful for scalability timing/TDG
+  size, but should not be used as a route-quality victory claim.
+- Existing scalability mock figure is only illustrative and uses fabricated
+  data: `python/results/experiments/exp3_compression_scalability/mock/`.
+  Do not cite it as an experimental result.
+
+## Current Implementation Notes
+
+- `tests/paper_baseline_test.cpp` is the current runner for one-shot paper
+  baselines `svp,gor,sor,fahl`. It accepts `--query-file` or `--query-dir` and
+  writes comparable route-quality/runtime CSVs.
+- `paper_baseline_test` logs phase progress to stderr so long runs show whether
+  they are in reference shortest-path evaluation, SVP, GOR, SOR, or FAHL work.
+- `src/svp.cpp` currently computes unique OD alternatives in parallel and then
+  assigns repeated OD queries deterministically. This matters for real data
+  where many queries can share OD pairs.
+- `src/gor.cpp` was checked for evaluator consistency. The GOR edge scoring now
+  uses the current flow before entry, matching the normal TD-Dijkstra/evaluator
+  convention.
+- FAHL in `paper_baseline_test` is currently treated as single-bucket query
+  processing; do not present a bucket-count sweep unless the code is changed
+  again.
+- `scripts/run_gro_scalability_one_dir.sh` requires `QUERY_DIR` and `LABEL`
+  from the wrapper scripts. It has defaults for `REPS`, `TDG_GAMMAS`,
+  `IMPACT_WEIGHTS`, `OMP_NUM_THREADS`, etc. If a server exits with code `126`,
+  first check executable permissions with `chmod +x scripts/*.sh`.
+
+## Current Script Entrypoints
+
+Overall-effectiveness paper baselines, each script runs lower/middle/extreme
+sequentially and supports `LOG=...`:
+
+```bash
+LOG=logs/paper_baseline_gor_100k_three_levels_capacity2_cap10e8.log nohup scripts/run_gor_three_levels.sh &
+LOG=logs/paper_baseline_fahl_100k_three_levels_capacity2_cap10e8.log OMP_NUM_THREADS=32 nohup scripts/run_fahl_three_levels.sh &
+LOG=logs/paper_baseline_sor_100k_three_levels_capacity2_cap10e8.log nohup scripts/run_sor_three_levels.sh &
+LOG=logs/paper_baseline_svp_100k_three_levels_capacity2_cap10e8.log OMP_NUM_THREADS=32 nohup scripts/run_svp_three_levels.sh &
+```
+
+GRO baseline on the same three levels:
+
+```bash
+LOG=logs/gro_baseline_random_delayed_normal_100k_three_levels_capacity2_cap10e8.log \
+  OMP_NUM_THREADS=24 \
+  nohup scripts/run_gro_baseline_three_levels.sh &
+```
+
+That script currently runs only `GRO_BASELINE` (`random,most_delayed` plus
+normal TD-Dijkstra). If the user wants `GRO_BASELINE` and proposed GRO variants
+in one combined overall-effectiveness CSV, extend or create a separate script
+rather than treating the current baseline-only CSV as complete.
+
+Scalability wrappers:
+
+```bash
+LOG=logs/gro_scalability_original_tdg_excess_full_capacity2_cap10e8.log nohup scripts/run_gro_scalability_original.sh &
+LOG=logs/gro_scalability_window6h_tdg_excess_full_capacity2_cap10e8.log nohup scripts/run_gro_scalability_window6h.sh &
+```
+
+To run only one scalability size, set `REPS`, e.g.:
+
+```bash
+OMP_NUM_THREADS=24 \
+REPS=2 \
+RESULTS_DIR=python/results/experiments/exp3_compression_scalability/rep2_test \
+LOG=logs/gro_scalability_window6h_rep2_test.log \
+nohup ./scripts/run_gro_scalability_window6h.sh &
+```
+
+The current scalability runner uses uncompressed TDG through
+`gro_ablation_test`. Treat compression-vs-uncompressed scalability as pending
+until the executable exposes or switches to compressed TDG in a controlled way.
 
 ## Execution Rule For Future Chats
 
@@ -220,6 +392,20 @@ plotter. It supports:
 
 The second y-axis is now auto-scaled per subplot, using the local TDG selected
 fraction and the baseline fraction line.
+
+Do not modify `python/plot_gro_component_ablation.py` just to tune the current
+selected-dataset presentation figure. The user has already tuned the main
+plotter's legend and layout. Keep the paper-facing labels:
+
+```text
+Selection: Random, Latency-based, TDG-guided
+Reroute: Normal TD-Dijkstra, TDG-impact reroute
+Layout: rows = Rep 1/2/4, columns = Hop 5/10/40
+```
+
+If the selected-dataset figures are regenerated or the selected seeds change,
+update `selected_dataset_manifest.md` and the corresponding selected-dataset
+CSV/plot-data files instead of silently changing the plotting script.
 
 ## New Chat Prompt Template
 
@@ -249,7 +435,9 @@ explicitly ask you to run them; otherwise give me the command.
 
 - Do not rename methods casually.
 - Do not treat every baseline as iterative.
-- Do not optimize for pretty plots by silently dropping datasets.
+- Do not optimize for pretty plots by silently dropping or reselecting datasets.
+  If the user explicitly asks for selected-dataset presentation tuning, keep it
+  separate from fair all-dataset results and update `selected_dataset_manifest.md`.
 - Do not add many new selection variants to the paper story unless we decide to
   publish them.
 - Do not claim TDG-impact rerouting is strong before checking evidence.

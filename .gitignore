@@ -63,3 +63,5 @@ python/figures/
 python/results/*.csv
 data/BJ_Real_query_sets/release/
 data/BJ_Real_query_sets/*.zip
+
+papers
