@@ -9,8 +9,10 @@ namespace gro {
 struct SOROptions {
     int detour_percent = 10;
     Time time_step = 60;
-    int max_time_steps = 1440;
-    int max_labels_per_query = 3;
+    int max_time_steps = 10080;
+    int max_labels_per_query = 20000;
+    int lower_bound_cache_size = 64;
+    int lower_bound_cache_min_frequency = 2;
 };
 
 std::vector<Route> compute_sor_routes(

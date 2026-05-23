@@ -2,6 +2,7 @@
 #include "data_structures.hpp"
 
 #include <algorithm>
+#include <iostream>
 #include <limits>
 #include <memory>
 #include <queue>
@@ -11,6 +12,10 @@ namespace gro {
 namespace {
 
 constexpr Cost kScale = 1000000;
+
+double seconds(long long microseconds) {
+    return static_cast<double>(microseconds) / 1000000.0;
+}
 
 Cost infinity() {
     return std::numeric_limits<Cost>::max() / 8;
@@ -149,11 +154,61 @@ struct FAHLIndex::Impl {
         : graph(graph),
           options(options),
           time_bucket(time_bucket) {
+        auto total_start = Clock::now();
+        std::cerr << "[fahl] index_start"
+                  << " vertices=" << graph.vertex_count
+                  << " edges=" << graph.edge_count
+                  << " flow_profile_entries=" << flow_profile.size()
+                  << " bucket=" << time_bucket
+                  << " alpha_percent=" << options.alpha_percent
+                  << " order_beta_percent=" << options.order_beta_percent
+                  << " time_step=" << options.time_step
+                  << "\n";
+
+        auto phase_start = Clock::now();
+        std::cerr << "[fahl] phase_start build_edge_scores\n";
         build_edge_scores(flow_profile);
+        std::cerr << "[fahl] phase_done build_edge_scores"
+                  << " sec=" << seconds(elapsed_us(phase_start))
+                  << "\n";
+
+        phase_start = Clock::now();
+        std::cerr << "[fahl] phase_start build_working_graph\n";
         build_working_graph();
+        std::cerr << "[fahl] phase_done build_working_graph"
+                  << " sec=" << seconds(elapsed_us(phase_start))
+                  << " working_vertices=" << working.size()
+                  << "\n";
+
+        phase_start = Clock::now();
+        std::cerr << "[fahl] phase_start contract_graph\n";
         contract_graph();
+        std::cerr << "[fahl] phase_done contract_graph"
+                  << " sec=" << seconds(elapsed_us(phase_start))
+                  << " order_size=" << order.size()
+                  << "\n";
+
+        phase_start = Clock::now();
+        std::cerr << "[fahl] phase_start build_tree\n";
         build_tree();
+        std::cerr << "[fahl] phase_done build_tree"
+                  << " sec=" << seconds(elapsed_us(phase_start))
+                  << " tree_nodes=" << tree.size()
+                  << "\n";
+
+        phase_start = Clock::now();
+        std::cerr << "[fahl] phase_start build_labels\n";
         build_labels();
+        std::cerr << "[fahl] phase_done build_labels"
+                  << " sec=" << seconds(elapsed_us(phase_start))
+                  << " tree_nodes=" << tree.size()
+                  << "\n";
+
+        std::cerr << "[fahl] index_done"
+                  << " sec=" << seconds(elapsed_us(total_start))
+                  << " order_size=" << order.size()
+                  << " tree_nodes=" << tree.size()
+                  << "\n";
     }
 
     const Graph& graph;
@@ -341,6 +396,7 @@ struct FAHLIndex::Impl {
         contracted_neighbors.assign(graph.vertex_count, {});
         initialise_ordering_stats();
 
+        auto start = Clock::now();
         std::vector<char> active(graph.vertex_count, 1);
         std::vector<int> versions(graph.vertex_count, 0);
         std::priority_queue<QueueItem, std::vector<QueueItem>, QueueCompare> queue;
@@ -350,6 +406,9 @@ struct FAHLIndex::Impl {
             push_queue_item(queue, active, versions, node);
         }
 
+        std::size_t processed = 0;
+        std::size_t progress_interval =
+            std::max<std::size_t>(10000, graph.vertex_count / 20);
         while (!queue.empty()) {
             QueueItem item = queue.top();
             queue.pop();
@@ -378,6 +437,7 @@ struct FAHLIndex::Impl {
 
             active[x] = 0;
             order.push_back(x);
+            ++processed;
 
             for (NodeId from : neighbors) {
                 Cost from_to_x = working[from][x].cost;
@@ -404,6 +464,18 @@ struct FAHLIndex::Impl {
             for (NodeId neighbor : neighbors) {
                 push_queue_item(queue, active, versions, neighbor);
             }
+
+            if (processed == static_cast<std::size_t>(graph.vertex_count) ||
+                processed % progress_interval == 0) {
+                std::cerr << "[fahl] contract_progress"
+                          << " processed=" << processed
+                          << "/" << graph.vertex_count
+                          << " elapsed_sec=" << seconds(elapsed_us(start))
+                          << " queue_size=" << queue.size()
+                          << " current_bag_size=" << neighbors.size()
+                          << " order_size=" << order.size()
+                          << "\n";
+            }
         }
     }
 
@@ -411,6 +483,8 @@ struct FAHLIndex::Impl {
         rank.assign(graph.vertex_count, kInvalidId);
         tree.clear();
         tree.reserve(order.size());
+        int max_height = 0;
+        int root_count = 0;
 
         for (auto it = order.rbegin(); it != order.rend(); ++it) {
             NodeId vertex = *it;
@@ -431,6 +505,10 @@ struct FAHLIndex::Impl {
 
             node.parent = parent;
             node.height = parent == kInvalidId ? 0 : tree[parent].height + 1;
+            max_height = std::max(max_height, node.height);
+            if (parent == kInvalidId) {
+                ++root_count;
+            }
             int tree_index = static_cast<int>(tree.size());
             rank[vertex] = tree_index;
             tree.push_back(std::move(node));
@@ -438,6 +516,10 @@ struct FAHLIndex::Impl {
                 tree[parent].children.push_back(tree_index);
             }
         }
+        std::cerr << "[fahl] build_tree_summary"
+                  << " roots=" << root_count
+                  << " max_height=" << max_height
+                  << "\n";
     }
 
     void initialise_label_positions(TreeNode& node) {
@@ -448,6 +530,13 @@ struct FAHLIndex::Impl {
     }
 
     void build_labels() {
+        auto start = Clock::now();
+        std::size_t processed = 0;
+        std::size_t total_label_entries = 0;
+        std::size_t max_label_entries = 0;
+        std::size_t progress_interval =
+            std::max<std::size_t>(10000, tree.size() / 20);
+
         for (TreeNode& node : tree) {
             if (node.parent != kInvalidId) {
                 node.label_vertices = tree[node.parent].label_vertices;
@@ -509,6 +598,24 @@ struct FAHLIndex::Impl {
                         node.backward_pivot[pos] = neighbor.node;
                     }
                 }
+            }
+
+            ++processed;
+            total_label_entries += label_count;
+            max_label_entries = std::max(max_label_entries, label_count);
+            if (processed == tree.size() ||
+                processed % progress_interval == 0) {
+                double avg_label_entries = processed == 0
+                    ? 0.0
+                    : static_cast<double>(total_label_entries) /
+                          static_cast<double>(processed);
+                std::cerr << "[fahl] label_progress"
+                          << " processed=" << processed
+                          << "/" << tree.size()
+                          << " elapsed_sec=" << seconds(elapsed_us(start))
+                          << " avg_label_entries=" << avg_label_entries
+                          << " max_label_entries=" << max_label_entries
+                          << "\n";
             }
         }
     }

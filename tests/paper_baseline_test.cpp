@@ -30,9 +30,9 @@ struct DatasetInput {
     std::filesystem::path path;
 };
 
-constexpr gro::Time kSorDefaultTimeStep = 1800;
-constexpr int kSorDefaultMaxTimeSteps = 48;  // 24h horizon with 30min buckets.
-constexpr int kSorDefaultMaxLabelsPerQuery = 3;
+constexpr gro::Time kSorDefaultTimeStep = 60;
+constexpr int kSorDefaultMaxTimeSteps = 10080;  // 7d horizon with 1min buckets.
+constexpr int kSorDefaultMaxLabelsPerQuery = 20000;
 
 struct Options {
     std::string config_path = "config/config.yaml";
