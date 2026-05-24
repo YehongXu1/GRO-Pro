@@ -119,6 +119,24 @@ bool variable_bound_exceeded(
     return false;
 }
 
+bool cell_bound_exceeded(
+    const Graph& graph,
+    const std::unordered_map<EdgeStep, int, PairHash>& volumes,
+    EdgeId edge_id,
+    int step,
+    double lambda,
+    const SOROptions& options) {
+    double capacity = static_cast<double>(edge_capacity(graph.edges[edge_id]));
+    double bound = std::exp(0.5) / capacity;
+    return variable_value(
+        graph,
+        volumes,
+        edge_id,
+        step,
+        lambda,
+        options.max_time_steps) > bound;
+}
+
 Route find_min_metric_route(
     const Graph& graph,
     const Query& query,
@@ -290,21 +308,33 @@ double route_metric(
     return metric;
 }
 
-void insert_route(
+bool insert_route(
     const Graph& graph,
     const Route& route,
     std::unordered_map<EdgeStep, int, PairHash>& volumes,
+    double lambda,
     const SOROptions& options) {
     Time time = route.departure_time;
+    bool inserted_cell_exceeds_bound = false;
     for (EdgeId edge_id : route.edge_ids) {
         for (int step : occupied_steps(
                  time,
                  graph.edges[edge_id].free_flow_time,
                  options.time_step)) {
             ++volumes[{edge_id, step}];
+            if (cell_bound_exceeded(
+                    graph,
+                    volumes,
+                    edge_id,
+                    step,
+                    lambda,
+                    options)) {
+                inserted_cell_exceeds_bound = true;
+            }
         }
         time += static_cast<Time>(graph.edges[edge_id].free_flow_time);
     }
+    return inserted_cell_exceeds_bound;
 }
 
 }  // namespace
@@ -451,11 +481,23 @@ std::vector<Route> compute_sor_routes(
     long long budget_exhausted_count = 0;
     long long fallback_count = 0;
     long long empty_route_count = 0;
+    long long lambda_update_count = 0;
+    long long volume_bound_full_scans = 0;
+    bool volume_bound_may_be_exceeded = false;
     std::size_t processed = 0;
 
     for (QueryId query_id : query_order) {
         const Query& query = queries[query_id];
         const std::vector<Cost>& remaining = remaining_distances(query.destination);
+        while (volume_bound_may_be_exceeded &&
+               lambda < std::numeric_limits<double>::max() / 4.0) {
+            lambda *= 2.0;
+            ++lambda_update_count;
+            ++volume_bound_full_scans;
+            volume_bound_may_be_exceeded =
+                variable_bound_exceeded(graph, volumes, lambda, options);
+        }
+
         SearchStats search_stats;
         Route route = find_min_metric_route(
             graph,
@@ -467,10 +509,10 @@ std::vector<Route> compute_sor_routes(
             &search_stats);
         double metric = route_metric(graph, route, volumes, lambda, options);
 
-        while ((metric > lambda ||
-                variable_bound_exceeded(graph, volumes, lambda, options)) &&
+        while (metric > lambda &&
                lambda < std::numeric_limits<double>::max() / 4.0) {
             lambda *= 2.0;
+            ++lambda_update_count;
             route = find_min_metric_route(
                 graph,
                 query,
@@ -493,7 +535,9 @@ std::vector<Route> compute_sor_routes(
             ++empty_route_count;
         }
 
-        insert_route(graph, route, volumes, options);
+        if (insert_route(graph, route, volumes, lambda, options)) {
+            volume_bound_may_be_exceeded = true;
+        }
         routes[query.id] = std::move(route);
 
         ++processed;
@@ -514,6 +558,11 @@ std::vector<Route> compute_sor_routes(
                       << " uncached_lower_bound_calls="
                       << uncached_lower_bound_calls
                       << " lambda=" << lambda
+                      << " lambda_updates=" << lambda_update_count
+                      << " volume_bound_full_scans="
+                      << volume_bound_full_scans
+                      << " volume_bound_pending="
+                      << (volume_bound_may_be_exceeded ? 1 : 0)
                       << " volume_cells=" << volumes.size()
                       << "\n";
         }
@@ -532,6 +581,10 @@ std::vector<Route> compute_sor_routes(
               << " empty=" << empty_route_count
               << " uncached_lower_bound_calls="
               << uncached_lower_bound_calls
+              << " lambda_updates=" << lambda_update_count
+              << " volume_bound_full_scans=" << volume_bound_full_scans
+              << " volume_bound_pending="
+              << (volume_bound_may_be_exceeded ? 1 : 0)
               << " volume_cells=" << volumes.size()
               << "\n";
     return routes;

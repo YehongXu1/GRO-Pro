@@ -65,13 +65,31 @@ The reason is structural: the old rule keeps a query if it touches any source
 congestion node. In a highly congested peak workload, most routes touch at least
 one such node, so the OR-style filter has weak pruning power.
 
-Candidate identification and TDG compression are both scalability reductions:
+Candidate pruning can be described in the Query Selection section because it is
+the first step of QS. However, its main experimental role should be scalability,
+not core component quality.
+
+Current paper-facing split:
+
+```text
+Method section:
+  Candidate pruning is the first step of Query Selection.
+
+Experiment section:
+  Component ablation evaluates TDG-excess selection with the full candidate
+  pool, so the selection signal is isolated.
+
+  Scalability evaluation evaluates candidate pruning as a search-space
+  reduction that lowers selection cost while preserving quality.
+```
+
+Candidate pruning and TDG compression are both scalability reductions:
 
 - Candidate identification reduces the **query search space**.
 - TDG compression reduces the **TDG/state space**.
 
-They should be discussed together in a scalability-oriented section rather than
-presented as quality-improving core selection components.
+They can both appear in the method description, but their primary evaluation
+should be in scalability rather than in the main component ablation.
 
 Suggested framing:
 
@@ -83,6 +101,48 @@ TDG-guided selection remains feasible at large scale.
 
 This protects the paper if candidate filtering trades a small amount of quality
 for substantial runtime savings.
+
+## Paper-Facing Query Selection Structure
+
+Use the current draft's main structure, but rewrite Section 6 around the new
+TDG-excess selection:
+
+```text
+6 Query Selection
+  6.1 Excess-relief signal
+  6.2 Score-based candidate pruning
+  6.3 Residual excess-relief selection
+  6.4 Complexity analysis
+```
+
+The code name `score_top` should not appear as the paper method name. Prefer:
+
+```text
+Score-based candidate pruning
+Relief-based candidate pruning
+Excess-relief candidate pruning
+```
+
+The pruning rule is simple by design:
+
+```text
+1. Compute one-pass route excess-relief score for each query.
+2. Sort queries by this score.
+3. Keep the smallest prefix whose cumulative score covers gamma of the total
+   one-pass query relief mass.
+4. Run residual excess-relief selection only over this candidate set.
+```
+
+This should be framed as a lightweight acceleration step derived from the same
+excess-relief objective, not as the main novelty. The main QS contribution is
+the combination of:
+
+```text
+static relief-based pruning + dynamic residual-relief selection
+```
+
+The dynamic selector remains responsible for handling interaction among query
+removals by updating residual TDG flow after each virtual removal.
 
 ## Congestion Pattern Findings
 
@@ -137,7 +197,11 @@ Interpretation:
   The challenge is preserving enough structurally diverse candidates so the
   later dynamic selection step can handle interactions among query removals.
 
-## Proposed Candidate Identification Algorithm
+## Component-Balanced Candidate Identification Diagnostic
+
+This section records a diagnostic design that we tested while exploring whether
+structural diversity across TDG components should drive candidate pruning. It
+is **not** the current paper-facing candidate pruning method.
 
 Working name:
 
@@ -246,48 +310,92 @@ Build query-component pairs: O(total trajectory length)
 Sort component query lists: O(sum_g |Q_g| log |Q_g|)
 ```
 
-This should be much cheaper than iterative all-query greedy selection, and it
-keeps candidate identification conceptually separate from final route removal:
-candidate identification preserves balanced search space; selection performs
-state-dependent removal.
+This was a reasonable intuition, but experiments show that pure component
+coverage loses too much high-value query signal. Keep this as diagnostic
+context, not as the recommended paper algorithm.
 
-## Suggested Paper Structure
+## Component-Marginal Budget Diagnostic
 
-One cleaner structure is:
+We also tested a budgeted component-marginal variant:
+
+```text
+component_marginal_samek: use the same candidate count as score_top, but rank
+                          by marginal component coverage.
+component_marginal_budget5: rank by marginal component coverage, keep 5%.
+component_marginal_budget3: rank by marginal component coverage, keep 3%.
+```
+
+The no-budget `component_marginal` variant was too weak as a filter on
+`BJRealRep1-0`: it kept 20.16% of queries, only a small improvement over
+`component_balanced` at 26.16%. Treat this level of candidate reduction as not
+meaningful unless it produces a much stronger quality or runtime result.
+
+First-five-iteration diagnostic on
+`data/BJ_Real_query_sets_scalability_inner_progressive_peak1h`, `Rep=1`,
+seeds `0..4`, config `config_bj_capacity2_cap10e8_iter5.yaml`:
+
+```text
+method                         avg_best_TTT_reduction   avg_candidate   avg_time
+score_top                      94.42%                   5.90%           99.5s
+component_marginal_samek       24.99%                   2.19%           65.1s
+component_marginal_budget5     57.99%                   5.00%           79.1s
+component_balanced             89.83%                   24.81%          174.9s
+```
+
+Interpretation:
+
+- Current component-marginal ranking does not reach the `score_top` effect with
+  a small candidate budget.
+- `budget5` is still far below `score_top`, so `budget3` is not worth running
+  as a paper-facing candidate.
+- `component_balanced` gets closer only by keeping roughly a quarter of all
+  queries, which weakens the scalability story.
+- This suggests that component coverage alone is missing the high-delay signal
+  that makes `score_top` strong. The next candidate-identification design
+  should not be pure component coverage; it needs to combine component coverage
+  with a direct query-delay or excess-cost term, or it should remain an
+  internal diagnostic rather than a paper contribution.
+
+## Suggested Paper Revision Structure
+
+Do not overhaul the current draft structure. The existing layout is mostly
+usable:
 
 ```text
 1. Introduction
-2. Problem Definition
-3. Overview
-4. Traffic Dependency Graph
-   4.1 TDG construction
-   4.2 TDG impact computation
-   4.3 TDG update under route modification
-5. TDG-Guided Global Route Optimization
-   5.1 Excess-relief query selection
-   5.2 TDG-aware rerouting
-   5.3 Iterative optimization loop
-6. Scalability Techniques
-   6.1 Candidate query identification as query-space reduction
-   6.2 TDG compression as state-space reduction
-   6.3 Complexity discussion
-7. Experiments
+2. Related Works
+3. Preliminaries
+4. GRO Framework
+5. Traffic Impact Estimation
+6. Query Selection
+7. Query Rerouting
+8. Dependency-Preserving TDG Compression / Scalability
 ```
 
-Alternative if the paper needs fewer structural changes:
+Needed revisions:
 
 ```text
-6. Query Selection
-   6.1 Excess-relief selection assuming a candidate set
-   6.2 Candidate identification for scalability
-7. TDG-Aware Rerouting
-8. Scalability
-   8.1 Candidate filtering
-   8.2 TDG compression
+Section 5.3:
+  Shorten TDG insert/remove. Current selection uses virtual flow decrement,
+  not structural RemoveRoute. Rerouting insert updates existing TDG node flows
+  and locally repairs same-edge dependencies.
+
+Section 6:
+  Replace old two-level incremental selection with score-based pruning plus
+  residual excess-relief selection.
+
+Section 7:
+  Mostly keep the current QR structure. Update only the parts that imply impact
+  is recomputed before every batch or that insertion is full structural TDG
+  maintenance.
+
+Section 8:
+  Discuss scalability components: score-based candidate pruning and TDG
+  compression. Candidate pruning can be defined in Section 6 but evaluated
+  mainly here.
 ```
 
-The first structure is cleaner: it separates the quality mechanism from the
-scalability mechanisms.
+This keeps the draft stable while aligning the claims with the current method.
 
 ## Experiment Implications
 

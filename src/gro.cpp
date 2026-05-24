@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <queue>
 #include <stack>
 #include <unordered_map>
 #include <unordered_set>
@@ -1533,6 +1534,356 @@ std::unordered_set<QueryId> GROAlgorithm::select_candidates_by_component_balance
             if (covered_score >= target_score) {
                 break;
             }
+        }
+    }
+
+    return candidate_ids;
+}
+
+std::unordered_set<QueryId> GROAlgorithm::select_candidates_by_component_marginal(
+    const std::vector<Query>& queries,
+    const TrafficResult& result,
+    const TrafficDependencyGraph& tdg,
+    const std::vector<Cost>& node_impacts) const {
+    return select_candidates_by_component_marginal(
+        queries,
+        result,
+        tdg,
+        node_impacts,
+        std::numeric_limits<size_t>::max());
+}
+
+std::unordered_set<QueryId> GROAlgorithm::select_candidates_by_component_marginal(
+    const std::vector<Query>& queries,
+    const TrafficResult& result,
+    const TrafficDependencyGraph& tdg,
+    const std::vector<Cost>& node_impacts,
+    size_t max_candidate_count) const {
+    return select_candidates_by_component_marginal(
+        queries,
+        result,
+        tdg,
+        node_impacts,
+        max_candidate_count,
+        100);
+}
+
+std::unordered_set<QueryId> GROAlgorithm::select_candidates_by_component_marginal(
+    const std::vector<Query>& queries,
+    const TrafficResult& result,
+    const TrafficDependencyGraph& tdg,
+    const std::vector<Cost>& node_impacts,
+    size_t max_candidate_count,
+    int component_mass_percent) const {
+    std::unordered_set<QueryId> candidate_ids;
+    if (max_candidate_count == 0) {
+        return candidate_ids;
+    }
+    if (queries.empty() || result.trajectories.empty() || tdg.nodes.empty()) {
+        return candidate_ids;
+    }
+
+    std::vector<long double> relief =
+        build_excess_relief_values(*this, graph_, result, tdg, node_impacts);
+    if (relief.empty()) {
+        return candidate_ids;
+    }
+
+    std::vector<char> active(tdg.nodes.size(), 0);
+    long long active_count = 0;
+    for (TDGNodeId node_id = 0;
+         node_id < static_cast<TDGNodeId>(relief.size());
+         ++node_id) {
+        if (relief[node_id] > 0.0L) {
+            active[node_id] = 1;
+            ++active_count;
+        }
+    }
+    if (active_count == 0) {
+        return candidate_ids;
+    }
+
+    CandidateComponentDSU dsu(tdg.nodes.size());
+    for (TDGNodeId node_id = 0;
+         node_id < static_cast<TDGNodeId>(tdg.nodes.size());
+         ++node_id) {
+        if (!active[node_id]) {
+            continue;
+        }
+
+        for (TDGNodeId child_id : tdg.route_outgoing[node_id]) {
+            if (child_id >= 0 &&
+                child_id < static_cast<TDGNodeId>(active.size()) &&
+                active[child_id]) {
+                dsu.unite(
+                    static_cast<size_t>(node_id),
+                    static_cast<size_t>(child_id));
+            }
+        }
+
+        const TDGNode& node = tdg.nodes[node_id];
+        if (node.edge_id < 0 ||
+            node.edge_id >= static_cast<EdgeId>(tdg.edge_timelines.size())) {
+            continue;
+        }
+        const auto& timeline = tdg.edge_timelines[node.edge_id];
+        auto event_it = timeline.find(node.time);
+        if (event_it == timeline.end()) {
+            continue;
+        }
+        TDGNodeId child_id = event_it->second.same_edge_child;
+        if (child_id >= 0 &&
+            child_id < static_cast<TDGNodeId>(active.size()) &&
+            active[child_id]) {
+            dsu.unite(
+                static_cast<size_t>(node_id),
+                static_cast<size_t>(child_id));
+        }
+    }
+
+    std::unordered_map<size_t, int> root_to_component;
+    std::vector<int> node_component(tdg.nodes.size(), -1);
+    std::vector<long double> component_mass;
+    for (TDGNodeId node_id = 0;
+         node_id < static_cast<TDGNodeId>(tdg.nodes.size());
+         ++node_id) {
+        if (!active[node_id]) {
+            continue;
+        }
+
+        size_t root = dsu.find(static_cast<size_t>(node_id));
+        auto [it, inserted] =
+            root_to_component.emplace(root, static_cast<int>(component_mass.size()));
+        if (inserted) {
+            component_mass.push_back(0.0L);
+        }
+        int component_id = it->second;
+        node_component[node_id] = component_id;
+        component_mass[component_id] += relief[node_id];
+    }
+
+    if (component_mass.empty()) {
+        return candidate_ids;
+    }
+
+    int clamped_component_mass_percent =
+        std::clamp(component_mass_percent, 0, 100);
+    if (clamped_component_mass_percent <= 0) {
+        return candidate_ids;
+    }
+
+    std::vector<char> kept_component(component_mass.size(), 1);
+    if (clamped_component_mass_percent < 100) {
+        std::fill(kept_component.begin(), kept_component.end(), 0);
+
+        long double total_component_mass = 0.0L;
+        std::vector<size_t> component_order(component_mass.size());
+        for (size_t component_id = 0;
+             component_id < component_mass.size();
+             ++component_id) {
+            total_component_mass += component_mass[component_id];
+            component_order[component_id] = component_id;
+        }
+        if (total_component_mass <= 0.0L) {
+            return candidate_ids;
+        }
+
+        std::sort(
+            component_order.begin(),
+            component_order.end(),
+            [&](size_t lhs, size_t rhs) {
+                if (component_mass[lhs] != component_mass[rhs]) {
+                    return component_mass[lhs] > component_mass[rhs];
+                }
+                return lhs < rhs;
+            });
+
+        long double target_component_mass =
+            total_component_mass *
+            static_cast<long double>(clamped_component_mass_percent) /
+            100.0L;
+        long double covered_component_mass = 0.0L;
+        for (size_t component_id : component_order) {
+            if (component_mass[component_id] <= 0.0L) {
+                continue;
+            }
+            kept_component[component_id] = 1;
+            covered_component_mass += component_mass[component_id];
+            if (covered_component_mass >= target_component_mass) {
+                break;
+            }
+        }
+    }
+
+    std::vector<std::vector<std::pair<int, long double>>> query_components(
+        queries.size());
+    std::vector<long double> query_component_score(component_mass.size(), 0.0L);
+    std::vector<int> seen_component(component_mass.size(), 0);
+    int component_epoch = 0;
+    std::vector<int> seen_node(tdg.nodes.size(), 0);
+    int node_epoch = 0;
+
+    for (const Trajectory& trajectory : result.trajectories) {
+        QueryId query_id = trajectory.query_id;
+        if (query_id < 0 ||
+            query_id >= static_cast<QueryId>(queries.size())) {
+            continue;
+        }
+
+        ++component_epoch;
+        ++node_epoch;
+        if (component_epoch == std::numeric_limits<int>::max()) {
+            std::fill(seen_component.begin(), seen_component.end(), 0);
+            component_epoch = 1;
+        }
+        if (node_epoch == std::numeric_limits<int>::max()) {
+            std::fill(seen_node.begin(), seen_node.end(), 0);
+            node_epoch = 1;
+        }
+
+        std::vector<int> touched_components;
+        for (TDGNodeId node_id : trajectory.tdg_node_ids) {
+            if (node_id < 0 ||
+                node_id >= static_cast<TDGNodeId>(relief.size()) ||
+                node_id >= static_cast<TDGNodeId>(seen_node.size()) ||
+                seen_node[node_id] == node_epoch ||
+                relief[node_id] <= 0.0L) {
+                continue;
+            }
+            seen_node[node_id] = node_epoch;
+
+            int component_id = node_component[node_id];
+            if (component_id < 0 ||
+                component_id >= static_cast<int>(component_mass.size()) ||
+                !kept_component[component_id]) {
+                continue;
+            }
+            if (seen_component[component_id] != component_epoch) {
+                seen_component[component_id] = component_epoch;
+                query_component_score[component_id] = 0.0L;
+                touched_components.push_back(component_id);
+            }
+            query_component_score[component_id] += relief[node_id];
+        }
+
+        auto& components_for_query = query_components[query_id];
+        components_for_query.reserve(touched_components.size());
+        for (int component_id : touched_components) {
+            long double score = query_component_score[component_id];
+            if (score <= 0.0L) {
+                continue;
+            }
+            components_for_query.push_back({component_id, score});
+        }
+    }
+
+    int clamped_gamma = std::clamp(options_.gamma, 0, 100);
+    if (clamped_gamma <= 0) {
+        return candidate_ids;
+    }
+
+    std::vector<long double> remaining(component_mass.size(), 0.0L);
+    long double total_remaining = 0.0L;
+    for (size_t component_id = 0;
+         component_id < component_mass.size();
+         ++component_id) {
+        if (!kept_component[component_id]) {
+            continue;
+        }
+        remaining[component_id] =
+            component_mass[component_id] *
+            static_cast<long double>(clamped_gamma) /
+            100.0L;
+        total_remaining += remaining[component_id];
+    }
+    if (total_remaining <= 0.0L) {
+        return candidate_ids;
+    }
+
+    auto exact_gain = [&](QueryId query_id) {
+        if (query_id < 0 ||
+            query_id >= static_cast<QueryId>(query_components.size())) {
+            return 0.0L;
+        }
+        long double gain = 0.0L;
+        for (const auto& item : query_components[query_id]) {
+            int component_id = item.first;
+            if (component_id < 0 ||
+                component_id >= static_cast<int>(remaining.size()) ||
+                remaining[component_id] <= 0.0L) {
+                continue;
+            }
+            gain += std::min(item.second, remaining[component_id]);
+        }
+        return gain;
+    };
+
+    struct HeapEntry {
+        long double gain = 0.0L;
+        QueryId query_id = kInvalidId;
+    };
+    struct HeapEntryLess {
+        bool operator()(const HeapEntry& lhs, const HeapEntry& rhs) const {
+            if (lhs.gain != rhs.gain) {
+                return lhs.gain < rhs.gain;
+            }
+            return lhs.query_id > rhs.query_id;
+        }
+    };
+
+    std::priority_queue<
+        HeapEntry,
+        std::vector<HeapEntry>,
+        HeapEntryLess> heap;
+    for (QueryId query_id = 0;
+         query_id < static_cast<QueryId>(query_components.size());
+         ++query_id) {
+        if (query_components[query_id].empty()) {
+            continue;
+        }
+        long double gain = exact_gain(query_id);
+        if (gain > 0.0L) {
+            heap.push({gain, query_id});
+        }
+    }
+
+    std::vector<char> selected(queries.size(), 0);
+    const long double stale_epsilon = 1e-12L;
+    const long double stop_epsilon = 1e-12L;
+    while (!heap.empty() &&
+           total_remaining > stop_epsilon &&
+           candidate_ids.size() < max_candidate_count) {
+        HeapEntry entry = heap.top();
+        heap.pop();
+
+        QueryId query_id = entry.query_id;
+        if (query_id < 0 ||
+            query_id >= static_cast<QueryId>(selected.size()) ||
+            selected[query_id]) {
+            continue;
+        }
+
+        long double gain = exact_gain(query_id);
+        if (gain <= stop_epsilon) {
+            continue;
+        }
+        if (gain + stale_epsilon < entry.gain) {
+            heap.push({gain, query_id});
+            continue;
+        }
+
+        selected[query_id] = 1;
+        candidate_ids.insert(query_id);
+        for (const auto& item : query_components[query_id]) {
+            int component_id = item.first;
+            if (component_id < 0 ||
+                component_id >= static_cast<int>(remaining.size()) ||
+                remaining[component_id] <= 0.0L) {
+                continue;
+            }
+            long double decrement = std::min(item.second, remaining[component_id]);
+            remaining[component_id] -= decrement;
+            total_remaining -= decrement;
         }
     }
 

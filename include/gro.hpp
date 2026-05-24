@@ -146,6 +146,27 @@ public:
         const TrafficDependencyGraph& tdg,
         const std::vector<Cost>& node_impacts) const;
 
+    std::unordered_set<QueryId> select_candidates_by_component_marginal(
+        const std::vector<Query>& queries,
+        const TrafficResult& result,
+        const TrafficDependencyGraph& tdg,
+        const std::vector<Cost>& node_impacts) const;
+
+    std::unordered_set<QueryId> select_candidates_by_component_marginal(
+        const std::vector<Query>& queries,
+        const TrafficResult& result,
+        const TrafficDependencyGraph& tdg,
+        const std::vector<Cost>& node_impacts,
+        std::size_t max_candidate_count) const;
+
+    std::unordered_set<QueryId> select_candidates_by_component_marginal(
+        const std::vector<Query>& queries,
+        const TrafficResult& result,
+        const TrafficDependencyGraph& tdg,
+        const std::vector<Cost>& node_impacts,
+        std::size_t max_candidate_count,
+        int component_mass_percent) const;
+
     std::vector<QueryId> select_queries(
         const std::unordered_set<QueryId>& candidate_query_ids,
         const std::vector<Query>& queries,

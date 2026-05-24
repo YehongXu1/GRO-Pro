@@ -220,7 +220,7 @@ Options parse_args(int argc, char** argv) {
                 << "[--reroute-methods normal,tdg] "
                 << "[--fixed-fractions 10,30] [--tdg-gammas 50] "
                 << "[--impact-weights 30] "
-                << "[--candidate-filter all|source_congestion|score_top|component_balanced] "
+                << "[--candidate-filter all|source_congestion|score_top|global_score|component_balanced|component_marginal|component_marginal_budget5|component_marginal_budget3|component_marginal_samek|component_marginal_major80_budget5|component_marginal_major90_budget5|component_marginal_major90_samek] "
                 << "[--hop 10] [--rep 1] "
                 << "[--datasets Hop10Rep1-0,BJRealRep10-0] "
                 << "[--dataset-list path] [--random-seed n] [--max-files n] "
@@ -241,9 +241,16 @@ Options parse_args(int argc, char** argv) {
             options.candidate_filter == "source_congestion" ||
             options.candidate_filter == "score_top" ||
             options.candidate_filter == "global_score" ||
-            options.candidate_filter == "component_balanced",
+            options.candidate_filter == "component_balanced" ||
+            options.candidate_filter == "component_marginal" ||
+            options.candidate_filter == "component_marginal_budget5" ||
+            options.candidate_filter == "component_marginal_budget3" ||
+            options.candidate_filter == "component_marginal_samek" ||
+            options.candidate_filter == "component_marginal_major80_budget5" ||
+            options.candidate_filter == "component_marginal_major90_budget5" ||
+            options.candidate_filter == "component_marginal_major90_samek",
         "Unknown candidate filter: " + options.candidate_filter +
-            " (expected all, source_congestion, score_top, or component_balanced)");
+            " (expected all, source_congestion, score_top, global_score, component_balanced, component_marginal, component_marginal_budget5, component_marginal_budget3, component_marginal_samek, component_marginal_major80_budget5, component_marginal_major90_budget5, or component_marginal_major90_samek)");
     return options;
 }
 
@@ -701,6 +708,16 @@ std::vector<SelectionRun> build_selection_runs(
 
         auto candidate_start = gro::Clock::now();
         std::unordered_set<gro::QueryId> candidate_set;
+        auto candidate_budget = [&](int percent) {
+            if (queries.empty()) {
+                return std::size_t{0};
+            }
+            return static_cast<std::size_t>(
+                std::ceil(
+                    static_cast<double>(queries.size()) *
+                    static_cast<double>(percent) /
+                    100.0));
+        };
         if (options.candidate_filter == "source_congestion") {
             candidate_set = selector.select_candidates(
                 queries,
@@ -720,6 +737,69 @@ std::vector<SelectionRun> build_selection_runs(
                 initial_traffic,
                 tdg,
                 raw_impacts);
+        } else if (options.candidate_filter == "component_marginal") {
+            candidate_set = selector.select_candidates_by_component_marginal(
+                queries,
+                initial_traffic,
+                tdg,
+                raw_impacts);
+        } else if (options.candidate_filter == "component_marginal_budget5") {
+            candidate_set = selector.select_candidates_by_component_marginal(
+                queries,
+                initial_traffic,
+                tdg,
+                raw_impacts,
+                candidate_budget(5));
+        } else if (options.candidate_filter == "component_marginal_budget3") {
+            candidate_set = selector.select_candidates_by_component_marginal(
+                queries,
+                initial_traffic,
+                tdg,
+                raw_impacts,
+                candidate_budget(3));
+        } else if (options.candidate_filter == "component_marginal_samek") {
+            std::unordered_set<gro::QueryId> score_top_candidates =
+                selector.select_candidates_by_score(
+                    queries,
+                    initial_traffic,
+                    tdg,
+                    raw_impacts);
+            candidate_set = selector.select_candidates_by_component_marginal(
+                queries,
+                initial_traffic,
+                tdg,
+                raw_impacts,
+                score_top_candidates.size());
+        } else if (options.candidate_filter == "component_marginal_major80_budget5") {
+            candidate_set = selector.select_candidates_by_component_marginal(
+                queries,
+                initial_traffic,
+                tdg,
+                raw_impacts,
+                candidate_budget(5),
+                80);
+        } else if (options.candidate_filter == "component_marginal_major90_budget5") {
+            candidate_set = selector.select_candidates_by_component_marginal(
+                queries,
+                initial_traffic,
+                tdg,
+                raw_impacts,
+                candidate_budget(5),
+                90);
+        } else if (options.candidate_filter == "component_marginal_major90_samek") {
+            std::unordered_set<gro::QueryId> score_top_candidates =
+                selector.select_candidates_by_score(
+                    queries,
+                    initial_traffic,
+                    tdg,
+                    raw_impacts);
+            candidate_set = selector.select_candidates_by_component_marginal(
+                queries,
+                initial_traffic,
+                tdg,
+                raw_impacts,
+                score_top_candidates.size(),
+                90);
         }
         run.candidate_us = gro::elapsed_us(candidate_start);
         run.candidate_count =

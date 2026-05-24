@@ -320,6 +320,61 @@ int main(int argc, char** argv) {
                 traffic_result,
                 tdg,
                 raw_impacts);
+        std::unordered_set<gro::QueryId> component_marginal_candidates =
+            algorithm.select_candidates_by_component_marginal(
+                queries,
+                traffic_result,
+                tdg,
+                raw_impacts);
+        std::size_t budget5 = static_cast<std::size_t>(
+            std::ceil(static_cast<double>(queries.size()) * 0.05));
+        std::size_t budget3 = static_cast<std::size_t>(
+            std::ceil(static_cast<double>(queries.size()) * 0.03));
+        std::unordered_set<gro::QueryId> component_marginal_budget5_candidates =
+            algorithm.select_candidates_by_component_marginal(
+                queries,
+                traffic_result,
+                tdg,
+                raw_impacts,
+                budget5);
+        std::unordered_set<gro::QueryId> component_marginal_budget3_candidates =
+            algorithm.select_candidates_by_component_marginal(
+                queries,
+                traffic_result,
+                tdg,
+                raw_impacts,
+                budget3);
+        std::unordered_set<gro::QueryId> component_marginal_samek_candidates =
+            algorithm.select_candidates_by_component_marginal(
+                queries,
+                traffic_result,
+                tdg,
+                raw_impacts,
+                score_top_candidates.size());
+        std::unordered_set<gro::QueryId> component_marginal_major80_budget5_candidates =
+            algorithm.select_candidates_by_component_marginal(
+                queries,
+                traffic_result,
+                tdg,
+                raw_impacts,
+                budget5,
+                80);
+        std::unordered_set<gro::QueryId> component_marginal_major90_budget5_candidates =
+            algorithm.select_candidates_by_component_marginal(
+                queries,
+                traffic_result,
+                tdg,
+                raw_impacts,
+                budget5,
+                90);
+        std::unordered_set<gro::QueryId> component_marginal_major90_samek_candidates =
+            algorithm.select_candidates_by_component_marginal(
+                queries,
+                traffic_result,
+                tdg,
+                raw_impacts,
+                score_top_candidates.size(),
+                90);
 
         DSU dsu(tdg.nodes.size());
         for (gro::TDGNodeId node_id = 0;
@@ -470,6 +525,29 @@ int main(int argc, char** argv) {
             total_query_score += stats.score;
         }
 
+        auto component_count_to_cover = [&](int percent) {
+            if (component_masses.empty() || component_mass_total <= 0.0L) {
+                return std::size_t{0};
+            }
+            std::vector<long double> sorted_masses = component_masses;
+            std::sort(
+                sorted_masses.begin(),
+                sorted_masses.end(),
+                std::greater<long double>());
+            long double target =
+                component_mass_total *
+                static_cast<long double>(std::clamp(percent, 0, 100)) /
+                100.0L;
+            long double covered = 0.0L;
+            for (std::size_t i = 0; i < sorted_masses.size(); ++i) {
+                covered += sorted_masses[i];
+                if (covered >= target) {
+                    return i + 1;
+                }
+            }
+            return sorted_masses.size();
+        };
+
         std::vector<long double> nonzero_edge_masses;
         for (long double mass : edge_mass) {
             if (mass > 0.0L) {
@@ -533,6 +611,48 @@ int main(int argc, char** argv) {
                   << static_cast<double>(component_balanced_candidates.size()) /
                         static_cast<double>(queries.size())
                   << '\n';
+        std::cout << "component_marginal_candidate_count="
+                  << component_marginal_candidates.size() << '\n';
+        std::cout << "component_marginal_candidate_fraction="
+                  << static_cast<double>(component_marginal_candidates.size()) /
+                        static_cast<double>(queries.size())
+                  << '\n';
+        std::cout << "component_marginal_budget5_candidate_count="
+                  << component_marginal_budget5_candidates.size() << '\n';
+        std::cout << "component_marginal_budget5_candidate_fraction="
+                  << static_cast<double>(component_marginal_budget5_candidates.size()) /
+                        static_cast<double>(queries.size())
+                  << '\n';
+        std::cout << "component_marginal_budget3_candidate_count="
+                  << component_marginal_budget3_candidates.size() << '\n';
+        std::cout << "component_marginal_budget3_candidate_fraction="
+                  << static_cast<double>(component_marginal_budget3_candidates.size()) /
+                        static_cast<double>(queries.size())
+                  << '\n';
+        std::cout << "component_marginal_samek_candidate_count="
+                  << component_marginal_samek_candidates.size() << '\n';
+        std::cout << "component_marginal_samek_candidate_fraction="
+                  << static_cast<double>(component_marginal_samek_candidates.size()) /
+                        static_cast<double>(queries.size())
+                  << '\n';
+        std::cout << "component_marginal_major80_budget5_candidate_count="
+                  << component_marginal_major80_budget5_candidates.size() << '\n';
+        std::cout << "component_marginal_major80_budget5_candidate_fraction="
+                  << static_cast<double>(component_marginal_major80_budget5_candidates.size()) /
+                        static_cast<double>(queries.size())
+                  << '\n';
+        std::cout << "component_marginal_major90_budget5_candidate_count="
+                  << component_marginal_major90_budget5_candidates.size() << '\n';
+        std::cout << "component_marginal_major90_budget5_candidate_fraction="
+                  << static_cast<double>(component_marginal_major90_budget5_candidates.size()) /
+                        static_cast<double>(queries.size())
+                  << '\n';
+        std::cout << "component_marginal_major90_samek_candidate_count="
+                  << component_marginal_major90_samek_candidates.size() << '\n';
+        std::cout << "component_marginal_major90_samek_candidate_fraction="
+                  << static_cast<double>(component_marginal_major90_samek_candidates.size()) /
+                        static_cast<double>(queries.size())
+                  << '\n';
         std::cout << "positive_score_query_count=" << sorted_queries.size() << '\n';
         std::cout << "positive_score_query_fraction="
                   << static_cast<double>(sorted_queries.size()) /
@@ -544,6 +664,10 @@ int main(int argc, char** argv) {
         std::cout << "component_top1_mass_share=" << static_cast<double>(top_share(component_masses, 1)) << '\n';
         std::cout << "component_top5_mass_share=" << static_cast<double>(top_share(component_masses, 5)) << '\n';
         std::cout << "component_top10_mass_share=" << static_cast<double>(top_share(component_masses, 10)) << '\n';
+        std::cout << "components_to_cover_80pct_mass="
+                  << component_count_to_cover(80) << '\n';
+        std::cout << "components_to_cover_90pct_mass="
+                  << component_count_to_cover(90) << '\n';
         std::cout << "active_query_component_mean="
                   << (active_query_component_counts.empty()
                           ? 0.0
