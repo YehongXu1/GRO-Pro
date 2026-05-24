@@ -297,10 +297,31 @@ std::size_t count_unreachable(
 std::vector<gro::Route> compute_shortest_path_routes(
     const gro::Graph& graph,
     const std::vector<gro::Query>& queries) {
-    std::vector<gro::Route> routes;
-    routes.reserve(queries.size());
-    for (const gro::Query& query : queries) {
-        routes.push_back(gro::shortest_path(graph, query));
+    std::vector<gro::Route> routes(queries.size());
+    auto start = gro::Clock::now();
+    std::size_t progress_interval = queries.size() <= 1000
+        ? std::max<std::size_t>(1, queries.size() / 10)
+        : std::max<std::size_t>(1000, queries.size() / 100);
+    long long processed = 0;
+
+    #pragma omp parallel for schedule(dynamic, 64)
+    for (long long i = 0; i < static_cast<long long>(queries.size()); ++i) {
+        routes[static_cast<std::size_t>(i)] =
+            gro::shortest_path(graph, queries[static_cast<std::size_t>(i)]);
+        long long done = 0;
+        #pragma omp atomic capture
+        done = ++processed;
+        if (done == static_cast<long long>(queries.size()) ||
+            done % static_cast<long long>(progress_interval) == 0) {
+            #pragma omp critical
+            {
+                std::cerr << "[phase] reference_shortest_path_progress"
+                          << " processed=" << done
+                          << "/" << queries.size()
+                          << " elapsed_sec="
+                          << seconds(gro::elapsed_us(start)) << "\n";
+            }
+        }
     }
     return routes;
 }
