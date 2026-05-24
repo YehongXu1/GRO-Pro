@@ -60,6 +60,8 @@ struct Options {
     std::vector<int> tdg_gammas = {50};
     std::vector<int> impact_weights = {30};
     std::string candidate_filter = "all";
+    std::string tdg_mode = "fine";
+    int conflict_threshold = -1;
     bool progress_log = true;
 };
 
@@ -208,6 +210,10 @@ Options parse_args(int argc, char** argv) {
             options.impact_weights = parse_percent_list(require_value(arg));
         } else if (arg == "--candidate-filter") {
             options.candidate_filter = require_value(arg);
+        } else if (arg == "--tdg-mode") {
+            options.tdg_mode = require_value(arg);
+        } else if (arg == "--conflict-threshold") {
+            options.conflict_threshold = std::stoi(require_value(arg));
         } else if (arg == "--max-files") {
             options.max_files = std::stoi(require_value(arg));
         } else if (arg == "--no-progress-log") {
@@ -217,10 +223,12 @@ Options parse_args(int argc, char** argv) {
                 << "Usage: ./gro_ablation_test [config] "
                 << "[--query-file path | --query-dir path] [--output path] "
                 << "[--selection-methods random,most_delayed,tdg_anchor,tdg_excess,tdg_bpr_relief] "
-                << "[--reroute-methods normal,tdg] "
+                << "[--reroute-methods normal,tdg,tdg_nobatch] "
                 << "[--fixed-fractions 10,30] [--tdg-gammas 50] "
                 << "[--impact-weights 30] "
                 << "[--candidate-filter all|source_congestion|score_top|global_score|component_balanced|component_marginal|component_marginal_budget5|component_marginal_budget3|component_marginal_samek|component_marginal_major80_budget5|component_marginal_major90_budget5|component_marginal_major90_samek] "
+                << "[--tdg-mode fine|compressed] "
+                << "[--conflict-threshold n] "
                 << "[--hop 10] [--rep 1] "
                 << "[--datasets Hop10Rep1-0,BJRealRep10-0] "
                 << "[--dataset-list path] [--random-seed n] [--max-files n] "
@@ -251,6 +259,13 @@ Options parse_args(int argc, char** argv) {
             options.candidate_filter == "component_marginal_major90_samek",
         "Unknown candidate filter: " + options.candidate_filter +
             " (expected all, source_congestion, score_top, global_score, component_balanced, component_marginal, component_marginal_budget5, component_marginal_budget3, component_marginal_samek, component_marginal_major80_budget5, component_marginal_major90_budget5, or component_marginal_major90_samek)");
+    require(
+        options.tdg_mode == "fine" || options.tdg_mode == "compressed",
+        "Unknown TDG mode: " + options.tdg_mode +
+            " (expected fine or compressed)");
+    require(
+        options.conflict_threshold == -1 || options.conflict_threshold >= 0,
+        "conflict threshold must be non-negative");
     return options;
 }
 
@@ -1046,7 +1061,9 @@ void write_row(
     std::size_t tdg_edge_timeline_count,
     long long cumulative_us) {
     bool uses_tdg_selection = is_tdg_selection_method(selection.method);
-    bool uses_tdg_reroute = reroute_method == "tdg_impact_reroute";
+    bool uses_tdg_reroute =
+        reroute_method == "tdg_impact_reroute" ||
+        reroute_method == "tdg_impact_reroute_nobatch";
 
     long long included_initial_routes_us = iteration == 0 ? initial_routes_us : 0;
     long long included_tdg_prepare_us =
@@ -1132,6 +1149,9 @@ int main(int argc, char** argv) {
         gro::Graph graph = gro::read_graph(input);
         gro::AlgorithmOptions algorithm_options =
             gro::load_algorithm_options(options.config_path);
+        if (options.conflict_threshold >= 0) {
+            algorithm_options.conflict_threshold = options.conflict_threshold;
+        }
         algorithm_options.enable_timing_log = false;
         gro::TrafficOptions traffic_options =
             gro::load_traffic_options(options.config_path);
@@ -1218,7 +1238,8 @@ int main(int argc, char** argv) {
                         for (const std::string& reroute_method_option :
                              options.reroute_methods) {
                             std::vector<int> weights =
-                                reroute_method_option == "tdg"
+                                reroute_method_option == "tdg" ||
+                                        reroute_method_option == "tdg_nobatch"
                                     ? options.impact_weights
                                     : std::vector<int>{0};
 
@@ -1276,13 +1297,21 @@ int main(int argc, char** argv) {
                                         " total_before=" +
                                         std::to_string(total_before));
 
+                                std::string tdg_stage =
+                                    options.tdg_mode == "compressed"
+                                        ? "compress_tdg"
+                                        : "build_tdg";
                                 log_progress(
                                     options,
                                     "[stage start] " + iter_context +
-                                        " stage=build_tdg");
+                                        " stage=" + tdg_stage);
                                 auto tdg_start = gro::Clock::now();
                                 gro::TrafficDependencyGraph tdg =
-                                    base_algorithm.build_tdg(traffic_result);
+                                    options.tdg_mode == "compressed"
+                                        ? base_algorithm.compress_tdg(
+                                              traffic_result)
+                                        : base_algorithm.build_tdg(
+                                              traffic_result);
                                 long long build_tdg_us =
                                     gro::elapsed_us(tdg_start);
                                 std::size_t tdg_edges =
@@ -1290,7 +1319,7 @@ int main(int argc, char** argv) {
                                 log_progress(
                                     options,
                                     "[stage done] " + iter_context +
-                                        " stage=build_tdg sec=" +
+                                        " stage=" + tdg_stage + " sec=" +
                                         std::to_string(
                                             seconds_from_us(build_tdg_us)) +
                                         " tdg_nodes=" +
@@ -1438,9 +1467,13 @@ int main(int argc, char** argv) {
                                             " stage=normal_reroute sec=" +
                                             std::to_string(
                                                 seconds_from_us(reroute_us)));
-                                } else if (reroute_method_option == "tdg") {
+                                } else if (
+                                    reroute_method_option == "tdg" ||
+                                    reroute_method_option == "tdg_nobatch") {
                                     reroute_method_name =
-                                        "tdg_impact_reroute";
+                                        reroute_method_option == "tdg_nobatch"
+                                            ? "tdg_impact_reroute_nobatch"
+                                            : "tdg_impact_reroute";
                                     logged_impact_weight = impact_weight;
 
                                     gro::AlgorithmOptions run_options =
@@ -1452,29 +1485,46 @@ int main(int argc, char** argv) {
                                         run_options,
                                         traffic_options);
 
-                                    log_progress(
-                                        options,
-                                        "[stage start] " + iter_context +
-                                            " stage=batch_queries selected=" +
-                                            std::to_string(
-                                                selection.selected_ids.size()));
-                                    auto batch_start = gro::Clock::now();
                                     std::vector<std::vector<gro::QueryId>>
+                                        batches;
+                                    if (reroute_method_option == "tdg_nobatch") {
+                                        if (!selection.selected_ids.empty()) {
+                                            batches.push_back(
+                                                selection.selected_ids);
+                                        }
+                                        batch_us = 0;
+                                    } else {
+                                        log_progress(
+                                            options,
+                                            "[stage start] " + iter_context +
+                                                " stage=batch_queries selected=" +
+                                                std::to_string(
+                                                    selection.selected_ids.size()));
+                                        auto batch_start = gro::Clock::now();
                                         batches =
-                                            rerouter.batch_queries(
-                                                selection.selected_ids,
-                                                tdg,
-                                                traffic_result);
-                                    batch_us = gro::elapsed_us(batch_start);
+                                                rerouter.batch_queries(
+                                                    selection.selected_ids,
+                                                    tdg,
+                                                    traffic_result);
+                                        batch_us = gro::elapsed_us(batch_start);
+                                    }
                                     batch_count = batches.size();
-                                    log_progress(
-                                        options,
-                                        "[stage done] " + iter_context +
-                                            " stage=batch_queries sec=" +
-                                            std::to_string(
-                                                seconds_from_us(batch_us)) +
-                                            " batches=" +
-                                            std::to_string(batch_count));
+                                    if (reroute_method_option == "tdg_nobatch") {
+                                        log_progress(
+                                            options,
+                                            "[stage done] " + iter_context +
+                                                " stage=no_batch_queries batches=" +
+                                                std::to_string(batch_count));
+                                    } else {
+                                        log_progress(
+                                            options,
+                                            "[stage done] " + iter_context +
+                                                " stage=batch_queries sec=" +
+                                                std::to_string(
+                                                    seconds_from_us(batch_us)) +
+                                                " batches=" +
+                                                std::to_string(batch_count));
+                                    }
 
                                     log_progress(
                                         options,
@@ -1533,7 +1583,9 @@ int main(int argc, char** argv) {
                                     is_tdg_selection_method(selection.method);
                                 bool uses_tdg_reroute =
                                     reroute_method_name ==
-                                    "tdg_impact_reroute";
+                                        "tdg_impact_reroute" ||
+                                    reroute_method_name ==
+                                        "tdg_impact_reroute_nobatch";
                                 long long method_total_us =
                                     (iteration == 0 ? initial_routes_us : 0) +
                                     evaluate_before_us +

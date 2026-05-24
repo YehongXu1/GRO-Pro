@@ -28,6 +28,8 @@ if [[ ! ${REROUTE_METHODS+x} || -z "$REROUTE_METHODS" ]]; then REROUTE_METHODS=t
 if [[ ! ${FIXED_FRACTIONS+x} || -z "$FIXED_FRACTIONS" ]]; then FIXED_FRACTIONS=10; fi
 if [[ ! ${SUFFIX+x} || -z "$SUFFIX" ]]; then SUFFIX=capacity2_cap10e8; fi
 if [[ ! ${CANDIDATE_FILTER+x} || -z "$CANDIDATE_FILTER" ]]; then CANDIDATE_FILTER=all; fi
+if [[ ! ${TDG_MODE+x} || -z "$TDG_MODE" ]]; then TDG_MODE=fine; fi
+if [[ ! ${CONFLICT_THRESHOLD+x} ]]; then CONFLICT_THRESHOLD=""; fi
 
 if [[ "$CANDIDATE_FILTER" == "all" ]]; then
   CANDIDATE_TAG=full
@@ -35,8 +37,20 @@ else
   CANDIDATE_TAG=candidate_${CANDIDATE_FILTER}
 fi
 
-TMPDIR="$RESULTS_DIR/tmp_gro_scalability_${LABEL}_tdg_excess_${CANDIDATE_TAG}_${SUFFIX}"
-OUT="$RESULTS_DIR/gro_scalability_${LABEL}_tdg_excess_${CANDIDATE_TAG}_${SUFFIX}.csv"
+if [[ "$TDG_MODE" == "fine" ]]; then
+  TDG_TAG=""
+else
+  TDG_TAG="_${TDG_MODE}"
+fi
+
+if [[ -n "$CONFLICT_THRESHOLD" ]]; then
+  CONFLICT_TAG="_conflict${CONFLICT_THRESHOLD}"
+else
+  CONFLICT_TAG=""
+fi
+
+TMPDIR="$RESULTS_DIR/tmp_gro_scalability_${LABEL}_tdg_excess_${CANDIDATE_TAG}${TDG_TAG}${CONFLICT_TAG}_${SUFFIX}"
+OUT="$RESULTS_DIR/gro_scalability_${LABEL}_tdg_excess_${CANDIDATE_TAG}${TDG_TAG}${CONFLICT_TAG}_${SUFFIX}.csv"
 
 mkdir -p "$TMPDIR" "$RESULTS_DIR"
 
@@ -50,7 +64,11 @@ for rep in "${REP_VALUES[@]}"; do
   fi
 
   REP_OUT="$TMPDIR/rep${rep}.csv"
-  echo "[run] label=$LABEL rep=$rep candidate_filter=$CANDIDATE_FILTER query_dir=$QUERY_DIR output=$REP_OUT"
+  echo "[run] label=$LABEL rep=$rep candidate_filter=$CANDIDATE_FILTER tdg_mode=$TDG_MODE conflict_threshold=${CONFLICT_THRESHOLD:-config} query_dir=$QUERY_DIR output=$REP_OUT"
+  EXTRA_ARGS=()
+  if [[ -n "$CONFLICT_THRESHOLD" ]]; then
+    EXTRA_ARGS+=(--conflict-threshold "$CONFLICT_THRESHOLD")
+  fi
   ./gro_ablation_test "$CONFIG" \
     --query-dir "$QUERY_DIR" \
     --rep "$rep" \
@@ -61,7 +79,9 @@ for rep in "${REP_VALUES[@]}"; do
     --tdg-gammas "$TDG_GAMMAS" \
     --impact-weights "$IMPACT_WEIGHTS" \
     --candidate-filter "$CANDIDATE_FILTER" \
-    --random-seed "$RANDOM_SEED"
+    --tdg-mode "$TDG_MODE" \
+    --random-seed "$RANDOM_SEED" \
+    "${EXTRA_ARGS[@]}"
 
   if [[ "$first" -eq 1 ]]; then
     head -n 1 "$REP_OUT" > "$OUT"

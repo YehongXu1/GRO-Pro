@@ -401,18 +401,24 @@ This keeps the draft stable while aligning the claims with the current method.
 
 ### Component Ablation
 
-Use component ablation mainly to show quality:
+Use component ablation mainly to show quality and isolate the TDG-excess
+selection signal:
 
 - `baseline_random_normal`
 - `baseline_delayed_normal`
 - `tdg_excess_normal`
 - `tdg_excess_full`
 
-Candidate identification does not need to be in the main 3x3 quality figure.
-If included, use a compact table:
+For this figure, use `--candidate-filter all` unless there is a strong reason
+not to. This prevents reviewer confusion about whether TDG-excess is better
+because of the selection signal or because candidate pruning filtered the query
+pool.
+
+Candidate pruning does not need to be in the main 3x3 quality figure. If
+included, use a compact auxiliary table only:
 
 ```text
-All candidates vs component-balanced candidates
+All candidates vs score-based pruned candidates
 ```
 
 Metrics:
@@ -425,16 +431,27 @@ Metrics:
 
 ### Scalability
 
-Scalability should use the full paper-facing method:
+Scalability should evaluate the full practical method and its reductions:
 
 ```text
-component-balanced candidate identification + tdg_excess selection + TDG compression
+tdg_excess selection + TDG reroute
+score-based pruning + tdg_excess selection + TDG reroute
+score-based pruning + tdg_excess selection + TDG reroute + TDG compression
 ```
 
-Also include a limited comparison against all-query selection:
+The key experimental question is not baseline superiority. It is:
+
+```text
+Does score-based candidate pruning reduce selection cost while preserving the
+quality of TDG-excess selection?
+Does TDG compression further reduce TDG/state cost while preserving quality?
+```
+
+Include a limited comparison against all-query selection:
 
 - all-query selection for sizes it can finish, e.g. 10k/20k;
-- candidate-filtered selection for the full curve;
+- score-pruned selection for the full curve;
+- score-pruned + compressed TDG for the full curve;
 - timeout or infeasible status for all-query selection at larger sizes if true.
 
 Key metrics:
@@ -450,6 +467,20 @@ Key metrics:
 - method total time
 - memory usage if available
 - final TTT and TTT preservation
+
+Current first-five-iteration peak1h scalability evidence is strong for
+`score_top`/score-based pruning:
+
+```text
+10k: full 398s, score-based 99s,   best TTT reduction 94.27% vs 94.42%
+20k: full 1535s, score-based 214s, best TTT reduction 97.45% vs 97.29%
+30k: full 3452s, score-based 381s, best TTT reduction 98.94% vs 98.86%
+50k: full 8899s, score-based 736s, best TTT reduction 98.31% vs 98.97%
+```
+
+Candidate fraction drops to roughly `3%-6%` for these sizes, and selection time
+becomes much smaller. This supports evaluating candidate pruning in the
+scalability section rather than treating it as a quality ablation.
 
 ### Real Scalability Workload
 
@@ -484,22 +515,35 @@ ratio threshold and collects queries whose routes traverse those nodes.
 The `gro_ablation_test` path now exposes candidate-filter switches:
 
 ```text
---candidate-filter all|source_congestion|score_top|component_balanced
+--candidate-filter all|source_congestion|score_top|global_score|component_balanced|component_marginal|...
 ```
 
-This is useful for measuring the old source-congestion filter, but it should
-not be treated as the final paper-facing candidate identification method.
-Current smoke results show it retains roughly 93-95% of peak1h queries.
-
-Recommended next implementation change:
+For paper wording, map implementation names to paper names:
 
 ```text
-Write component-level coverage metrics to the experiment CSV.
+score_top/global_score  -> score-based candidate pruning
+source_congestion       -> old draft-style filter, diagnostic only
+component_balanced      -> component-coverage diagnostic
+component_marginal*     -> component-coverage diagnostic
+```
+
+The old source-congestion filter should not be treated as the final
+paper-facing candidate identification method. Current smoke results show it
+retains roughly 93-95% of peak1h queries.
+
+Recommended next implementation / analysis changes:
+
+```text
+1. Keep `--candidate-filter all` for component ablation reproducibility.
+2. Use `--candidate-filter score_top` for candidate-pruned scalability.
+3. Add / run the combined score-pruned + compressed-TDG scalability experiment.
+4. If needed, write candidate_count, candidate_fraction, and candidate_sec into
+   all scalability summaries.
 ```
 
 Default should remain `all` for old ablation result reproducibility. The
-paper-facing scalability script should eventually use `component_balanced`
-if experiments confirm it preserves quality while reducing `select_sec`.
+paper-facing scalability script should use `score_top` / score-based pruning
+when evaluating practical scalability.
 
 Implemented experimental filters:
 
@@ -507,6 +551,7 @@ Implemented experimental filters:
 source_congestion     old draft-style filter
 score_top             global one-pass top relief-score filter
 component_balanced    component-balanced relief coverage filter
+component_marginal*   component-coverage / marginal diagnostic filters
 ```
 
 On `BJRealRep1-0` initial routes with `gamma=50`, the fast diagnostic reports:
@@ -517,9 +562,9 @@ score_top_candidate_fraction = 2.78%
 component_balanced_candidate_fraction = 26.16%
 ```
 
-This gives a useful experimental contrast: `score_top` is aggressive but may
-lose structural coverage; `component_balanced` keeps a larger but more balanced
-candidate set for the downstream dynamic selector.
+This contrast helped rule out pure component-coverage pruning as the current
+paper-facing direction. The practical method should use `score_top`, renamed in
+the paper as score-based or relief-based candidate pruning.
 
 Recommended CSV additions:
 
