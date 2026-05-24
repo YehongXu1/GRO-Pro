@@ -11,8 +11,8 @@ struct SOROptions {
     Time time_step = 60;
     int max_time_steps = 10080;
     int max_labels_per_query = 20000;
-    int lower_bound_cache_size = 64;
-    int lower_bound_cache_min_frequency = 2;
+    int lower_bound_cache_size = -1;  // Negative means cache all query destinations.
+    int lower_bound_cache_min_frequency = 1;
 };
 
 std::vector<Route> compute_sor_routes(

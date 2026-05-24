@@ -13,7 +13,9 @@ mkdir -p "$TMPDIR"
   --sor-detour-percent 10 \
   --sor-time-step 60 \
   --sor-max-time-steps 10080 \
-  --sor-max-labels-per-query 20000
+  --sor-max-labels-per-query 20000 \
+  --sor-lower-bound-cache-size -1 \
+  --sor-lower-bound-cache-min-frequency 1
 
 ./paper_baseline_test config/config_bj_capacity2_cap10e8.yaml \
   --query-file data/BJ_Real_query_sets_window6h/BJRealRep10-2.txt \
@@ -22,7 +24,9 @@ mkdir -p "$TMPDIR"
   --sor-detour-percent 10 \
   --sor-time-step 60 \
   --sor-max-time-steps 10080 \
-  --sor-max-labels-per-query 20000
+  --sor-max-labels-per-query 20000 \
+  --sor-lower-bound-cache-size -1 \
+  --sor-lower-bound-cache-min-frequency 1
 
 ./paper_baseline_test config/config_bj_capacity2_cap10e8.yaml \
   --query-file data/BJ_Real_query_sets_window6h/BJRealRep10-4.txt \
@@ -31,7 +35,9 @@ mkdir -p "$TMPDIR"
   --sor-detour-percent 10 \
   --sor-time-step 60 \
   --sor-max-time-steps 10080 \
-  --sor-max-labels-per-query 20000
+  --sor-max-labels-per-query 20000 \
+  --sor-lower-bound-cache-size -1 \
+  --sor-lower-bound-cache-min-frequency 1
 
 head -n 1 "$TMPDIR/lower_original_BJRealRep10-2.csv" > "$OUT"
 tail -n +2 "$TMPDIR/lower_original_BJRealRep10-2.csv" >> "$OUT"

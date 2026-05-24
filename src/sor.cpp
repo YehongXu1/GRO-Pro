@@ -347,8 +347,9 @@ std::vector<Route> compute_sor_routes(
 
     std::vector<std::pair<NodeId, int>> popular_destinations;
     popular_destinations.reserve(destination_frequency.size());
+    int min_cache_frequency = std::max(1, options.lower_bound_cache_min_frequency);
     for (const auto& [destination, frequency] : destination_frequency) {
-        if (frequency >= std::max(1, options.lower_bound_cache_min_frequency)) {
+        if (frequency >= min_cache_frequency) {
             popular_destinations.push_back({destination, frequency});
         }
     }
@@ -362,8 +363,9 @@ std::vector<Route> compute_sor_routes(
             return lhs.first < rhs.first;
         });
 
-    std::size_t cache_size = static_cast<std::size_t>(
-        std::max(0, options.lower_bound_cache_size));
+    std::size_t cache_size = options.lower_bound_cache_size < 0
+        ? popular_destinations.size()
+        : static_cast<std::size_t>(options.lower_bound_cache_size);
     if (popular_destinations.size() > cache_size) {
         popular_destinations.resize(cache_size);
     }
@@ -376,9 +378,16 @@ std::vector<Route> compute_sor_routes(
 
     std::vector<std::vector<Cost>> cached_distances(cached_destinations.size());
     auto cache_start = Clock::now();
+    double estimated_cache_gib =
+        static_cast<double>(cached_destinations.size()) *
+        static_cast<double>(std::max(0, graph.vertex_count)) *
+        static_cast<double>(sizeof(Cost)) /
+        (1024.0 * 1024.0 * 1024.0);
     std::cerr << "[sor] lower_bound_cache_start"
               << " unique_destinations=" << destination_frequency.size()
               << " cached_destinations=" << cached_destinations.size()
+              << " min_frequency=" << min_cache_frequency
+              << " estimated_gib=" << estimated_cache_gib
               << "\n";
     #pragma omp parallel for schedule(dynamic)
     for (long long i = 0; i < static_cast<long long>(cached_destinations.size()); ++i) {
@@ -397,16 +406,26 @@ std::vector<Route> compute_sor_routes(
         cached_index[cached_destinations[i]] = i;
     }
 
-    std::vector<Cost> scratch_remaining;
+    std::unordered_map<NodeId, std::vector<Cost>> on_demand_distances;
+    on_demand_distances.reserve(
+        destination_frequency.size() > cached_destinations.size()
+            ? destination_frequency.size() - cached_destinations.size()
+            : 0);
     long long uncached_lower_bound_calls = 0;
     auto remaining_distances = [&](NodeId destination) -> const std::vector<Cost>& {
         auto it = cached_index.find(destination);
         if (it != cached_index.end()) {
             return cached_distances[it->second];
         }
+        auto on_demand_it = on_demand_distances.find(destination);
+        if (on_demand_it != on_demand_distances.end()) {
+            return on_demand_it->second;
+        }
         ++uncached_lower_bound_calls;
-        scratch_remaining = reverse_shortest_distances(graph, destination);
-        return scratch_remaining;
+        auto inserted = on_demand_distances.emplace(
+            destination,
+            reverse_shortest_distances(graph, destination));
+        return inserted.first->second;
     };
 
     std::vector<QueryId> query_order(queries.size());

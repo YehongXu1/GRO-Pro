@@ -50,6 +50,8 @@ struct Options {
     gro::Time sor_time_step = kSorDefaultTimeStep;
     int sor_max_time_steps = kSorDefaultMaxTimeSteps;
     int sor_max_labels_per_query = kSorDefaultMaxLabelsPerQuery;
+    int sor_lower_bound_cache_size = -1;
+    int sor_lower_bound_cache_min_frequency = 1;
     int fahl_alpha_percent = 50;
     gro::Time fahl_time_step = 60;
     int fahl_order_beta_percent = 70;
@@ -154,6 +156,10 @@ Options parse_args(int argc, char** argv) {
             options.sor_max_time_steps = std::stoi(require_value(arg));
         } else if (arg == "--sor-max-labels-per-query") {
             options.sor_max_labels_per_query = std::stoi(require_value(arg));
+        } else if (arg == "--sor-lower-bound-cache-size") {
+            options.sor_lower_bound_cache_size = std::stoi(require_value(arg));
+        } else if (arg == "--sor-lower-bound-cache-min-frequency") {
+            options.sor_lower_bound_cache_min_frequency = std::stoi(require_value(arg));
         } else if (arg == "--fahl-alpha-percent") {
             options.fahl_alpha_percent = std::stoi(require_value(arg));
         } else if (arg == "--fahl-time-step") {
@@ -167,6 +173,7 @@ Options parse_args(int argc, char** argv) {
                 << "[--query-dir path | --query-file path] "
                 << "[--output path] [--methods svp,gor,sor,fahl] "
                 << "[--rep n] [--max-files n] [--max-queries n] "
+                << "[--sor-lower-bound-cache-size n] "
                 << "[--fahl-time-step sec] [--fahl-order-beta-percent n]\n";
             std::exit(0);
         } else {
@@ -397,6 +404,9 @@ RunStats run_sor(
     sor_options.time_step = options.sor_time_step;
     sor_options.max_time_steps = options.sor_max_time_steps;
     sor_options.max_labels_per_query = options.sor_max_labels_per_query;
+    sor_options.lower_bound_cache_size = options.sor_lower_bound_cache_size;
+    sor_options.lower_bound_cache_min_frequency =
+        options.sor_lower_bound_cache_min_frequency;
 
     std::cerr << "  [phase] sor route_start queries=" << queries.size()
               << " detour_percent=" << sor_options.detour_percent
@@ -405,6 +415,10 @@ RunStats run_sor(
               << " max_time_sec="
               << (sor_options.time_step * sor_options.max_time_steps)
               << " max_labels_per_query=" << sor_options.max_labels_per_query
+              << " lower_bound_cache_size="
+              << sor_options.lower_bound_cache_size
+              << " lower_bound_cache_min_frequency="
+              << sor_options.lower_bound_cache_min_frequency
               << "\n";
     auto start = gro::Clock::now();
     std::vector<gro::Route> routes =
@@ -520,7 +534,11 @@ std::string params_for_method(
             << ";max_time_steps=" << options.sor_max_time_steps
             << ";max_time_sec="
             << (options.sor_time_step * options.sor_max_time_steps)
-            << ";max_labels_per_query=" << options.sor_max_labels_per_query;
+            << ";max_labels_per_query=" << options.sor_max_labels_per_query
+            << ";lower_bound_cache_size="
+            << options.sor_lower_bound_cache_size
+            << ";lower_bound_cache_min_frequency="
+            << options.sor_lower_bound_cache_min_frequency;
     } else if (method == "fahl") {
         out << "alpha_percent=" << options.fahl_alpha_percent
             << ";order_beta_percent=" << options.fahl_order_beta_percent
