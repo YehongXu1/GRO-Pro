@@ -104,33 +104,56 @@ it is explicitly labeled as the lower level.
 
 ## Paper Baselines
 
-The MH real six-hour window paper baselines can be launched with:
+The MH real six-hour window paper baselines should usually be launched by
+method, with each method running all datasets in
+`data/MH_Real_query_sets_window6h`:
 
 ```bash
 make paper_baseline_test
 
-LOG=logs/paper_baselines_mh_real_window6h_rep10.log \
+bash scripts/launch_mh_real_window6h_paper_baselines_by_method.sh
+```
+
+This launches four jobs:
+
+```text
+svp  -> paper_baseline_svp_mh_real_window6h_all.csv
+gor  -> paper_baseline_gor_mh_real_window6h_all.csv
+sor  -> paper_baseline_sor_mh_real_window6h_all.csv
+fahl -> paper_baseline_fahl_mh_real_window6h_all.csv
+```
+
+By default this includes Rep1, Rep5, and Rep10, so each method runs all 15
+window6h query files. To launch one method over all datasets:
+
+```bash
+METHODS=sor \
+METHOD_TAG=sor \
+LOG=logs/paper_baseline_sor_mh_real_window6h_all.log \
+OUT=python/results/experiments/exp5_overall_effectiveness/paper_baseline_sor_mh_real_window6h_all.csv \
 nohup bash scripts/run_mh_real_window6h_paper_baselines.sh \
   > /dev/null 2>&1 < /dev/null &
 ```
 
-By default this runs `svp,gor,sor,fahl` on all five
-`data/MH_Real_query_sets_window6h/MHRealRep10-*.txt` datasets with
-`config/config.yaml`, and writes:
+`scripts/run_mh_real_window6h_paper_baselines.sh` runs the selected method(s) on
+all `data/MH_Real_query_sets_window6h/MHRealRep*.txt` datasets with
+`config/config.yaml`. If `OUT` is not set, it writes:
 
 ```text
-python/results/experiments/exp5_overall_effectiveness/paper_baselines_mh_real_window6h_rep10.csv
+python/results/experiments/exp5_overall_effectiveness/paper_baseline_${METHOD_TAG}_mh_real_window6h_all.csv
 ```
 
 Useful overrides:
 
 ```bash
 METHODS=sor
-REP=5
+REP=10
+REP_TAG=rep10
 MAX_FILES=1
 MAX_QUERIES=10000
 OUT=path/to/output.csv
 LOG=path/to/log
+DRY_RUN=1
 ```
 
 ## Generator
