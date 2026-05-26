@@ -1,0 +1,60 @@
+{
+  "source_query_dir": "data/MH_Real_query_sets",
+  "output_query_dir": "data/MH_Real_query_sets_100k_window6h",
+  "pattern": "MHRealRep10-*.txt",
+  "window_sec": 21600,
+  "method": "linear_rescale_per_file",
+  "description": "Departure times are mapped per file from the original min/max departure span to [0, window_sec], preserving relative order.",
+  "files": [
+    {
+      "dataset": "MHRealRep10-0",
+      "query_count": 100000,
+      "input_min_departure": 0,
+      "input_max_departure": 1726534,
+      "input_departure_span_sec": 1726534,
+      "output_min_departure": 0,
+      "output_max_departure": 21600,
+      "output_departure_span_sec": 21600
+    },
+    {
+      "dataset": "MHRealRep10-1",
+      "query_count": 100000,
+      "input_min_departure": 180,
+      "input_max_departure": 1721980,
+      "input_departure_span_sec": 1721800,
+      "output_min_departure": 0,
+      "output_max_departure": 21600,
+      "output_departure_span_sec": 21600
+    },
+    {
+      "dataset": "MHRealRep10-2",
+      "query_count": 100000,
+      "input_min_departure": 60,
+      "input_max_departure": 1723098,
+      "input_departure_span_sec": 1723038,
+      "output_min_departure": 0,
+      "output_max_departure": 21600,
+      "output_departure_span_sec": 21600
+    },
+    {
+      "dataset": "MHRealRep10-3",
+      "query_count": 100000,
+      "input_min_departure": 0,
+      "input_max_departure": 1722726,
+      "input_departure_span_sec": 1722726,
+      "output_min_departure": 0,
+      "output_max_departure": 21600,
+      "output_departure_span_sec": 21600
+    },
+    {
+      "dataset": "MHRealRep10-4",
+      "query_count": 100000,
+      "input_min_departure": 0,
+      "input_max_departure": 1724829,
+      "input_departure_span_sec": 1724829,
+      "output_min_departure": 0,
+      "output_max_departure": 21600,
+      "output_departure_span_sec": 21600
+    }
+  ]
+}

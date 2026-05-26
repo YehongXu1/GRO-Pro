@@ -15,6 +15,10 @@ def infer_group(dataset: str, hop: int, rep: int) -> str:
     if real:
         return f"BJRealRep{real.group(1)}"
 
+    real = re.match(r"MHRealRep(\d+)-\d+$", dataset)
+    if real:
+        return f"MHRealRep{real.group(1)}"
+
     if hop >= 0 and rep >= 0:
         return f"Hop{hop}Rep{rep}"
     if rep >= 0:
@@ -49,8 +53,14 @@ def load_input(path: str) -> pd.DataFrame:
 
 
 def build_summary(df: pd.DataFrame) -> pd.DataFrame:
+    group_columns = ["group", "hop", "rep"]
+    sort_columns = ["rep", "hop", "group"]
+    if "window_label" in df.columns:
+        group_columns = ["window_label"] + group_columns
+        sort_columns = ["window_label"] + sort_columns
+
     summary = (
-        df.groupby(["group", "hop", "rep"], as_index=False)
+        df.groupby(group_columns, as_index=False)
         .agg(
             files=("dataset", "count"),
             mean_query_count=("query_count", "mean"),
@@ -63,7 +73,7 @@ def build_summary(df: pd.DataFrame) -> pd.DataFrame:
             mean_avg_free_flow_tt=("avg_free_flow_tt", "mean"),
             mean_avg_evaluated_tt=("avg_evaluated_tt", "mean"),
         )
-        .sort_values(["rep", "hop", "group"])
+        .sort_values(sort_columns)
     )
     return summary
 

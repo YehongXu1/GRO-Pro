@@ -81,12 +81,48 @@ shortest-path congestion diagnostics before use.
 
 ## Selection for Overall Effectiveness
 
-After generation, run the same shortest-path congestion diagnostic used for BJ:
+Important correction: overall effectiveness should keep query count fixed at
+100k and vary congestion intensity only. Do not use `Rep1/Rep5/Rep10` as the
+three MH congestion levels for the final overall effectiveness table, because
+that changes both density and problem size. Use `MHRealRep10-*` for every
+level, then create candidate time windows and select lower/middle/extreme by
+diagnosed congestion ratio.
+
+Build the fixed-100k congestion-window candidates:
+
+```bash
+DRY_RUN=1 bash scripts/build_mh_real_100k_congestion_candidates.sh
+
+LOG=logs/build_mh_real_100k_congestion_candidates.log \
+nohup bash scripts/build_mh_real_100k_congestion_candidates.sh \
+  > /dev/null 2>&1 < /dev/null &
+```
+
+The default windows are `6h, 3h, 2h, 1h, 30min`. Each output directory contains
+only `MHRealRep10-*.txt`, so every candidate file has 100k queries.
+
+After candidate construction, run the same shortest-path congestion diagnostic
+used for BJ:
 
 ```text
 free-flow shortest-path route set
 evaluated through the project BPR traffic evaluator
 inflation_ratio = evaluated_ttt / free_flow_ttt
+```
+
+```bash
+DRY_RUN=1 bash scripts/run_mh_real_100k_congestion_diagnostic.sh
+
+LOG=logs/mh_real_100k_congestion_diagnostic.log \
+nohup bash scripts/run_mh_real_100k_congestion_diagnostic.sh \
+  > /dev/null 2>&1 < /dev/null &
+```
+
+The diagnostic outputs are:
+
+```text
+python/results/experiments/exp5_overall_effectiveness/mh_real_100k_congestion_candidates.csv
+python/results/experiments/exp5_overall_effectiveness/mh_real_100k_congestion_candidates_summary.csv
 ```
 
 Select three 100k representatives:
@@ -103,6 +139,11 @@ overall effectiveness, a lower-congestion representative can be below `10x` if
 it is explicitly labeled as the lower level.
 
 ## Paper Baselines
+
+The older `window6h_all` scripts are useful for diagnostics but are not the
+final MH overall effectiveness design, because they mix 10k, 50k, and 100k
+query counts. For final overall effectiveness, first select three 100k
+representatives using the congestion diagnostic above.
 
 The MH real six-hour window paper baselines should usually be launched by
 method, with each method running all datasets in
@@ -176,6 +217,28 @@ The standalone GRO baseline script is:
 LOG=logs/gro_baseline_random_delayed_normal_mh_real_window6h_all.log \
 nohup bash scripts/run_mh_real_window6h_gro_baseline.sh \
   > /dev/null 2>&1 < /dev/null &
+```
+
+The proposed score-pruned + compressed GRO run for MH real window6h is:
+
+```bash
+make gro_ablation_test
+
+LOG=logs/gro_score_top_compressed_mh_real_window6h_all.log \
+nohup bash scripts/run_mh_real_window6h_score_top_compressed.sh \
+  > /dev/null 2>&1 < /dev/null &
+```
+
+By default it runs all `MHRealRep*.txt` datasets with:
+
+```text
+selection-methods = tdg_excess
+reroute-methods = tdg
+candidate-filter = score_top
+tdg-mode = compressed
+conflict-threshold = 5000
+tdg-gammas = 50
+impact-weights = 20
 ```
 
 ## Generator

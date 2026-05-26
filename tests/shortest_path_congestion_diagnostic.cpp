@@ -152,12 +152,17 @@ DatasetInfo dataset_info_from_path(const std::filesystem::path& path) {
 
     std::regex synthetic_pattern(R"(Hop([0-9]+)Rep([0-9]+)-([0-9]+))");
     std::regex bj_real_pattern(R"(BJRealRep([0-9]+)-([0-9]+))");
+    std::regex mh_real_pattern(R"(MHRealRep([0-9]+)-([0-9]+))");
     std::smatch match;
     if (std::regex_match(info.dataset, match, synthetic_pattern)) {
         info.hop = std::stoi(match[1].str());
         info.rep = std::stoi(match[2].str());
         info.seed = std::stoi(match[3].str());
     } else if (std::regex_match(info.dataset, match, bj_real_pattern)) {
+        info.hop = -1;
+        info.rep = std::stoi(match[1].str());
+        info.seed = std::stoi(match[2].str());
+    } else if (std::regex_match(info.dataset, match, mh_real_pattern)) {
         info.hop = -1;
         info.rep = std::stoi(match[1].str());
         info.seed = std::stoi(match[2].str());
@@ -184,7 +189,7 @@ std::vector<DatasetInput> discover_datasets(
     const std::filesystem::path& query_dir) {
     std::vector<DatasetInput> datasets;
     std::regex query_pattern(
-        R"((Hop([0-9]+)Rep([0-9]+)-([0-9]+)|BJRealRep([0-9]+)-([0-9]+))\.txt)");
+        R"((Hop([0-9]+)Rep([0-9]+)-([0-9]+)|BJRealRep([0-9]+)-([0-9]+)|MHRealRep([0-9]+)-([0-9]+))\.txt)");
     for (const auto& entry : std::filesystem::directory_iterator(query_dir)) {
         if (!entry.is_regular_file() || entry.path().extension() != ".txt") {
             continue;

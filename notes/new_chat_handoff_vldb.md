@@ -256,6 +256,39 @@ Do not use `BJRealRep5-*` for overall effectiveness, because those files have
 only 50k queries. For Subsection 5, use the three 100k datasets above unless
 the user explicitly changes the selection.
 
+The current proposed GRO run for these BJ representatives uses score-pruned TDG
+selection with compressed TDG construction:
+
+```bash
+LOG=logs/gro_score_top_compressed_bj_selected_real_capacity2_cap10e8.log \
+nohup bash scripts/run_bj_selected_real_score_top_compressed.sh \
+  > /dev/null 2>&1 < /dev/null &
+```
+
+For Manhattan real taxi-derived overall effectiveness, do not use
+`Rep1/Rep5/Rep10` as congestion levels. The final MH design should keep every
+query set at 100k queries (`MHRealRep10-*`) and vary only the departure window
+to create lower/middle/extreme congestion. Build and diagnose candidates first:
+
+```bash
+LOG=logs/build_mh_real_100k_congestion_candidates.log \
+nohup bash scripts/build_mh_real_100k_congestion_candidates.sh \
+  > /dev/null 2>&1 < /dev/null &
+
+LOG=logs/mh_real_100k_congestion_diagnostic.log \
+nohup bash scripts/run_mh_real_100k_congestion_diagnostic.sh \
+  > /dev/null 2>&1 < /dev/null &
+```
+
+After the diagnostic, choose three 100k files by `inflation_ratio`; only then
+launch MH paper baselines and proposed GRO on those selected files. The older
+`window6h_all` MH scripts are diagnostic only because they mix 10k, 50k, and
+100k query counts.
+
+The proposed GRO scripts use `selection-methods=tdg_excess`, `reroute-methods=tdg`,
+`candidate-filter=score_top`, `tdg-mode=compressed`,
+`conflict-threshold=5000`, `tdg-gammas=50`, and `impact-weights=20`.
+
 ## Current Experiment Layout
 
 The preferred paper experiment order is:
