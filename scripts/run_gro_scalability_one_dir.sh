@@ -30,6 +30,9 @@ if [[ ! ${SUFFIX+x} || -z "$SUFFIX" ]]; then SUFFIX=capacity2_cap10e8; fi
 if [[ ! ${CANDIDATE_FILTER+x} || -z "$CANDIDATE_FILTER" ]]; then CANDIDATE_FILTER=all; fi
 if [[ ! ${TDG_MODE+x} || -z "$TDG_MODE" ]]; then TDG_MODE=fine; fi
 if [[ ! ${CONFLICT_THRESHOLD+x} ]]; then CONFLICT_THRESHOLD=""; fi
+if [[ ! ${DELTA_COMPRESS+x} ]]; then DELTA_COMPRESS=""; fi
+if [[ ! ${ANCHOR_WINDOW+x} ]]; then ANCHOR_WINDOW=""; fi
+if [[ ! ${ANCHOR_THRESHOLD+x} ]]; then ANCHOR_THRESHOLD=""; fi
 
 if [[ "$CANDIDATE_FILTER" == "all" ]]; then
   CANDIDATE_TAG=full
@@ -49,8 +52,19 @@ else
   CONFLICT_TAG=""
 fi
 
-TMPDIR="$RESULTS_DIR/tmp_gro_scalability_${LABEL}_tdg_excess_${CANDIDATE_TAG}${TDG_TAG}${CONFLICT_TAG}_${SUFFIX}"
-OUT="$RESULTS_DIR/gro_scalability_${LABEL}_tdg_excess_${CANDIDATE_TAG}${TDG_TAG}${CONFLICT_TAG}_${SUFFIX}.csv"
+COMPRESSION_PARAM_TAG=""
+if [[ -n "$DELTA_COMPRESS" ]]; then
+  COMPRESSION_PARAM_TAG="${COMPRESSION_PARAM_TAG}_delta${DELTA_COMPRESS}"
+fi
+if [[ -n "$ANCHOR_WINDOW" ]]; then
+  COMPRESSION_PARAM_TAG="${COMPRESSION_PARAM_TAG}_anchorw${ANCHOR_WINDOW}"
+fi
+if [[ -n "$ANCHOR_THRESHOLD" ]]; then
+  COMPRESSION_PARAM_TAG="${COMPRESSION_PARAM_TAG}_anchort${ANCHOR_THRESHOLD}"
+fi
+
+TMPDIR="$RESULTS_DIR/tmp_gro_scalability_${LABEL}_tdg_excess_${CANDIDATE_TAG}${TDG_TAG}${CONFLICT_TAG}${COMPRESSION_PARAM_TAG}_${SUFFIX}"
+OUT="$RESULTS_DIR/gro_scalability_${LABEL}_tdg_excess_${CANDIDATE_TAG}${TDG_TAG}${CONFLICT_TAG}${COMPRESSION_PARAM_TAG}_${SUFFIX}.csv"
 
 mkdir -p "$TMPDIR" "$RESULTS_DIR"
 
@@ -64,10 +78,19 @@ for rep in "${REP_VALUES[@]}"; do
   fi
 
   REP_OUT="$TMPDIR/rep${rep}.csv"
-  echo "[run] label=$LABEL rep=$rep candidate_filter=$CANDIDATE_FILTER tdg_mode=$TDG_MODE conflict_threshold=${CONFLICT_THRESHOLD:-config} query_dir=$QUERY_DIR output=$REP_OUT"
+  echo "[run] label=$LABEL rep=$rep candidate_filter=$CANDIDATE_FILTER tdg_mode=$TDG_MODE conflict_threshold=${CONFLICT_THRESHOLD:-config} delta_compress=${DELTA_COMPRESS:-config} anchor_window=${ANCHOR_WINDOW:-config} anchor_threshold=${ANCHOR_THRESHOLD:-config} query_dir=$QUERY_DIR output=$REP_OUT"
   EXTRA_ARGS=()
   if [[ -n "$CONFLICT_THRESHOLD" ]]; then
     EXTRA_ARGS+=(--conflict-threshold "$CONFLICT_THRESHOLD")
+  fi
+  if [[ -n "$DELTA_COMPRESS" ]]; then
+    EXTRA_ARGS+=(--delta-compress "$DELTA_COMPRESS")
+  fi
+  if [[ -n "$ANCHOR_WINDOW" ]]; then
+    EXTRA_ARGS+=(--anchor-window "$ANCHOR_WINDOW")
+  fi
+  if [[ -n "$ANCHOR_THRESHOLD" ]]; then
+    EXTRA_ARGS+=(--anchor-threshold "$ANCHOR_THRESHOLD")
   fi
   ./gro_ablation_test "$CONFIG" \
     --query-dir "$QUERY_DIR" \

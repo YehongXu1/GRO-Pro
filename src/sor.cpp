@@ -15,6 +15,10 @@ namespace gro {
 namespace {
 
 using EdgeStep = std::pair<EdgeId, int>;
+using LowerBoundCost = int;
+
+constexpr LowerBoundCost kLowerBoundInfinity =
+    std::numeric_limits<LowerBoundCost>::max() / 4;
 
 struct SearchStats {
     int states_expanded = 0;
@@ -29,6 +33,22 @@ double seconds(long long microseconds) {
 
 Flow edge_capacity(const Edge& edge) {
     return edge.capacity > 0 ? edge.capacity : 1;
+}
+
+std::vector<LowerBoundCost> compress_lower_bounds(
+    const std::vector<Cost>& distances) {
+    std::vector<LowerBoundCost> compressed(distances.size(), kLowerBoundInfinity);
+    constexpr Cost source_infinity = std::numeric_limits<Cost>::max() / 4;
+    for (std::size_t i = 0; i < distances.size(); ++i) {
+        Cost distance = distances[i];
+        if (distance >= source_infinity ||
+            distance >= static_cast<Cost>(kLowerBoundInfinity)) {
+            compressed[i] = kLowerBoundInfinity;
+        } else {
+            compressed[i] = static_cast<LowerBoundCost>(distance);
+        }
+    }
+    return compressed;
 }
 
 std::vector<int> occupied_steps(
@@ -140,7 +160,7 @@ bool cell_bound_exceeded(
 Route find_min_metric_route(
     const Graph& graph,
     const Query& query,
-    const std::vector<Cost>& remaining,
+    const std::vector<LowerBoundCost>& remaining,
     const std::unordered_map<EdgeStep, int, PairHash>& volumes,
     double lambda,
     const SOROptions& options,
@@ -149,17 +169,16 @@ Route find_min_metric_route(
         *stats = SearchStats{};
     }
 
-    const Cost infinity = std::numeric_limits<Cost>::max() / 4;
     Route empty_route;
     empty_route.query_id = query.id;
     empty_route.departure_time = query.departure_time;
 
-    if (remaining[query.origin] == infinity) {
+    if (remaining[query.origin] == kLowerBoundInfinity) {
         return empty_route;
     }
 
     Cost max_travel_time =
-        remaining[query.origin] *
+        static_cast<Cost>(remaining[query.origin]) *
         static_cast<Cost>(100 + std::max(0, options.detour_percent)) / 100;
 
     struct Candidate {
@@ -174,7 +193,7 @@ Route find_min_metric_route(
     std::vector<EdgeId> path;
     std::vector<EdgeId> best_path;
     double best_metric = std::numeric_limits<double>::infinity();
-    Cost best_travel_time = infinity;
+    Cost best_travel_time = std::numeric_limits<Cost>::max() / 4;
     int states_expanded = 0;
     bool budget_exhausted = false;
 
@@ -209,12 +228,14 @@ Route find_min_metric_route(
                 if (edge.to < 0 ||
                     edge.to >= graph.vertex_count ||
                     visited[edge.to] ||
-                    remaining[edge.to] == infinity) {
+                    remaining[edge.to] == kLowerBoundInfinity) {
                     continue;
                 }
 
                 Cost next_travel_time = travel_time + edge.free_flow_time;
-                if (next_travel_time + remaining[edge.to] > max_travel_time) {
+                if (next_travel_time +
+                        static_cast<Cost>(remaining[edge.to]) >
+                    max_travel_time) {
                     continue;
                 }
 
@@ -239,8 +260,12 @@ Route find_min_metric_route(
                     if (lhs.next_metric != rhs.next_metric) {
                         return lhs.next_metric < rhs.next_metric;
                     }
-                    Cost lhs_bound = lhs.next_travel_time + remaining[lhs.to];
-                    Cost rhs_bound = rhs.next_travel_time + remaining[rhs.to];
+                    Cost lhs_bound =
+                        lhs.next_travel_time +
+                        static_cast<Cost>(remaining[lhs.to]);
+                    Cost rhs_bound =
+                        rhs.next_travel_time +
+                        static_cast<Cost>(remaining[rhs.to]);
                     if (lhs_bound != rhs_bound) {
                         return lhs_bound < rhs_bound;
                     }
@@ -275,7 +300,10 @@ Route find_min_metric_route(
         route.query_id = query.id;
         route.edge_ids = std::move(best_path);
         route.departure_time = query.departure_time;
-        route.travel_time = best_travel_time == infinity ? 0 : best_travel_time;
+        route.travel_time =
+            best_travel_time == std::numeric_limits<Cost>::max() / 4
+                ? 0
+                : best_travel_time;
         if (stats != nullptr) {
             stats->found_route = true;
         }
@@ -406,12 +434,13 @@ std::vector<Route> compute_sor_routes(
         cached_destinations.push_back(entry.first);
     }
 
-    std::vector<std::vector<Cost>> cached_distances(cached_destinations.size());
+    std::vector<std::vector<LowerBoundCost>> cached_distances(
+        cached_destinations.size());
     auto cache_start = Clock::now();
     double estimated_cache_gib =
         static_cast<double>(cached_destinations.size()) *
         static_cast<double>(std::max(0, graph.vertex_count)) *
-        static_cast<double>(sizeof(Cost)) /
+        static_cast<double>(sizeof(LowerBoundCost)) /
         (1024.0 * 1024.0 * 1024.0);
     std::cerr << "[sor] lower_bound_cache_start"
               << " unique_destinations=" << destination_frequency.size()
@@ -422,9 +451,9 @@ std::vector<Route> compute_sor_routes(
     #pragma omp parallel for schedule(dynamic)
     for (long long i = 0; i < static_cast<long long>(cached_destinations.size()); ++i) {
         cached_distances[static_cast<std::size_t>(i)] =
-            reverse_shortest_distances(
+            compress_lower_bounds(reverse_shortest_distances(
                 graph,
-                cached_destinations[static_cast<std::size_t>(i)]);
+                cached_destinations[static_cast<std::size_t>(i)]));
     }
     std::cerr << "[sor] lower_bound_cache_done"
               << " sec=" << seconds(elapsed_us(cache_start))
@@ -436,13 +465,14 @@ std::vector<Route> compute_sor_routes(
         cached_index[cached_destinations[i]] = i;
     }
 
-    std::unordered_map<NodeId, std::vector<Cost>> on_demand_distances;
+    std::unordered_map<NodeId, std::vector<LowerBoundCost>> on_demand_distances;
     on_demand_distances.reserve(
         destination_frequency.size() > cached_destinations.size()
             ? destination_frequency.size() - cached_destinations.size()
             : 0);
     long long uncached_lower_bound_calls = 0;
-    auto remaining_distances = [&](NodeId destination) -> const std::vector<Cost>& {
+    auto remaining_distances =
+        [&](NodeId destination) -> const std::vector<LowerBoundCost>& {
         auto it = cached_index.find(destination);
         if (it != cached_index.end()) {
             return cached_distances[it->second];
@@ -454,7 +484,7 @@ std::vector<Route> compute_sor_routes(
         ++uncached_lower_bound_calls;
         auto inserted = on_demand_distances.emplace(
             destination,
-            reverse_shortest_distances(graph, destination));
+            compress_lower_bounds(reverse_shortest_distances(graph, destination)));
         return inserted.first->second;
     };
 
@@ -488,7 +518,8 @@ std::vector<Route> compute_sor_routes(
 
     for (QueryId query_id : query_order) {
         const Query& query = queries[query_id];
-        const std::vector<Cost>& remaining = remaining_distances(query.destination);
+        const std::vector<LowerBoundCost>& remaining =
+            remaining_distances(query.destination);
         while (volume_bound_may_be_exceeded &&
                lambda < std::numeric_limits<double>::max() / 4.0) {
             lambda *= 2.0;

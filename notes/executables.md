@@ -502,7 +502,9 @@ cd /Users/xyh/Desktop/GRO-Pro
   --selection-fraction-label TDG-guided \
   --selection-fraction-reroute "TDG-impact reroute" \
   --baseline-fraction 10 \
-  --output python/results/experiments/exp1_component_ablation/bj_synthetic_capacity2_cap10e8/plots/bj_component_ablation_best_param_capacity2_cap10e8_with_selection_fraction.png
+  --row-height 2.25 \
+  --h-pad 0.35 \
+  --output python/results/experiments/exp1_component_ablation/bj_synthetic_capacity2_cap10e8/plots/bj_component_ablation_best_param_capacity2_cap10e8_with_selection_fraction_compact.pdf
 ```
 
 ## Unit Tests

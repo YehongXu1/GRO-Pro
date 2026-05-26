@@ -1,0 +1,44 @@
+{
+  "source": "NYC TLC yellow taxi trip records",
+  "source_files": [
+    "data/MH_Real_query_sets/nyc_tlc/anondata.csv"
+  ],
+  "graph": "data/MH.txt",
+  "coordinates": "data/MH_NodeIDLonLat.txt",
+  "output_dir": "data/MH_Real_query_sets",
+  "naming": "MHRealRep{amplification_factor}-{set_id}.txt",
+  "sets": 5,
+  "queries_per_base_set": 10000,
+  "rep_values": [
+    1,
+    5,
+    10
+  ],
+  "preferred_schema": "coordinate-level pickup/dropoff longitude/latitude",
+  "input_format": "ncl-anondata",
+  "bbox": {
+    "min_lon": -74.02533292807487,
+    "min_lat": 40.697205495495496,
+    "max_lon": -73.90495607192513,
+    "max_lat": 40.878403504504504,
+    "padding_km": 0.5
+  },
+  "max_snap_distance_m": 250.0,
+  "min_duration_min": 2.0,
+  "max_duration_min": 60.0,
+  "min_distance_km": 0.5,
+  "max_distance_km": 30.0,
+  "amplify_time_jitter_sec": 0,
+  "random_seed": 0,
+  "time_origin_seconds": 1356969600,
+  "counters": {
+    "rows_seen": 1999999,
+    "candidates_seen": 1632398,
+    "bad_duration": 29292,
+    "bad_trip_distance": 12357,
+    "bad_haversine": 78434,
+    "outside_bbox": 210551,
+    "bad_coordinate": 31062,
+    "snap_failed": 5905
+  }
+}

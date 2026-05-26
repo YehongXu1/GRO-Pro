@@ -62,6 +62,9 @@ struct Options {
     std::string candidate_filter = "all";
     std::string tdg_mode = "fine";
     int conflict_threshold = -1;
+    int delta_compress = -1;
+    int anchor_window = -1;
+    int anchor_threshold = -1;
     bool progress_log = true;
 };
 
@@ -214,6 +217,12 @@ Options parse_args(int argc, char** argv) {
             options.tdg_mode = require_value(arg);
         } else if (arg == "--conflict-threshold") {
             options.conflict_threshold = std::stoi(require_value(arg));
+        } else if (arg == "--delta-compress") {
+            options.delta_compress = std::stoi(require_value(arg));
+        } else if (arg == "--anchor-window") {
+            options.anchor_window = std::stoi(require_value(arg));
+        } else if (arg == "--anchor-threshold") {
+            options.anchor_threshold = std::stoi(require_value(arg));
         } else if (arg == "--max-files") {
             options.max_files = std::stoi(require_value(arg));
         } else if (arg == "--no-progress-log") {
@@ -229,6 +238,8 @@ Options parse_args(int argc, char** argv) {
                 << "[--candidate-filter all|source_congestion|score_top|global_score|component_balanced|component_marginal|component_marginal_budget5|component_marginal_budget3|component_marginal_samek|component_marginal_major80_budget5|component_marginal_major90_budget5|component_marginal_major90_samek] "
                 << "[--tdg-mode fine|compressed] "
                 << "[--conflict-threshold n] "
+                << "[--delta-compress seconds] [--anchor-window seconds] "
+                << "[--anchor-threshold percent] "
                 << "[--hop 10] [--rep 1] "
                 << "[--datasets Hop10Rep1-0,BJRealRep10-0] "
                 << "[--dataset-list path] [--random-seed n] [--max-files n] "
@@ -266,6 +277,15 @@ Options parse_args(int argc, char** argv) {
     require(
         options.conflict_threshold == -1 || options.conflict_threshold >= 0,
         "conflict threshold must be non-negative");
+    require(
+        options.delta_compress == -1 || options.delta_compress > 0,
+        "delta compress must be positive");
+    require(
+        options.anchor_window == -1 || options.anchor_window > 0,
+        "anchor window must be positive");
+    require(
+        options.anchor_threshold == -1 || options.anchor_threshold >= 0,
+        "anchor threshold must be non-negative");
     return options;
 }
 
@@ -1151,6 +1171,15 @@ int main(int argc, char** argv) {
             gro::load_algorithm_options(options.config_path);
         if (options.conflict_threshold >= 0) {
             algorithm_options.conflict_threshold = options.conflict_threshold;
+        }
+        if (options.delta_compress > 0) {
+            algorithm_options.delta_compress = options.delta_compress;
+        }
+        if (options.anchor_window > 0) {
+            algorithm_options.anchor_window = options.anchor_window;
+        }
+        if (options.anchor_threshold >= 0) {
+            algorithm_options.anchor_threshold = options.anchor_threshold;
         }
         algorithm_options.enable_timing_log = false;
         gro::TrafficOptions traffic_options =

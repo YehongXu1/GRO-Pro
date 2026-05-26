@@ -60,7 +60,9 @@ python/results/*
 python/figures/
 *.log
 *.zip
- 
+
+data/MH_Real_query_sets/nyc_tlc/anondata.csv
+.data/MH_Real_query_sets/nyc_tlc/
 .data/BJ_Real_query_sets/release/
 python/results/*.csv
 data/BJ_Real_query_sets/release/
@@ -68,3 +70,6 @@ data/BJ_Real_query_sets/*.zip
 
 papers
 H2Hcode
+
+data/MH_Real_query_sets/nyc_tlc/
+data/MH_Real_query_sets/nyc_tlc/

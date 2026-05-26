@@ -6,10 +6,11 @@ if [[ -n "${LOG:-}" ]]; then
   exec > "$LOG" 2>&1
 fi
 
-export OMP_NUM_THREADS="${OMP_NUM_THREADS:-1}"
+export OMP_NUM_THREADS="${OMP_NUM_THREADS:-16}"
+SOR_MAX_LABELS="${SOR_MAX_LABELS:-20000}"
 
-OUT=python/results/bj_real/overall_effectiveness/paper_baseline_sor_100k_three_levels_capacity2_cap10e8.csv
-TMPDIR=python/results/bj_real/overall_effectiveness/tmp_sor_100k_three_levels_capacity2_cap10e8
+OUT="${OUT:-python/results/experiments/exp5_overall_effectiveness/paper_baseline_sor_100k_three_levels_capacity2_cap10e8.csv}"
+TMPDIR="${TMPDIR:-python/results/experiments/exp5_overall_effectiveness/tmp_sor_100k_three_levels_capacity2_cap10e8}"
 
 mkdir -p "$TMPDIR"
 
@@ -20,7 +21,7 @@ mkdir -p "$TMPDIR"
   --sor-detour-percent 10 \
   --sor-time-step 60 \
   --sor-max-time-steps 10080 \
-  --sor-max-labels-per-query 20000 \
+  --sor-max-labels-per-query "$SOR_MAX_LABELS" \
   --sor-lower-bound-cache-size -1 \
   --sor-lower-bound-cache-min-frequency 1
 
@@ -31,7 +32,7 @@ mkdir -p "$TMPDIR"
   --sor-detour-percent 10 \
   --sor-time-step 60 \
   --sor-max-time-steps 10080 \
-  --sor-max-labels-per-query 20000 \
+  --sor-max-labels-per-query "$SOR_MAX_LABELS" \
   --sor-lower-bound-cache-size -1 \
   --sor-lower-bound-cache-min-frequency 1
 
@@ -42,7 +43,7 @@ mkdir -p "$TMPDIR"
   --sor-detour-percent 10 \
   --sor-time-step 60 \
   --sor-max-time-steps 10080 \
-  --sor-max-labels-per-query 20000 \
+  --sor-max-labels-per-query "$SOR_MAX_LABELS" \
   --sor-lower-bound-cache-size -1 \
   --sor-lower-bound-cache-min-frequency 1
 

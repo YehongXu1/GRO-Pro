@@ -11,6 +11,7 @@ import matplotlib
 matplotlib.use("Agg")
 
 import matplotlib.pyplot as plt
+import matplotlib.ticker as mticker
 import pandas as pd
 from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
@@ -235,6 +236,11 @@ def plot_component_ablation(
     selection_fraction_label: str = "TDG-guided",
     selection_fraction_reroute: str = "Normal TD-Dijkstra",
     baseline_fraction: Optional[int] = None,
+    baseline_fraction_by_panel_from_data: bool = False,
+    fig_width: float = 13.8,
+    row_height: float = 2.35,
+    h_pad: float = 0.55,
+    w_pad: float = 1.2,
 ) -> None:
     combos = (
         plot_df[["rep", "hop"]]
@@ -246,13 +252,15 @@ def plot_component_ablation(
 
     n_cols = 3
     n_rows = math.ceil(len(combos) / n_cols)
+    fig_height = max(3.0, row_height * n_rows + 0.85)
     fig, axes = plt.subplots(
         n_rows,
         n_cols,
-        figsize=(13.8, 9.1),
+        figsize=(fig_width, fig_height),
         sharex=True,
         squeeze=False,
     )
+    has_selection_fraction_axis = False
 
     for panel_index, (rep, hop) in enumerate(combos):
         row = panel_index // n_cols
@@ -269,7 +277,19 @@ def plot_component_ablation(
             ].sort_values("plot_iteration")
             fraction_curve = fraction_curve.dropna(subset=["selected_fraction"])
             if not fraction_curve.empty:
+                has_selection_fraction_axis = True
                 ax2 = ax.twinx()
+                panel_baseline_fraction = baseline_fraction
+                if baseline_fraction_by_panel_from_data:
+                    baseline_curve = sub[
+                        (sub["selection_label"] == "Random")
+                        & (sub["reroute_label"] == "Normal TD-Dijkstra")
+                        & (sub["plot_iteration"] > 0)
+                    ]["selected_fraction"].dropna()
+                    if not baseline_curve.empty:
+                        panel_baseline_fraction = int(
+                            round(float(baseline_curve.mean()) * 100.0)
+                        )
                 ax2.bar(
                     fraction_curve["plot_iteration"],
                     fraction_curve["selected_fraction"] * 100.0,
@@ -279,9 +299,9 @@ def plot_component_ablation(
                     edgecolor="none",
                     zorder=0,
                 )
-                if baseline_fraction is not None:
+                if panel_baseline_fraction is not None:
                     ax2.axhline(
-                        baseline_fraction,
+                        panel_baseline_fraction,
                         color="#4F4F4F",
                         linestyle=":",
                         linewidth=1.25,
@@ -290,16 +310,13 @@ def plot_component_ablation(
                     )
                 ax2.set_ylim(
                     0,
-                    selection_fraction_axis_top(fraction_curve, baseline_fraction),
+                    selection_fraction_axis_top(
+                        fraction_curve,
+                        panel_baseline_fraction,
+                    ),
                 )
                 ax2.grid(False)
                 ax2.tick_params(axis="y", labelsize=9, pad=2, colors="#666666")
-                if col == n_cols - 1:
-                    ax2.set_ylabel(
-                        "TDG selected queries (%)",
-                        fontsize=11,
-                        color="#666666",
-                    )
 
                 ax.set_zorder(ax2.get_zorder() + 1)
                 ax.patch.set_visible(False)
@@ -335,10 +352,10 @@ def plot_component_ablation(
         ax.set_xticks(range(0, int(plot_df["plot_iteration"].max()) + 1, 2))
         ax.grid(False)
         ax.ticklabel_format(axis="y", style="plain", useOffset=False)
+        if rep == 1:
+            ax.yaxis.set_major_formatter(mticker.FormatStrFormatter("%.3f"))
         ax.tick_params(axis="both", labelsize=10, pad=2)
 
-        if col == 0:
-            ax.set_ylabel("Log. Total travel time (h)", fontsize=12)
         if row == n_rows - 1:
             ax.set_xlabel("Iteration number", fontsize=12)
 
@@ -394,20 +411,49 @@ def plot_component_ablation(
         if text.get_text().endswith(":"):
             text.set_weight("semibold")
 
+    fig.text(
+        0.033,
+        0.48,
+        "Log. Total travel time (h)",
+        rotation=90,
+        va="center",
+        ha="center",
+        fontsize=15,
+    )
+    if has_selection_fraction_axis:
+        fig.text(
+            0.972,
+            0.48,
+            "TDG selected queries (%)",
+            rotation=270,
+            va="center",
+            ha="center",
+            fontsize=15,
+            color="#666666",
+        )
+
     output_dir = os.path.dirname(output)
     if output_dir:
         os.makedirs(output_dir, exist_ok=True)
-    fig.tight_layout(rect=(0.035, 0.035, 0.995, 0.915), h_pad=1.5, w_pad=1.4)
+    fig.tight_layout(rect=(0.06, 0.035, 0.945, 0.91), h_pad=h_pad, w_pad=w_pad)
     fig.savefig(output, dpi=300, bbox_inches="tight")
     plt.close(fig)
 
 
 def main() -> None:
     parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--plot-data",
+        help=(
+            "Optional pre-aggregated plot-data CSV with columns produced by "
+            "build_plot_dataframe. When provided, raw method inputs are not "
+            "loaded."
+        ),
+    )
     parser.add_argument("--random-normal")
-    parser.add_argument("--delayed-normal", required=True)
+    parser.add_argument("--delayed-normal")
     parser.add_argument("--delayed-tdg-reroute")
-    parser.add_argument("--tdg-excess-normal", required=True)
+    parser.add_argument("--tdg-excess-normal")
     parser.add_argument("--tdg-excess-full")
     parser.add_argument("--tdg-selection-method", default="tdg_excess")
     parser.add_argument("--tdg-removal-mode")
@@ -428,61 +474,91 @@ def main() -> None:
     parser.add_argument("--show-selection-fraction", action="store_true")
     parser.add_argument("--selection-fraction-label", default="TDG-guided")
     parser.add_argument("--selection-fraction-reroute", default="Normal TD-Dijkstra")
+    parser.add_argument(
+        "--baseline-fraction-by-panel-from-data",
+        action="store_true",
+        help=(
+            "Infer the dotted selection-fraction reference separately for each "
+            "panel from Random + Normal TD-Dijkstra rows."
+        ),
+    )
     parser.add_argument("--exclude-datasets")
     parser.add_argument("--exclude-dataset-file")
+    parser.add_argument("--fig-width", type=float, default=13.8)
+    parser.add_argument(
+        "--row-height",
+        type=float,
+        default=2.35,
+        help="Figure height per subplot row. Smaller values make panels flatter.",
+    )
+    parser.add_argument(
+        "--h-pad",
+        type=float,
+        default=0.55,
+        help="Vertical padding between subplot rows.",
+    )
+    parser.add_argument("--w-pad", type=float, default=1.2)
     parser.add_argument("--output", required=True)
     args = parser.parse_args()
 
-    frames = [
-        load_method(
-            args.random_normal,
-            "Random",
-            "Normal TD-Dijkstra",
-            "random",
-            "normal_td_dijkstra",
-            selection_fraction=args.baseline_fraction,
-        ),
-        load_method(
-            args.delayed_normal,
-            "Latency-based",
-            "Normal TD-Dijkstra",
-            "most_delayed",
-            "normal_td_dijkstra",
-            selection_fraction=args.baseline_fraction,
-        ),
-        load_method(
-            args.delayed_tdg_reroute,
-            "Latency-based",
-            "TDG-impact reroute",
-            "most_delayed",
-            "tdg_impact_reroute",
-            selection_fraction=args.baseline_fraction,
-        ),
-        load_method(
-            args.tdg_excess_normal,
-            "TDG-guided",
-            "Normal TD-Dijkstra",
-            args.tdg_selection_method,
-            "normal_td_dijkstra",
-            gamma=args.tdg_gamma,
-            removal_mode=args.tdg_removal_mode,
-        ),
-        load_method(
-            args.tdg_excess_full,
-            "TDG-guided",
-            "TDG-impact reroute",
-            args.tdg_selection_method,
-            "tdg_impact_reroute",
-            gamma=args.tdg_gamma,
-            impact_weight=args.tdg_impact_weight,
-            removal_mode=args.tdg_removal_mode,
-        ),
-    ]
-    excluded_datasets = parse_dataset_names(args.exclude_datasets)
-    excluded_datasets |= load_dataset_names(args.exclude_dataset_file)
-    frames = exclude_datasets(frames, excluded_datasets)
+    if args.plot_data:
+        plot_df = pd.read_csv(args.plot_data)
+    else:
+        if not args.delayed_normal or not args.tdg_excess_normal:
+            raise ValueError(
+                "--delayed-normal and --tdg-excess-normal are required unless "
+                "--plot-data is provided."
+            )
+        frames = [
+            load_method(
+                args.random_normal,
+                "Random",
+                "Normal TD-Dijkstra",
+                "random",
+                "normal_td_dijkstra",
+                selection_fraction=args.baseline_fraction,
+            ),
+            load_method(
+                args.delayed_normal,
+                "Latency-based",
+                "Normal TD-Dijkstra",
+                "most_delayed",
+                "normal_td_dijkstra",
+                selection_fraction=args.baseline_fraction,
+            ),
+            load_method(
+                args.delayed_tdg_reroute,
+                "Latency-based",
+                "TDG-impact reroute",
+                "most_delayed",
+                "tdg_impact_reroute",
+                selection_fraction=args.baseline_fraction,
+            ),
+            load_method(
+                args.tdg_excess_normal,
+                "TDG-guided",
+                "Normal TD-Dijkstra",
+                args.tdg_selection_method,
+                "normal_td_dijkstra",
+                gamma=args.tdg_gamma,
+                removal_mode=args.tdg_removal_mode,
+            ),
+            load_method(
+                args.tdg_excess_full,
+                "TDG-guided",
+                "TDG-impact reroute",
+                args.tdg_selection_method,
+                "tdg_impact_reroute",
+                gamma=args.tdg_gamma,
+                impact_weight=args.tdg_impact_weight,
+                removal_mode=args.tdg_removal_mode,
+            ),
+        ]
+        excluded_datasets = parse_dataset_names(args.exclude_datasets)
+        excluded_datasets |= load_dataset_names(args.exclude_dataset_file)
+        frames = exclude_datasets(frames, excluded_datasets)
 
-    plot_df = build_plot_dataframe(frames)
+        plot_df = build_plot_dataframe(frames)
     plot_component_ablation(
         plot_df,
         args.output,
@@ -490,6 +566,13 @@ def main() -> None:
         selection_fraction_label=args.selection_fraction_label,
         selection_fraction_reroute=args.selection_fraction_reroute,
         baseline_fraction=args.baseline_fraction,
+        baseline_fraction_by_panel_from_data=(
+            args.baseline_fraction_by_panel_from_data
+        ),
+        fig_width=args.fig_width,
+        row_height=args.row_height,
+        h_pad=args.h_pad,
+        w_pad=args.w_pad,
     )
     print(f"Saved to {args.output}")
 

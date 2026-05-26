@@ -184,6 +184,20 @@ data/BJ_Real_query_sets_scalability_window6h
 The real sets are generated from T-Drive taxi trajectories, filtered around
 Tiananmen within an 8 km radius. See `notes/bj_real_queries.md`.
 
+Planned MH/NY taxi-derived query sets:
+
+```text
+data/MH_Real_query_sets
+data/MH_Real_query_sets_window6h
+```
+
+These have not been generated yet. The preferred source is historical NYC TLC
+yellow taxi trip records with explicit pickup/dropoff longitude and latitude,
+snapped to `data/MH_NodeIDLonLat.txt`. Modern TLC Parquet records are official
+and easier to obtain but are zone-level (`PULocationID`/`DOLocationID`), so they
+should be treated as a coarse fallback unless historical coordinate records are
+not usable. See `notes/mh_real_queries.md`.
+
 `data/BJ_Real_query_sets` preserves the original relative departure span, which
 is about six days. This makes congestion weak for low amplification factors.
 `data/BJ_Real_query_sets_window6h` linearly rescales each query file's departure
