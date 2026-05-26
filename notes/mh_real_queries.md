@@ -114,13 +114,27 @@ make paper_baseline_test
 bash scripts/launch_mh_real_window6h_paper_baselines_by_method.sh
 ```
 
-This launches four jobs:
+This launches four prior-paper baseline jobs:
 
 ```text
 svp  -> paper_baseline_svp_mh_real_window6h_all.csv
 gor  -> paper_baseline_gor_mh_real_window6h_all.csv
 sor  -> paper_baseline_sor_mh_real_window6h_all.csv
 fahl -> paper_baseline_fahl_mh_real_window6h_all.csv
+```
+
+To include the iterative no-TDG GRO baseline in the same launcher:
+
+```bash
+METHOD_LIST=gro_baseline,svp,gor,sor,fahl \
+bash scripts/launch_mh_real_window6h_paper_baselines_by_method.sh
+```
+
+`gro_baseline` runs `random,most_delayed` selection with normal TD-Dijkstra
+rerouting over all MH window6h datasets, and writes:
+
+```text
+python/results/experiments/exp5_overall_effectiveness/gro_baseline_random_delayed_normal_mh_real_window6h_all.csv
 ```
 
 By default this includes Rep1, Rep5, and Rep10, so each method runs all 15
@@ -154,6 +168,14 @@ MAX_QUERIES=10000
 OUT=path/to/output.csv
 LOG=path/to/log
 DRY_RUN=1
+```
+
+The standalone GRO baseline script is:
+
+```bash
+LOG=logs/gro_baseline_random_delayed_normal_mh_real_window6h_all.log \
+nohup bash scripts/run_mh_real_window6h_gro_baseline.sh \
+  > /dev/null 2>&1 < /dev/null &
 ```
 
 ## Generator
