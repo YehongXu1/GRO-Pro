@@ -15,6 +15,7 @@ from __future__ import annotations
 import argparse
 import bisect
 import csv
+import heapq
 import io
 import json
 import math
@@ -29,6 +30,7 @@ from typing import Dict, Iterable, Iterator, List, Optional, Sequence, Tuple
 
 NodeId = int
 Coordinate = Tuple[float, float]
+Adjacency = Dict[NodeId, List[Tuple[NodeId, int]]]
 
 
 @dataclass(frozen=True)
@@ -57,6 +59,7 @@ class QueryCandidate:
     taxi_id: str
     duration_seconds: int
     haversine_km: float
+    free_flow_seconds: Optional[int] = None
 
 
 class SpatialIndex:
@@ -139,10 +142,11 @@ def read_coordinates(path: Path) -> Dict[NodeId, Coordinate]:
 def read_graph_connectivity(
     path: Path,
     coordinates: Dict[NodeId, Coordinate],
-) -> Tuple[set[NodeId], set[NodeId], List[Tuple[NodeId, NodeId]]]:
+) -> Tuple[set[NodeId], set[NodeId], List[Tuple[NodeId, NodeId, int]], Adjacency]:
     outgoing: set[NodeId] = set()
     incoming: set[NodeId] = set()
-    edges: List[Tuple[NodeId, NodeId]] = []
+    edges: List[Tuple[NodeId, NodeId, int]] = []
+    adjacency: Adjacency = defaultdict(list)
     with path.open() as file:
         for line in file:
             parts = line.split()
@@ -157,10 +161,41 @@ def read_graph_connectivity(
                 continue
             if haversine_km(coordinates[source], coordinates[target]) <= 0.0:
                 continue
+            free_flow_time = max(1, int(parts[3]))
             outgoing.add(source)
             incoming.add(target)
-            edges.append((source, target))
-    return outgoing, incoming, edges
+            edges.append((source, target, free_flow_time))
+            adjacency[source].append((target, free_flow_time))
+    return outgoing, incoming, edges, dict(adjacency)
+
+
+def shortest_path_free_flow_seconds(
+    adjacency: Adjacency,
+    source: NodeId,
+    target: NodeId,
+    cutoff_seconds: Optional[int],
+) -> Optional[int]:
+    if source == target:
+        return 0
+
+    distances: Dict[NodeId, int] = {source: 0}
+    heap: List[Tuple[int, NodeId]] = [(0, source)]
+    while heap:
+        distance, node = heapq.heappop(heap)
+        if distance != distances[node]:
+            continue
+        if cutoff_seconds is not None and distance > cutoff_seconds:
+            break
+        if node == target:
+            return distance
+        for next_node, weight in adjacency.get(node, []):
+            next_distance = distance + weight
+            if cutoff_seconds is not None and next_distance > cutoff_seconds:
+                continue
+            if next_distance < distances.get(next_node, math.inf):
+                distances[next_node] = next_distance
+                heapq.heappush(heap, (next_distance, next_node))
+    return None
 
 
 def datetime_to_seconds(value: datetime) -> int:
@@ -439,12 +474,18 @@ def write_metadata(
                 "max_departure",
                 "mean_duration_sec",
                 "mean_haversine_km",
+                "mean_free_flow_sec",
             ],
         )
         writer.writeheader()
         for set_id, candidates in enumerate(selected_sets):
             durations = [candidate.duration_seconds for candidate in candidates]
             distances = [candidate.haversine_km for candidate in candidates]
+            free_flows = [
+                candidate.free_flow_seconds
+                for candidate in candidates
+                if candidate.free_flow_seconds is not None
+            ]
             departures = [candidate.departure_abs_seconds for candidate in candidates]
             writer.writerow(
                 {
@@ -457,6 +498,9 @@ def write_metadata(
                     ),
                     "mean_haversine_km": (
                         sum(distances) / len(distances) if distances else ""
+                    ),
+                    "mean_free_flow_sec": (
+                        sum(free_flows) / len(free_flows) if free_flows else ""
                     ),
                 }
             )
@@ -479,6 +523,25 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--max-duration-min", type=float, default=60.0)
     parser.add_argument("--min-distance-km", type=float, default=0.8)
     parser.add_argument("--max-distance-km", type=float, default=16.0)
+    parser.add_argument(
+        "--min-free-flow-min",
+        type=float,
+        default=0.0,
+        help="Reject candidates whose directed graph shortest path is shorter.",
+    )
+    parser.add_argument(
+        "--max-free-flow-min",
+        type=float,
+        default=0.0,
+        help="Reject candidates whose directed graph shortest path is longer. "
+        "Use 0 to disable the upper bound.",
+    )
+    parser.add_argument(
+        "--shortest-path-cache-size",
+        type=int,
+        default=500000,
+        help="Maximum number of OD shortest-path values to cache; 0 disables caching.",
+    )
     parser.add_argument("--start-time")
     parser.add_argument("--end-time")
     parser.add_argument("--start-stride", type=int, default=1)
@@ -518,8 +581,18 @@ def main() -> int:
         else None
     )
 
+    min_free_flow_seconds = int(round(args.min_free_flow_min * 60.0))
+    max_free_flow_seconds = (
+        int(round(args.max_free_flow_min * 60.0))
+        if args.max_free_flow_min > 0.0
+        else None
+    )
+    if max_free_flow_seconds is not None and max_free_flow_seconds < min_free_flow_seconds:
+        raise RuntimeError("--max-free-flow-min must be >= --min-free-flow-min")
+    network_filter_enabled = min_free_flow_seconds > 0 or max_free_flow_seconds is not None
+
     coordinates = read_coordinates(coords_path)
-    outgoing, incoming, edges = read_graph_connectivity(graph_path, coordinates)
+    outgoing, incoming, edges, adjacency = read_graph_connectivity(graph_path, coordinates)
     inside_nodes = {
         node
         for node, coord in coordinates.items()
@@ -542,12 +615,67 @@ def main() -> int:
     snapped_points = 0
     internal_edges = [
         (source, target)
-        for source, target in edges
+        for source, target, _ in edges
         if source in usable_nodes and target in usable_nodes
     ]
+    print(
+        "loaded graph/region: "
+        f"coordinates={len(coordinates)}, usable_nodes={len(usable_nodes)}, "
+        f"internal_edges={len(internal_edges)}, "
+        f"network_filter={network_filter_enabled}, "
+        f"min_free_flow_sec={min_free_flow_seconds}, "
+        f"max_free_flow_sec={max_free_flow_seconds}",
+        flush=True,
+    )
+    shortest_path_cache: Dict[Tuple[NodeId, NodeId], Optional[int]] = {}
+    network_filter_stats = {
+        "cache_hits": 0,
+        "dijkstra_calls": 0,
+        "below_min": 0,
+        "above_max_or_unreachable": 0,
+    }
+    coarse_candidates_seen = 0
+
+    def with_free_flow_filter(candidate: QueryCandidate) -> Optional[QueryCandidate]:
+        if not network_filter_enabled:
+            return candidate
+
+        key = (candidate.origin, candidate.destination)
+        if key in shortest_path_cache:
+            free_flow_seconds = shortest_path_cache[key]
+            network_filter_stats["cache_hits"] += 1
+        else:
+            free_flow_seconds = shortest_path_free_flow_seconds(
+                adjacency,
+                candidate.origin,
+                candidate.destination,
+                max_free_flow_seconds,
+            )
+            network_filter_stats["dijkstra_calls"] += 1
+            if (
+                args.shortest_path_cache_size > 0
+                and len(shortest_path_cache) < args.shortest_path_cache_size
+            ):
+                shortest_path_cache[key] = free_flow_seconds
+
+        if free_flow_seconds is None:
+            network_filter_stats["above_max_or_unreachable"] += 1
+            return None
+        if free_flow_seconds < min_free_flow_seconds:
+            network_filter_stats["below_min"] += 1
+            return None
+        return QueryCandidate(
+            origin=candidate.origin,
+            destination=candidate.destination,
+            departure_abs_seconds=candidate.departure_abs_seconds,
+            taxi_id=candidate.taxi_id,
+            duration_seconds=candidate.duration_seconds,
+            haversine_km=candidate.haversine_km,
+            free_flow_seconds=free_flow_seconds,
+        )
 
     def process_points(points: Sequence[SnappedPoint]) -> None:
-        nonlocal seen_candidates
+        nonlocal coarse_candidates_seen, seen_candidates
         for candidate in generate_candidates_from_track(
             points,
             min_duration_seconds,
@@ -557,6 +685,10 @@ def main() -> int:
             args.start_stride,
             args.max_end_points_per_start,
         ):
+            coarse_candidates_seen += 1
+            candidate = with_free_flow_filter(candidate)
+            if candidate is None:
+                continue
             seen_candidates += 1
             reservoir_insert(
                 reservoir,
@@ -600,8 +732,14 @@ def main() -> int:
                 if args.progress_interval > 0 and file_count % args.progress_interval == 0:
                     print(
                         "processed "
-                        f"{file_count} files, seen_candidates={seen_candidates}, "
-                        f"reservoir={len(reservoir)}"
+                        f"{file_count} files, coarse_candidates={coarse_candidates_seen}, "
+                        f"accepted_candidates={seen_candidates}, reservoir={len(reservoir)}, "
+                        f"dijkstra_calls={network_filter_stats['dijkstra_calls']}, "
+                        f"cache_hits={network_filter_stats['cache_hits']}, "
+                        f"below_min={network_filter_stats['below_min']}, "
+                        "above_max_or_unreachable="
+                        f"{network_filter_stats['above_max_or_unreachable']}",
+                        flush=True,
                     )
     else:
         for path in iter_trajectory_files(
@@ -625,17 +763,24 @@ def main() -> int:
             snapped_points += snapped
             process_points(points)
             if args.progress_interval > 0 and file_count % args.progress_interval == 0:
-                print(
-                    "processed "
-                    f"{file_count} files, seen_candidates={seen_candidates}, "
-                    f"reservoir={len(reservoir)}"
-                )
+                    print(
+                        "processed "
+                        f"{file_count} files, coarse_candidates={coarse_candidates_seen}, "
+                        f"accepted_candidates={seen_candidates}, reservoir={len(reservoir)}, "
+                        f"dijkstra_calls={network_filter_stats['dijkstra_calls']}, "
+                        f"cache_hits={network_filter_stats['cache_hits']}, "
+                        f"below_min={network_filter_stats['below_min']}, "
+                        "above_max_or_unreachable="
+                        f"{network_filter_stats['above_max_or_unreachable']}",
+                        flush=True,
+                    )
 
     if len(reservoir) < required_candidates:
         raise RuntimeError(
             f"Only found {len(reservoir)} candidates, but "
             f"{required_candidates} are required. Try lowering "
-            "--queries-per-set, --sets, --min-duration-min, or --min-distance-km."
+            "--queries-per-set, --sets, --min-duration-min, --min-distance-km, "
+            "or --min-free-flow-min."
         )
 
     rng.shuffle(reservoir)
@@ -673,7 +818,7 @@ def main() -> int:
         "naming": "BJRealRep{amplification_factor}-{set_id}.txt",
         "center": {"lon": args.center_lon, "lat": args.center_lat},
         "region_radius_km": args.region_radius_km,
-        "region_description": "8 km Tiananmen-centered third-ring proxy",
+        "region_description": "Tiananmen-centered candidate region",
         "road_nodes_inside_region": len(inside_nodes),
         "usable_road_nodes_inside_region": len(usable_nodes),
         "usable_internal_directed_edges": len(internal_edges),
@@ -685,6 +830,10 @@ def main() -> int:
         "max_duration_min": args.max_duration_min,
         "min_distance_km": args.min_distance_km,
         "max_distance_km": args.max_distance_km,
+        "min_free_flow_min": args.min_free_flow_min,
+        "max_free_flow_min": args.max_free_flow_min,
+        "network_free_flow_filter_enabled": network_filter_enabled,
+        "shortest_path_cache_size": args.shortest_path_cache_size,
         "start_time": args.start_time,
         "end_time": args.end_time,
         "start_stride": args.start_stride,
@@ -697,7 +846,10 @@ def main() -> int:
         "gps_points_parsed": parsed_points,
         "gps_points_inside_region": region_points,
         "gps_points_snapped": snapped_points,
+        "coarse_candidate_segments_seen": coarse_candidates_seen,
         "candidate_segments_seen": seen_candidates,
+        "network_filter_stats": network_filter_stats,
+        "shortest_path_cache_entries": len(shortest_path_cache),
         "time_origin_seconds": time_origin_seconds,
     }
     output_dir.mkdir(parents=True, exist_ok=True)

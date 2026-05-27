@@ -201,35 +201,165 @@ compression a large synthetic-data experiment.
 Purpose:
 
 Show that the default parameters are reasonable and that the method is not
-fragile.
+fragile. This subsection is a robustness check, not a tuning contest. It should
+use a small number of pre-declared values and then fix one default for the
+overall-effectiveness section.
 
-Dataset:
-
-```text
-BJ Synthetic 3 x 3 x 30 for gamma and impact_weight
-One representative real-world workload for delta_compress
-```
-
-Parameters:
+Default candidates:
 
 ```text
-gamma: 25, 50
-impact_weight: 0, 30, optionally 50
-delta_compress: small/default/large
+gamma = 50
+impact_weight = 20
+delta_compress = 1200 seconds
+compressed real-workload conflict_threshold = 5000
 ```
 
-Metrics:
+These match the current proposed GRO runner settings. Older component-ablation
+figures may still use `gamma = 25` or `impact_weight = 30`; treat those as
+ablation settings unless the final paper default is explicitly changed.
+
+Parameter groups:
+
+```text
+gamma: 25, 50, 90
+impact_weight: 0, 10, 20, 30, 50
+delta_compress: 600, 1200, 2400 seconds
+```
+
+Datasets and scope:
+
+```text
+gamma:
+  BJ Synthetic 3 x 3 x 30
+  tdg_excess_normal and tdg_excess_full
+
+impact_weight:
+  BJ Synthetic 3 x 3 x 30
+  gamma fixed to the selected default
+  tdg_excess_full only
+
+delta_compress:
+  one representative peak real-world workload
+  compressed TDG only
+  candidate_filter = score_top
+  gamma and impact_weight fixed to the selected defaults
+```
+
+Primary metrics:
 
 ```text
 final TTT
 average query travel time
+improvement over shortest-path initialization
 selected_fraction
-runtime
-TDG size for delta_compress
+method_total_sec
+tdg_prepare_sec
+select_sec
+reroute_sec
+tdg_node_count and tdg_edge_timeline_count for delta_compress
 ```
 
-Keep this subsection compact. It should justify defaults, not become a second
-main evaluation.
+Decision rule:
+
+- Use all 270 BJ synthetic datasets for `gamma` and `impact_weight`; do not
+  choose a default from selected-presentation seeds.
+- Compare fixed parameter values, not oracle or best-param-by-iteration rows.
+- Prefer a parameter if it is within the stable quality band of the best tested
+  value, avoids catastrophic dense-workload failures, and does not noticeably
+  inflate selected fraction or runtime.
+- Report medians and per-configuration summaries because means are sensitive to
+  a few extreme dense synthetic workloads.
+
+Current result status:
+
+- Gamma has usable BJ synthetic results under
+  `python/results/experiments/exp4_parameter_sensitivity/bj_synthetic_capacity2_cap10e8/gamma/`.
+  In the selection-only normal-reroute comparison, `gamma = 25` selects about
+  `3.70%` of queries on average and wins `61.9%` of datasets; `gamma = 50`
+  selects about `7.91%` and has similar median final TTT; `gamma = 90` selects
+  about `20.63%`, is slower, and is not a good default candidate. In the
+  TDG-impact reroute comparison, `gamma = 50` is safer for dense outlier cases,
+  while `gamma = 25` wins more individual datasets. This supports a paper
+  statement that the method is stable for `gamma` in the `25-50` range and that
+  `90` is an over-selection stress setting.
+- The current exp4 impact-weight CSV is incomplete:
+  `python/results/experiments/exp4_parameter_sensitivity/bj_synthetic_capacity2_cap10e8/impact_weight/csv/gro_ablation_tdg_excess_full_impact_sweep_capacity2_cap10e8.csv`
+  has `11351` data rows, not the expected full grid. Do not cite it as a
+  completed paper-facing result. A complete diagnostic subset exists for
+  weights `5,10,20` in the exp1 raw/analysis files, and it reinforces the
+  current caveat that TDG-impact rerouting is less stable than selection.
+- Delta-compression sensitivity is still pending as a clean exp4 result. There
+  is only a single `delta=2400` probe in the exp3 peak1h directory, so it should
+  not be cited until matched `600/1200/2400` runs are produced on the same
+  workload and machine setting.
+
+Suggested execution commands:
+
+```bash
+make gro_ablation_test
+
+mkdir -p \
+  python/results/experiments/exp4_parameter_sensitivity/bj_synthetic_capacity2_cap10e8/gamma/csv \
+  python/results/experiments/exp4_parameter_sensitivity/bj_synthetic_capacity2_cap10e8/impact_weight/csv \
+  python/results/experiments/exp4_parameter_sensitivity/real_peak1h_delta/csv \
+  logs
+
+# Gamma sensitivity on BJ synthetic.
+nohup ./gro_ablation_test config/config_bj_capacity2_cap10e8.yaml \
+  --query-dir data/BJ_Synthetic_query_sets \
+  --output python/results/experiments/exp4_parameter_sensitivity/bj_synthetic_capacity2_cap10e8/gamma/csv/gro_ablation_tdg_excess_gamma_sweep_capacity2_cap10e8.csv \
+  --selection-methods tdg_excess \
+  --reroute-methods normal,tdg \
+  --fixed-fractions 10 \
+  --tdg-gammas 25,50,90 \
+  --impact-weights 20 \
+  --random-seed 0 \
+  > logs/exp4_bj_tdg_excess_gamma_sweep_capacity2_cap10e8.log 2>&1 &
+
+# Impact-weight sensitivity after fixing gamma.
+nohup ./gro_ablation_test config/config_bj_capacity2_cap10e8.yaml \
+  --query-dir data/BJ_Synthetic_query_sets \
+  --output python/results/experiments/exp4_parameter_sensitivity/bj_synthetic_capacity2_cap10e8/impact_weight/csv/gro_ablation_tdg_excess_impact_weight_sweep_gamma50_capacity2_cap10e8.csv \
+  --selection-methods tdg_excess \
+  --reroute-methods tdg \
+  --fixed-fractions 10 \
+  --tdg-gammas 50 \
+  --impact-weights 0,10,20,30,50 \
+  --random-seed 0 \
+  > logs/exp4_bj_tdg_excess_impact_weight_sweep_gamma50_capacity2_cap10e8.log 2>&1 &
+
+# Delta-compression sensitivity on one representative 100k peak workload.
+for delta in 600 1200 2400; do
+  ./gro_ablation_test config/config_bj_capacity2_cap10e8_iter5.yaml \
+    --query-file data/BJ_Real_query_sets_scalability_inner_progressive_peak1h/BJRealRep10-4.txt \
+    --output python/results/experiments/exp4_parameter_sensitivity/real_peak1h_delta/csv/gro_delta${delta}_BJRealRep10-4.csv \
+    --selection-methods tdg_excess \
+    --reroute-methods tdg \
+    --fixed-fractions 10 \
+    --tdg-gammas 50 \
+    --impact-weights 20 \
+    --candidate-filter score_top \
+    --tdg-mode compressed \
+    --conflict-threshold 5000 \
+    --delta-compress "$delta" \
+    --random-seed 0 \
+    > "logs/exp4_delta${delta}_BJRealRep10-4.log" 2>&1
+done
+```
+
+Paper presentation:
+
+Use one compact table, not a large figure. Recommended rows are:
+
+```text
+gamma = 25 / 50 / 90
+impact_weight = 0 / 10 / 20 / 30 / 50
+delta_compress = 600 / 1200 / 2400
+```
+
+For `gamma` and `impact_weight`, report final average travel time, selected
+fraction, and runtime. For `delta_compress`, report TDG size, runtime, and
+final TTT relative to `delta_compress = 1200`.
 
 ## Subsection 5: Overall Effectiveness
 
