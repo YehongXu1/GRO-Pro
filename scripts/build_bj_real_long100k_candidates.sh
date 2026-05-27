@@ -10,8 +10,10 @@ export PYTHONUNBUFFERED="${PYTHONUNBUFFERED:-1}"
 
 TDRIVE_INPUT="${TDRIVE_INPUT:-data/BJ_Real_query_sets/T-drive Taxi Trajectories.zip}"
 BASE_OUTPUT="${BASE_OUTPUT:-data/BJ_Real_query_sets_long100k}"
+COARSE_CANDIDATES="${COARSE_CANDIDATES:-${BASE_OUTPUT}/coarse_candidates.csv}"
 WINDOWS="${WINDOWS:-21600,10800,7200,3600}"
 MAX_FILES="${MAX_FILES:-1000}"
+STOP_AFTER_COARSE="${STOP_AFTER_COARSE:-220000}"
 SETS="${SETS:-5}"
 QUERIES_PER_SET="${QUERIES_PER_SET:-10000}"
 REP_VALUES="${REP_VALUES:-10}"
@@ -24,6 +26,9 @@ MIN_FREE_FLOW_MIN="${MIN_FREE_FLOW_MIN:-8}"
 MAX_FREE_FLOW_MIN="${MAX_FREE_FLOW_MIN:-60}"
 MAX_END_POINTS_PER_START="${MAX_END_POINTS_PER_START:-80}"
 PROGRESS_INTERVAL="${PROGRESS_INTERVAL:-25}"
+FILTER_PROGRESS_INTERVAL="${FILTER_PROGRESS_INTERVAL:-50000}"
+THREADS="${THREADS:-0}"
+SKIP_BUILD="${SKIP_BUILD:-0}"
 DRY_RUN="${DRY_RUN:-0}"
 
 window_label() {
@@ -37,7 +42,7 @@ window_label() {
   fi
 }
 
-generate_cmd=(
+coarse_cmd=(
   python3 python/generate_bj_real_queries_from_tdrive.py
   --tdrive-dir "$TDRIVE_INPUT"
   --output-dir "$BASE_OUTPUT"
@@ -49,20 +54,52 @@ generate_cmd=(
   --max-duration-min "$MAX_DURATION_MIN"
   --min-distance-km "$MIN_DISTANCE_KM"
   --max-distance-km "$MAX_DISTANCE_KM"
-  --min-free-flow-min "$MIN_FREE_FLOW_MIN"
-  --max-free-flow-min "$MAX_FREE_FLOW_MIN"
   --max-end-points-per-start "$MAX_END_POINTS_PER_START"
   --max-files "$MAX_FILES"
+  --coarse-candidates-output "$COARSE_CANDIDATES"
+  --coarse-only
+  --stop-after-coarse "$STOP_AFTER_COARSE"
   --shuffle-files
   --progress-interval "$PROGRESS_INTERVAL"
   --random-seed 0
 )
 
-printf '[build] base long100k:'
-printf ' %q' "${generate_cmd[@]}"
+printf '[build] coarse candidates:'
+printf ' %q' "${coarse_cmd[@]}"
 printf '\n'
 if [[ "$DRY_RUN" == "0" ]]; then
-  "${generate_cmd[@]}"
+  "${coarse_cmd[@]}"
+fi
+
+build_cmd=(make bj_real_candidate_filter)
+printf '[build] C++ filter binary:'
+printf ' %q' "${build_cmd[@]}"
+printf '\n'
+if [[ "$DRY_RUN" == "0" && "$SKIP_BUILD" == "0" ]]; then
+  "${build_cmd[@]}"
+fi
+
+filter_cmd=(
+  ./bj_real_candidate_filter
+  --graph data/BJ.txt
+  --coords data/BJ_NodeIDLonLat.txt
+  --candidates "$COARSE_CANDIDATES"
+  --output-dir "$BASE_OUTPUT"
+  --sets "$SETS"
+  --queries-per-set "$QUERIES_PER_SET"
+  --rep-values "$REP_VALUES"
+  --min-free-flow-min "$MIN_FREE_FLOW_MIN"
+  --max-free-flow-min "$MAX_FREE_FLOW_MIN"
+  --threads "$THREADS"
+  --progress-interval "$FILTER_PROGRESS_INTERVAL"
+  --random-seed 0
+)
+
+printf '[build] C++ free-flow filter:'
+printf ' %q' "${filter_cmd[@]}"
+printf '\n'
+if [[ "$DRY_RUN" == "0" ]]; then
+  "${filter_cmd[@]}"
 fi
 
 IFS=',' read -r -a window_values <<< "$WINDOWS"

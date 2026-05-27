@@ -548,6 +548,27 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--max-end-points-per-start", type=int, default=40)
     parser.add_argument("--amplify-time-jitter-sec", type=int, default=0)
     parser.add_argument("--max-files", type=int, default=0)
+    parser.add_argument(
+        "--stop-after-accepted",
+        type=int,
+        default=0,
+        help="Stop scanning once this many candidates pass all filters; 0 disables.",
+    )
+    parser.add_argument(
+        "--coarse-candidates-output",
+        help="Optional CSV path for candidates before graph shortest-path filtering.",
+    )
+    parser.add_argument(
+        "--coarse-only",
+        action="store_true",
+        help="Only write coarse candidates and skip final query-set generation.",
+    )
+    parser.add_argument(
+        "--stop-after-coarse",
+        type=int,
+        default=0,
+        help="Stop scanning once this many coarse candidates are written; 0 disables.",
+    )
     parser.add_argument("--shuffle-files", action="store_true")
     parser.add_argument("--progress-interval", type=int, default=100)
     parser.add_argument("--random-seed", type=int, default=0)
@@ -635,6 +656,24 @@ def main() -> int:
         "above_max_or_unreachable": 0,
     }
     coarse_candidates_seen = 0
+    coarse_file = None
+    coarse_writer = None
+    if args.coarse_candidates_output:
+        coarse_path = Path(args.coarse_candidates_output)
+        coarse_path.parent.mkdir(parents=True, exist_ok=True)
+        coarse_file = coarse_path.open("w", newline="")
+        coarse_writer = csv.DictWriter(
+            coarse_file,
+            fieldnames=[
+                "origin",
+                "destination",
+                "departure_abs_seconds",
+                "taxi_id",
+                "duration_seconds",
+                "haversine_km",
+            ],
+        )
+        coarse_writer.writeheader()
 
     def with_free_flow_filter(candidate: QueryCandidate) -> Optional[QueryCandidate]:
         if not network_filter_enabled:
@@ -686,6 +725,19 @@ def main() -> int:
             args.max_end_points_per_start,
         ):
             coarse_candidates_seen += 1
+            if coarse_writer is not None:
+                coarse_writer.writerow(
+                    {
+                        "origin": candidate.origin,
+                        "destination": candidate.destination,
+                        "departure_abs_seconds": candidate.departure_abs_seconds,
+                        "taxi_id": candidate.taxi_id,
+                        "duration_seconds": candidate.duration_seconds,
+                        "haversine_km": f"{candidate.haversine_km:.9f}",
+                    }
+                )
+            if args.coarse_only:
+                continue
             candidate = with_free_flow_filter(candidate)
             if candidate is None:
                 continue
@@ -741,6 +793,26 @@ def main() -> int:
                         f"{network_filter_stats['above_max_or_unreachable']}",
                         flush=True,
                     )
+                if args.stop_after_accepted > 0 and seen_candidates >= args.stop_after_accepted:
+                    print(
+                        "early_stop "
+                        f"accepted_candidates={seen_candidates} "
+                        f"stop_after_accepted={args.stop_after_accepted}",
+                        flush=True,
+                    )
+                    break
+                if (
+                    args.coarse_only
+                    and args.stop_after_coarse > 0
+                    and coarse_candidates_seen >= args.stop_after_coarse
+                ):
+                    print(
+                        "early_stop "
+                        f"coarse_candidates={coarse_candidates_seen} "
+                        f"stop_after_coarse={args.stop_after_coarse}",
+                        flush=True,
+                    )
+                    break
     else:
         for path in iter_trajectory_files(
             tdrive_dir,
@@ -763,17 +835,80 @@ def main() -> int:
             snapped_points += snapped
             process_points(points)
             if args.progress_interval > 0 and file_count % args.progress_interval == 0:
-                    print(
-                        "processed "
-                        f"{file_count} files, coarse_candidates={coarse_candidates_seen}, "
-                        f"accepted_candidates={seen_candidates}, reservoir={len(reservoir)}, "
-                        f"dijkstra_calls={network_filter_stats['dijkstra_calls']}, "
-                        f"cache_hits={network_filter_stats['cache_hits']}, "
-                        f"below_min={network_filter_stats['below_min']}, "
-                        "above_max_or_unreachable="
-                        f"{network_filter_stats['above_max_or_unreachable']}",
-                        flush=True,
-                    )
+                print(
+                    "processed "
+                    f"{file_count} files, coarse_candidates={coarse_candidates_seen}, "
+                    f"accepted_candidates={seen_candidates}, reservoir={len(reservoir)}, "
+                    f"dijkstra_calls={network_filter_stats['dijkstra_calls']}, "
+                    f"cache_hits={network_filter_stats['cache_hits']}, "
+                    f"below_min={network_filter_stats['below_min']}, "
+                    "above_max_or_unreachable="
+                    f"{network_filter_stats['above_max_or_unreachable']}",
+                    flush=True,
+                )
+            if args.stop_after_accepted > 0 and seen_candidates >= args.stop_after_accepted:
+                print(
+                    "early_stop "
+                    f"accepted_candidates={seen_candidates} "
+                    f"stop_after_accepted={args.stop_after_accepted}",
+                    flush=True,
+                )
+                break
+            if (
+                args.coarse_only
+                and args.stop_after_coarse > 0
+                and coarse_candidates_seen >= args.stop_after_coarse
+            ):
+                print(
+                    "early_stop "
+                    f"coarse_candidates={coarse_candidates_seen} "
+                    f"stop_after_coarse={args.stop_after_coarse}",
+                    flush=True,
+                )
+                break
+
+    if coarse_file is not None:
+        coarse_file.close()
+
+    if args.coarse_only:
+        metadata = {
+            "source": "T-Drive Beijing taxi GPS trajectories",
+            "graph": str(graph_path),
+            "coordinates": str(coords_path),
+            "tdrive_dir": str(tdrive_dir),
+            "coarse_candidates_output": args.coarse_candidates_output,
+            "center": {"lon": args.center_lon, "lat": args.center_lat},
+            "region_radius_km": args.region_radius_km,
+            "max_snap_distance_m": args.max_snap_distance_m,
+            "min_duration_min": args.min_duration_min,
+            "max_duration_min": args.max_duration_min,
+            "min_distance_km": args.min_distance_km,
+            "max_distance_km": args.max_distance_km,
+            "start_time": args.start_time,
+            "end_time": args.end_time,
+            "start_stride": args.start_stride,
+            "max_end_points_per_start": args.max_end_points_per_start,
+            "max_files": args.max_files,
+            "stop_after_coarse": args.stop_after_coarse,
+            "shuffle_files": args.shuffle_files,
+            "random_seed": args.random_seed,
+            "files_processed": file_count,
+            "gps_points_parsed": parsed_points,
+            "gps_points_inside_region": region_points,
+            "gps_points_snapped": snapped_points,
+            "coarse_candidate_segments_seen": coarse_candidates_seen,
+        }
+        if args.coarse_candidates_output:
+            metadata_path = Path(args.coarse_candidates_output).with_suffix(".metadata.json")
+            with metadata_path.open("w") as file:
+                json.dump(metadata, file, indent=2)
+            print(f"wrote coarse metadata to {metadata_path}", flush=True)
+        print(
+            "coarse_done "
+            f"files={file_count} coarse_candidates={coarse_candidates_seen}",
+            flush=True,
+        )
+        return 0
 
     if len(reservoir) < required_candidates:
         raise RuntimeError(
@@ -840,6 +975,7 @@ def main() -> int:
         "max_end_points_per_start": args.max_end_points_per_start,
         "amplify_time_jitter_sec": args.amplify_time_jitter_sec,
         "max_files": args.max_files,
+        "stop_after_accepted": args.stop_after_accepted,
         "shuffle_files": args.shuffle_files,
         "random_seed": args.random_seed,
         "files_processed": file_count,

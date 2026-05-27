@@ -18,6 +18,7 @@ gro_fixed_random_selection_test
 gro_ablation_test
 gro_slot_legacy_ablation_test
 congestion_pattern_diagnostic
+bj_real_candidate_filter
 mh_synthetic_experiment
 svp_test
 gor_test

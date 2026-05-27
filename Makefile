@@ -74,6 +74,7 @@ TARGETS = \
 	gro_ablation_test \
 	congestion_pattern_diagnostic \
 	paper_baseline_test \
+	bj_real_candidate_filter \
 	mh_synthetic_experiment \
 	shortest_path_congestion_diagnostic \
 	svp_test \
@@ -91,6 +92,7 @@ TEST_OBJECTS = \
 	tests/gro_ablation_test.o \
 	tests/congestion_pattern_diagnostic.o \
 	tests/paper_baseline_test.o \
+	tests/bj_real_candidate_filter.o \
 	tests/mh_synthetic_experiment.o \
 	tests/shortest_path_congestion_diagnostic.o \
 	tests/svp_test.o \
@@ -161,6 +163,9 @@ congestion_pattern_diagnostic: $(OBJECTS_LIB) tests/congestion_pattern_diagnosti
 	$(CXX) $(CXXFLAGS) $(OPENMP_FLAGS) -o $@ $(filter-out Makefile,$^) $(LIB_DIRS) $(LIBS)
 
 paper_baseline_test: $(OBJECTS_LIB) tests/paper_baseline_test.o Makefile
+	$(CXX) $(CXXFLAGS) $(OPENMP_FLAGS) -o $@ $(filter-out Makefile,$^) $(LIB_DIRS) $(LIBS)
+
+bj_real_candidate_filter: $(OBJECTS_LIB) tests/bj_real_candidate_filter.o Makefile
 	$(CXX) $(CXXFLAGS) $(OPENMP_FLAGS) -o $@ $(filter-out Makefile,$^) $(LIB_DIRS) $(LIBS)
 
 mh_synthetic_experiment: $(OBJECTS_LIB) tests/mh_synthetic_experiment.o Makefile
