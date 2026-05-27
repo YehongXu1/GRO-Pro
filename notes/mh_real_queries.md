@@ -140,105 +140,77 @@ it is explicitly labeled as the lower level.
 
 ## Paper Baselines
 
-The older `window6h_all` scripts are useful for diagnostics but are not the
-final MH overall effectiveness design, because they mix 10k, 50k, and 100k
-query counts. For final overall effectiveness, first select three 100k
-representatives using the congestion diagnostic above.
+The old `window6h_all` scripts and result CSVs were removed because they mixed
+10k, 50k, and 100k query counts. For final overall effectiveness, first select
+three 100k representatives using the congestion diagnostic above.
 
-The MH real six-hour window paper baselines should usually be launched by
-method, with each method running all datasets in
-`data/MH_Real_query_sets_window6h`:
+To run paper baselines over the current fixed-100k window candidates:
 
 ```bash
 make paper_baseline_test
 
-bash scripts/launch_mh_real_window6h_paper_baselines_by_method.sh
-```
-
-This launches four prior-paper baseline jobs:
-
-```text
-svp  -> paper_baseline_svp_mh_real_window6h_all.csv
-gor  -> paper_baseline_gor_mh_real_window6h_all.csv
-sor  -> paper_baseline_sor_mh_real_window6h_all.csv
-fahl -> paper_baseline_fahl_mh_real_window6h_all.csv
-```
-
-To include the iterative no-TDG GRO baseline in the same launcher:
-
-```bash
-METHOD_LIST=gro_baseline,svp,gor,sor,fahl \
-bash scripts/launch_mh_real_window6h_paper_baselines_by_method.sh
-```
-
-`gro_baseline` runs `random,most_delayed` selection with normal TD-Dijkstra
-rerouting over all MH window6h datasets, and writes:
-
-```text
-python/results/experiments/exp5_overall_effectiveness/gro_baseline_random_delayed_normal_mh_real_window6h_all.csv
-```
-
-By default this includes Rep1, Rep5, and Rep10, so each method runs all 15
-window6h query files. To launch one method over all datasets:
-
-```bash
-METHODS=sor \
-METHOD_TAG=sor \
-LOG=logs/paper_baseline_sor_mh_real_window6h_all.log \
-OUT=python/results/experiments/exp5_overall_effectiveness/paper_baseline_sor_mh_real_window6h_all.csv \
-nohup bash scripts/run_mh_real_window6h_paper_baselines.sh \
+LOG=logs/paper_baselines_mh_real_100k_all_windows.wrapper.log \
+nohup bash scripts/run_mh_real_100k_windows_paper_baselines.sh \
   > /dev/null 2>&1 < /dev/null &
 ```
 
-`scripts/run_mh_real_window6h_paper_baselines.sh` runs the selected method(s) on
-all `data/MH_Real_query_sets_window6h/MHRealRep*.txt` datasets with
-`config/config.yaml`. If `OUT` is not set, it writes:
+By default this runs:
 
 ```text
-python/results/experiments/exp5_overall_effectiveness/paper_baseline_${METHOD_TAG}_mh_real_window6h_all.csv
+methods: svp,gor,sor,fahl
+windows: window6h,window3h,window2h,window1h,window30min
+rep: 10
 ```
 
 Useful overrides:
 
 ```bash
-METHODS=sor
-REP=10
-REP_TAG=rep10
-MAX_FILES=1
-MAX_QUERIES=10000
-OUT=path/to/output.csv
-LOG=path/to/log
+METHODS=sor,fahl
+WINDOW_LABELS=window6h,window3h
 DRY_RUN=1
 ```
 
-The standalone GRO baseline script is:
+Output files are written as:
 
-```bash
-LOG=logs/gro_baseline_random_delayed_normal_mh_real_window6h_all.log \
-nohup bash scripts/run_mh_real_window6h_gro_baseline.sh \
-  > /dev/null 2>&1 < /dev/null &
+```text
+python/results/experiments/exp5_overall_effectiveness/paper_baseline_${method}_mh_real_100k_${window}.csv
 ```
 
-The proposed score-pruned + compressed GRO run for MH real window6h is:
+## GRO Runs
+
+Run proposed GRO and/or iterative no-TDG baselines over the current fixed-100k
+window candidates:
 
 ```bash
 make gro_ablation_test
 
-LOG=logs/gro_score_top_compressed_mh_real_window6h_all.log \
-nohup bash scripts/run_mh_real_window6h_score_top_compressed.sh \
+RUNS=score_top,baseline \
+LOG=logs/gro_mh_real_100k_all_windows.wrapper.log \
+nohup bash scripts/run_mh_real_100k_windows_gro.sh \
   > /dev/null 2>&1 < /dev/null &
 ```
 
-By default it runs all `MHRealRep*.txt` datasets with:
+By default:
 
 ```text
-selection-methods = tdg_excess
-reroute-methods = tdg
-candidate-filter = score_top
-tdg-mode = compressed
-conflict-threshold = 5000
-tdg-gammas = 50
-impact-weights = 20
+score_top = tdg_excess + tdg reroute + score_top candidate filter + compressed TDG
+baseline = random,most_delayed + normal TD-Dijkstra
+```
+
+Useful overrides:
+
+```bash
+RUNS=score_top
+WINDOW_LABELS=window6h,window3h
+DRY_RUN=1
+```
+
+The generic child scripts are:
+
+```text
+scripts/run_gro_score_top_compressed_query_dir.sh
+scripts/run_gro_iterative_baselines_query_dir.sh
+scripts/run_paper_baselines_query_dir.sh
 ```
 
 ## Generator

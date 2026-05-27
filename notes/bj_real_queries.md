@@ -109,24 +109,73 @@ data/BJ_Real_query_sets/metadata.json
 data/BJ_Real_query_sets/query_set_summary.csv
 ```
 
-## Six-Hour Peak Workload
+## Removed Time-Window Diagnostics
 
 The original T-Drive-derived query sets span about six days, which makes
 congestion too weak for low amplification factors. A one-hour modulo workload
-is too aggressive because it folds all trips into one artificial peak. The
-current controlled real workload therefore uses a six-hour departure window:
+was too aggressive because it folded all trips into one artificial peak. The
+old derived directories `data/BJ_Real_query_sets_window6h` and
+`data/BJ_Real_query_sets_window1h` were removed during the
+overall-effectiveness cleanup because the underlying BJ real OD sets are too
+short for the final paper-facing real-world table.
 
-```bash
-/Users/xyh/opt/anaconda3/envs/plot/bin/python \
-  python/rescale_query_departures.py \
-  --input-dir data/BJ_Real_query_sets \
-  --output-dir data/BJ_Real_query_sets_window6h \
-  --window-sec 21600
+## Revised Paper-Facing Overall Effectiveness Plan
+
+The current BJ real query sets should be treated as diagnostic, not final
+paper-facing overall-effectiveness workloads. They pass the congestion-ratio
+gate after departure-window compression, but their OD lengths are too short:
+`BJRealRep10-2` has `free_flow_ttt = 21,306,090` for 100k queries, which is
+only about `3.55` minutes per query. A reviewer could reasonably object that
+the workload is mostly short local trips and that high congestion is created by
+compressing many short trips into the same time window.
+
+For final real-world overall effectiveness, use the following gates:
+
+```text
+query_count: fixed at 100k for every dataset
+OD source: T-Drive-derived real trajectory segments
+query length gate: network free-flow shortest-path avg >= 8-10 min
+query length upper guard: network free-flow shortest-path avg <= 45-60 min
+congestion gate: choose lower / middle / high by evaluated_ttt / free_flow_ttt
 ```
 
-This linearly rescales departures within each query file to `[0, 21600]`
-seconds. It preserves the OD pairs and relative temporal order, unlike modulo
-folding.
+The final three traffic levels should vary congestion intensity while keeping
+the 100k query count and OD-length distribution comparable. Do not use
+`Rep1/Rep5/Rep10` as traffic-intensity levels, because that changes both query
+count and congestion. Prefer generating a pool of 100k longer-trip BJ real
+candidate files and then creating departure-window variants such as:
+
+```text
+data/BJ_Real_query_sets_long100k
+data/BJ_Real_query_sets_long100k_window6h
+data/BJ_Real_query_sets_long100k_window3h
+data/BJ_Real_query_sets_long100k_window2h
+data/BJ_Real_query_sets_long100k_window1h
+```
+
+Candidate selection should be based on shortest-path congestion diagnostics:
+
+```text
+free_flow_ttt
+evaluated_ttt
+avg_free_flow_tt
+avg_evaluated_tt
+inflation_ratio = evaluated_ttt / free_flow_ttt
+```
+
+Suggested final target bands:
+
+```text
+lower   avg_free_flow >= 8-10 min, inflation roughly 3x-10x
+middle  avg_free_flow >= 8-10 min, inflation roughly 10x-40x
+high    avg_free_flow >= 8-10 min, inflation roughly 40x-100x
+```
+
+The exact ratio bands can be adjusted after seeing candidate diagnostics, but
+the query-length gate should not be relaxed below the current short-trip
+setting. The existing `data/BJ_Real_query_sets` source-style query files remain
+useful for debugging and regeneration experiments, but they should not be used
+as the final real-world table.
 
 ## Ablation Test
 

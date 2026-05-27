@@ -114,21 +114,15 @@ notes/bj_real_queries.md
 
 ## BJ Real Time-Window Variants
 
-These variants preserve the OD pairs and relative temporal order within each
-file, but rescale departures into controlled windows. They are experimental
-traffic-stress workloads, not independent raw samples.
+These old variants were removed during the overall-effectiveness cleanup. They
+preserved OD pairs and relative temporal order, but the underlying BJ real query
+sets have too-short free-flow trips for the final paper-facing real-world
+overall-effectiveness table.
 
 | Path | Status | Query files | Window | Experiment use |
 | --- | --- | ---: | --- | --- |
-| `data/BJ_Real_query_sets_window1h/` | release-candidate, derived-from-third-party | 15 | `[0, 3600]` seconds | Dense one-hour workload checks and scalability probes |
-| `data/BJ_Real_query_sets_window6h/` | release-candidate, derived-from-third-party | 15 | `[0, 21600]` seconds | Controlled real workload with moderate congestion |
-
-Metadata:
-
-```text
-data/BJ_Real_query_sets_window1h/departure_rescale_metadata.json
-data/BJ_Real_query_sets_window6h/departure_rescale_metadata.json
-```
+| `data/BJ_Real_query_sets_window1h/` | removed diagnostic | 15 | `[0, 3600]` seconds | Deleted; do not use for final paper results |
+| `data/BJ_Real_query_sets_window6h/` | removed diagnostic | 15 | `[0, 21600]` seconds | Deleted; do not use for final paper results |
 
 Rescaling script:
 

@@ -9,9 +9,9 @@ fi
 export OMP_NUM_THREADS="${OMP_NUM_THREADS:-32}"
 
 CONFIG="${CONFIG:-config/config.yaml}"
-QUERY_DIR="${QUERY_DIR:-data/MH_Real_query_sets_window6h}"
+QUERY_DIR="${QUERY_DIR:?QUERY_DIR is required}"
+RESULTS_DIR="${RESULTS_DIR:-python/results/experiments/exp5_overall_effectiveness}"
 REP="${REP:-all}"
-REP_TAG="${REP_TAG:-${REP}}"
 MAX_FILES="${MAX_FILES:-0}"
 FIXED_FRACTIONS="${FIXED_FRACTIONS:-10}"
 SELECTION_METHODS="${SELECTION_METHODS:-random,most_delayed}"
@@ -21,7 +21,7 @@ IMPACT_WEIGHTS_PLACEHOLDER="${IMPACT_WEIGHTS_PLACEHOLDER:-30}"
 RANDOM_SEED="${RANDOM_SEED:-0}"
 DRY_RUN="${DRY_RUN:-0}"
 
-OUT="${OUT:-python/results/experiments/exp5_overall_effectiveness/gro_baseline_random_delayed_normal_mh_real_window6h_${REP_TAG}.csv}"
+OUT="${OUT:-$RESULTS_DIR/gro_iterative_baselines.csv}"
 
 mkdir -p "$(dirname "$OUT")"
 

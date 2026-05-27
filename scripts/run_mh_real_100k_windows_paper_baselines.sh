@@ -68,7 +68,7 @@ for label in "${window_values[@]}"; do
       SOR_MAX_LABELS="$SOR_MAX_LABELS"
       OMP_NUM_THREADS="$OMP_NUM_THREADS"
       DRY_RUN="$DRY_RUN"
-      bash scripts/run_mh_real_window6h_paper_baselines.sh
+      bash scripts/run_paper_baselines_query_dir.sh
     )
 
     printf '[run] %s %s:' "$method" "$label"

@@ -9,10 +9,9 @@ fi
 export OMP_NUM_THREADS="${OMP_NUM_THREADS:-32}"
 
 CONFIG="${CONFIG:-config/config.yaml}"
-QUERY_DIR="${QUERY_DIR:-data/MH_Real_query_sets_window6h}"
+QUERY_DIR="${QUERY_DIR:?QUERY_DIR is required}"
 RESULTS_DIR="${RESULTS_DIR:-python/results/experiments/exp5_overall_effectiveness}"
 REP="${REP:-all}"
-REP_TAG="${REP_TAG:-${REP}}"
 MAX_FILES="${MAX_FILES:-0}"
 TDG_GAMMAS="${TDG_GAMMAS:-50}"
 IMPACT_WEIGHTS="${IMPACT_WEIGHTS:-20}"
@@ -21,9 +20,9 @@ RANDOM_SEED="${RANDOM_SEED:-0}"
 CONFLICT_THRESHOLD="${CONFLICT_THRESHOLD:-5000}"
 DRY_RUN="${DRY_RUN:-0}"
 
-OUT="${OUT:-$RESULTS_DIR/gro_score_top_compressed_mh_real_window6h_${REP_TAG}.csv}"
+OUT="${OUT:-$RESULTS_DIR/gro_score_top_compressed.csv}"
 
-mkdir -p "$RESULTS_DIR"
+mkdir -p "$(dirname "$OUT")"
 
 cmd=(
   ./gro_ablation_test "$CONFIG"

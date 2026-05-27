@@ -83,7 +83,7 @@ for label in "${window_values[@]}"; do
       RANDOM_SEED="$RANDOM_SEED"
       CONFLICT_THRESHOLD="$CONFLICT_THRESHOLD"
       DRY_RUN="$DRY_RUN"
-      bash scripts/run_mh_real_window6h_score_top_compressed.sh
+      bash scripts/run_gro_score_top_compressed_query_dir.sh
     )
     printf '[run] score_top %s:' "$label"
     print_cmd "${cmd[@]}"
@@ -111,7 +111,7 @@ for label in "${window_values[@]}"; do
       IMPACT_WEIGHTS_PLACEHOLDER="$BASELINE_IMPACT_WEIGHTS_PLACEHOLDER"
       RANDOM_SEED="$RANDOM_SEED"
       DRY_RUN="$DRY_RUN"
-      bash scripts/run_mh_real_window6h_gro_baseline.sh
+      bash scripts/run_gro_iterative_baselines_query_dir.sh
     )
     printf '[run] baseline %s:' "$label"
     print_cmd "${cmd[@]}"
