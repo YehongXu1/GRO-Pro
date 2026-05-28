@@ -98,13 +98,16 @@ After downloading and extracting T-Drive, run for example:
   --random-seed 0
 ```
 
-The current generated set used a reproducible random subset of 500 taxi files.
+The obsolete generated set used a reproducible random subset of 500 taxi files.
 This subset produced 232,093 candidate trajectory segments inside the 8 km
 region, enough to sample five disjoint base query sets of 10,000 queries each.
+Those short-trip query files and their metadata were removed after the
+long-trip paper-facing workloads were generated.
 
-The script also writes:
+Removed files:
 
 ```text
+data/BJ_Real_query_sets/BJRealRep*.txt
 data/BJ_Real_query_sets/metadata.json
 data/BJ_Real_query_sets/query_set_summary.csv
 ```
@@ -172,10 +175,10 @@ high    avg_free_flow >= 8-10 min, inflation roughly 40x-100x
 ```
 
 The exact ratio bands can be adjusted after seeing candidate diagnostics, but
-the query-length gate should not be relaxed below the current short-trip
-setting. The existing `data/BJ_Real_query_sets` source-style query files remain
-useful for debugging and regeneration experiments, but they should not be used
-as the final real-world table.
+the query-length gate should not be relaxed back to the old short-trip setting.
+The old `data/BJ_Real_query_sets` query files were removed; that directory now
+keeps only the T-Drive raw source archive/extracted trajectories for
+regeneration.
 
 ## Ablation Test
 

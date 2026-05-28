@@ -203,8 +203,9 @@ and easier to obtain but are zone-level (`PULocationID`/`DOLocationID`), so they
 should be treated as a coarse fallback unless historical coordinate records are
 not usable. See `notes/mh_real_queries.md`.
 
-`data/BJ_Real_query_sets` preserves the original relative departure span, which
-is about six days. This makes congestion weak for low amplification factors.
+The obsolete short-trip query files formerly in `data/BJ_Real_query_sets` were
+removed after the long-trip `data/BJ_Real_query_sets_long100k*` workloads were
+generated. The directory is now source-only for T-Drive raw data/regeneration.
 The old derived `data/BJ_Real_query_sets_window6h` and
 `data/BJ_Real_query_sets_window1h` directories were removed during
 overall-effectiveness cleanup because the short-trip BJ real workload is no
@@ -254,7 +255,7 @@ representative datasets are now diagnostic only:
 
 | Level | Query file | Shortest-path congestion ratio | Role |
 | --- | --- | --- | --- |
-| lower | `data/BJ_Real_query_sets/BJRealRep10-2.txt` | `4.1618` | lowest-congestion 100k representative |
+| lower | `data/BJ_Real_query_sets/BJRealRep10-2.txt` (deleted diagnostic) | `4.1618` | lowest-congestion 100k representative |
 | middle | `data/BJ_Real_query_sets_window6h/BJRealRep10-2.txt` (deleted diagnostic) | `31.2855` | moderate/high six-hour peak representative |
 | extreme | `data/BJ_Real_query_sets_window6h/BJRealRep10-4.txt` (deleted diagnostic) | `83.6263` | extreme six-hour peak representative |
 

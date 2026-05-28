@@ -1,0 +1,30 @@
+{
+  "source": "T-Drive Beijing taxi GPS trajectories",
+  "graph": "data/BJ.txt",
+  "coordinates": "data/BJ_NodeIDLonLat.txt",
+  "tdrive_dir": "data/BJ_Real_query_sets/T-drive Taxi Trajectories.zip",
+  "coarse_candidates_output": "data/BJ_Real_query_sets_long100k/coarse_candidates.csv",
+  "center": {
+    "lon": 116.3975,
+    "lat": 39.9087
+  },
+  "region_radius_km": 20.0,
+  "max_snap_distance_m": 500.0,
+  "min_duration_min": 10.0,
+  "max_duration_min": 90.0,
+  "min_distance_km": 4.0,
+  "max_distance_km": 40.0,
+  "start_time": null,
+  "end_time": null,
+  "start_stride": 1,
+  "max_end_points_per_start": 80,
+  "max_files": 700,
+  "stop_after_coarse": 220000,
+  "shuffle_files": true,
+  "random_seed": 0,
+  "files_processed": 302,
+  "gps_points_parsed": 434115,
+  "gps_points_inside_region": 329362,
+  "gps_points_snapped": 329238,
+  "coarse_candidate_segments_seen": 220314
+}

@@ -1,0 +1,60 @@
+{
+  "source_query_dir": "data/BJ_Real_query_sets_long100k",
+  "output_query_dir": "data/BJ_Real_query_sets_long100k_window6h",
+  "pattern": "BJRealRep10-*.txt",
+  "window_sec": 21600,
+  "method": "linear_rescale_per_file",
+  "description": "Departure times are mapped per file from the original min/max departure span to [0, window_sec], preserving relative order.",
+  "files": [
+    {
+      "dataset": "BJRealRep10-0",
+      "query_count": 100000,
+      "input_min_departure": 2,
+      "input_max_departure": 532408,
+      "input_departure_span_sec": 532406,
+      "output_min_departure": 0,
+      "output_max_departure": 21600,
+      "output_departure_span_sec": 21600
+    },
+    {
+      "dataset": "BJRealRep10-1",
+      "query_count": 100000,
+      "input_min_departure": 193,
+      "input_max_departure": 532613,
+      "input_departure_span_sec": 532420,
+      "output_min_departure": 0,
+      "output_max_departure": 21600,
+      "output_departure_span_sec": 21600
+    },
+    {
+      "dataset": "BJRealRep10-2",
+      "query_count": 100000,
+      "input_min_departure": 0,
+      "input_max_departure": 532313,
+      "input_departure_span_sec": 532313,
+      "output_min_departure": 0,
+      "output_max_departure": 21600,
+      "output_departure_span_sec": 21600
+    },
+    {
+      "dataset": "BJRealRep10-3",
+      "query_count": 100000,
+      "input_min_departure": 57,
+      "input_max_departure": 532461,
+      "input_departure_span_sec": 532404,
+      "output_min_departure": 0,
+      "output_max_departure": 21600,
+      "output_departure_span_sec": 21600
+    },
+    {
+      "dataset": "BJRealRep10-4",
+      "query_count": 100000,
+      "input_min_departure": 176,
+      "input_max_departure": 532372,
+      "input_departure_span_sec": 532196,
+      "output_min_departure": 0,
+      "output_max_departure": 21600,
+      "output_departure_span_sec": 21600
+    }
+  ]
+}

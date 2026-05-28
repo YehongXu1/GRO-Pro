@@ -1,0 +1,19 @@
+{
+  "source": "T-Drive Beijing taxi GPS trajectories",
+  "graph": "data/BJ.txt",
+  "coordinates": "data/BJ_NodeIDLonLat.txt",
+  "coarse_candidates": "data/BJ_Real_query_sets_long100k/coarse_candidates.csv",
+  "output_dir": "data/BJ_Real_query_sets_long100k",
+  "naming": "BJRealRep{amplification_factor}-{set_id}.txt",
+  "sets": 5,
+  "queries_per_base_set": 10000,
+  "rep_values": [10],
+  "min_free_flow_min": 8,
+  "max_free_flow_min": 60,
+  "coarse_candidate_segments_seen": 220314,
+  "unique_od_count": 171536,
+  "candidate_segments_seen": 52627,
+  "below_min_free_flow_count": 167687,
+  "above_max_or_unreachable_count": 0,
+  "time_origin_seconds": 1201959067
+}

@@ -91,20 +91,20 @@ notes/bj_synthetic_queries.md
 | Field | Value |
 | --- | --- |
 | Path | `data/BJ_Real_query_sets/` |
-| Status | release-candidate, derived-from-third-party |
-| Experiment use | Real-workload robustness and congestion diagnostics |
-| Query files | 15 |
-| Dimensions | Rep 1/5/10 x seeds 0-4 |
-| Query counts | Rep1 = 10,000; Rep5 = 50,000; Rep10 = 100,000 |
+| Status | source-only, derived-from-third-party |
+| Experiment use | Raw T-Drive source storage for regeneration only |
+| Query files | 0 |
+| Dimensions | n/a |
+| Query counts | n/a |
 | Source | Public T-Drive Beijing taxi GPS trajectories |
 | Generator | `python/generate_bj_real_queries_from_tdrive.py` |
-| Metadata | `data/BJ_Real_query_sets/metadata.json`, `data/BJ_Real_query_sets/query_set_summary.csv` |
+| Metadata | Removed with obsolete short-trip query files |
 
-These files are not raw taxi trajectories. They are derived OD query sets
-created by filtering T-Drive GPS points in an 8 km Tiananmen-centered region,
-snapping to the BJ graph, extracting trajectory segments, and sampling OD
-queries. The raw T-Drive zip should remain out of any public package unless the
-upstream license allows redistribution.
+The obsolete short-trip OD query files formerly stored in this directory were
+removed after the long-trip `data/BJ_Real_query_sets_long100k*` workloads were
+generated. This directory now keeps only the T-Drive source archive/extracted
+raw trajectories for regeneration. The raw T-Drive zip should remain out of any
+public package unless the upstream license allows redistribution.
 
 Generation details are recorded in:
 
