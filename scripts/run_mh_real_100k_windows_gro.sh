@@ -12,8 +12,8 @@ CONFIG="${CONFIG:-config/config.yaml}"
 WINDOW_LABELS="${WINDOW_LABELS:-window6h,window3h,window2h,window1h,window30min}"
 RUNS="${RUNS:-score_top}"
 RESULTS_DIR="${RESULTS_DIR:-python/results/experiments/exp5_overall_effectiveness}"
-OURS_DIR="${OURS_DIR:-$RESULTS_DIR/ours}"
-BASELINE_DIR="${BASELINE_DIR:-$RESULTS_DIR/baselines}"
+SCORE_TOP_DIR="${SCORE_TOP_DIR:-$RESULTS_DIR/gro_score_top_compressed_mh_real}"
+GRO_BASELINE_DIR="${GRO_BASELINE_DIR:-$RESULTS_DIR/gro_baseline_random_delayed_normal_mh_real}"
 LOG_DIR="${LOG_DIR:-logs}"
 DRY_RUN="${DRY_RUN:-0}"
 SKIP_BUILD="${SKIP_BUILD:-0}"
@@ -28,7 +28,7 @@ BASELINE_SELECTION_METHODS="${BASELINE_SELECTION_METHODS:-random,most_delayed}"
 BASELINE_REROUTE_METHODS="${BASELINE_REROUTE_METHODS:-normal}"
 BASELINE_IMPACT_WEIGHTS_PLACEHOLDER="${BASELINE_IMPACT_WEIGHTS_PLACEHOLDER:-30}"
 
-mkdir -p "$RESULTS_DIR" "$OURS_DIR" "$BASELINE_DIR" "$LOG_DIR"
+mkdir -p "$RESULTS_DIR" "$SCORE_TOP_DIR" "$GRO_BASELINE_DIR" "$LOG_DIR"
 
 IFS=',' read -r -a run_values <<< "$RUNS"
 IFS=',' read -r -a window_values <<< "$WINDOW_LABELS"
@@ -69,7 +69,7 @@ for label in "${window_values[@]}"; do
   fi
 
   if run_enabled score_top; then
-    out="$OURS_DIR/gro_score_top_compressed_mh_real_100k_${label}.csv"
+    out="$SCORE_TOP_DIR/${label}/gro_score_top_compressed.csv"
     child_log="$LOG_DIR/gro_score_top_compressed_mh_real_100k_${label}.log"
     cmd=(
       env
@@ -96,7 +96,7 @@ for label in "${window_values[@]}"; do
   fi
 
   if run_enabled baseline; then
-    out="$BASELINE_DIR/gro_baseline_random_delayed_normal_mh_real_100k_${label}.csv"
+    out="$GRO_BASELINE_DIR/${label}/gro_baseline_random_delayed_normal.csv"
     child_log="$LOG_DIR/gro_baseline_random_delayed_normal_mh_real_100k_${label}.log"
     cmd=(
       env
