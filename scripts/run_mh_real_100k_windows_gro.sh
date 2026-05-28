@@ -69,7 +69,7 @@ for label in "${window_values[@]}"; do
   fi
 
   if run_enabled score_top; then
-    out="$SCORE_TOP_DIR/${label}/gro_score_top_compressed.csv"
+    out="$SCORE_TOP_DIR/gro_score_top_compressed/${label}.csv"
     child_log="$LOG_DIR/gro_score_top_compressed_mh_real_100k_${label}.log"
     cmd=(
       env
@@ -96,7 +96,7 @@ for label in "${window_values[@]}"; do
   fi
 
   if run_enabled baseline; then
-    out="$GRO_BASELINE_DIR/${label}/gro_baseline_random_delayed_normal.csv"
+    out="$GRO_BASELINE_DIR/gro_baseline_random_delayed_normal/${label}.csv"
     child_log="$LOG_DIR/gro_baseline_random_delayed_normal_mh_real_100k_${label}.log"
     cmd=(
       env
