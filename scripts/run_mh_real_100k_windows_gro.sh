@@ -11,9 +11,9 @@ export OMP_NUM_THREADS="${OMP_NUM_THREADS:-32}"
 CONFIG="${CONFIG:-config/config.yaml}"
 WINDOW_LABELS="${WINDOW_LABELS:-window6h,window3h,window2h,window1h,window30min}"
 RUNS="${RUNS:-score_top}"
-RESULTS_DIR="${RESULTS_DIR:-python/results/experiments/exp5_overall_effectiveness}"
-SCORE_TOP_DIR="${SCORE_TOP_DIR:-$RESULTS_DIR/gro_score_top_compressed_mh_real}"
-GRO_BASELINE_DIR="${GRO_BASELINE_DIR:-$RESULTS_DIR/gro_baseline_random_delayed_normal_mh_real}"
+RESULTS_DIR="${RESULTS_DIR:-python/results/experiments/exp5_overall_effectiveness/mh_real}"
+# SCORE_TOP_DIR="${SCORE_TOP_DIR:-$RESULTS_DIR/gro_score_top_compressed_mh_real}"
+# GRO_BASELINE_DIR="${GRO_BASELINE_DIR:-$RESULTS_DIR/gro_baseline_random_delayed_normal_mh_real}"
 LOG_DIR="${LOG_DIR:-logs}"
 DRY_RUN="${DRY_RUN:-0}"
 SKIP_BUILD="${SKIP_BUILD:-0}"
@@ -69,7 +69,7 @@ for label in "${window_values[@]}"; do
   fi
 
   if run_enabled score_top; then
-    out="$SCORE_TOP_DIR/gro_score_top_compressed/${label}.csv"
+    out="$RESULTS_DIR/gro_score_top_compressed/${label}.csv"
     child_log="$LOG_DIR/gro_score_top_compressed_mh_real_100k_${label}.log"
     cmd=(
       env
@@ -96,7 +96,7 @@ for label in "${window_values[@]}"; do
   fi
 
   if run_enabled baseline; then
-    out="$GRO_BASELINE_DIR/gro_baseline_random_delayed_normal/${label}.csv"
+    out="$RESULTS_DIR/gro_baseline_random_delayed_normal/${label}.csv"
     child_log="$LOG_DIR/gro_baseline_random_delayed_normal_mh_real_100k_${label}.log"
     cmd=(
       env
