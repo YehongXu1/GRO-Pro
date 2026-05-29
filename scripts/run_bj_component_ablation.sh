@@ -1,18 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if [[ -n "${LOG:-}" ]]; then
-  mkdir -p "$(dirname "$LOG")"
-  exec > "$LOG" 2>&1
-fi
-
 export OMP_NUM_THREADS="${OMP_NUM_THREADS:-16}"
 
 CONFIG="${CONFIG:-config/config_bj_capacity2_cap10e8.yaml}"
 QUERY_DIR="${QUERY_DIR:-data/BJ_Synthetic_query_sets}"
 RESULTS_DIR="${RESULTS_DIR:-python/results/experiments/exp1_component_ablation/bj_synthetic_capacity2_cap10e8/raw}"
 SUFFIX="${SUFFIX:-capacity2_cap10e8}"
-LABEL="${LABEL:-component_core}"
 
 SELECTION_METHODS="${SELECTION_METHODS:-random,most_delayed,tdg_excess}"
 REROUTE_METHODS="${REROUTE_METHODS:-normal,tdg}"
@@ -37,7 +31,33 @@ ANCHOR_THRESHOLD="${ANCHOR_THRESHOLD:-}"
 NO_PROGRESS_LOG="${NO_PROGRESS_LOG:-0}"
 DRY_RUN="${DRY_RUN:-0}"
 
+sanitize_tag() {
+  local value="$1"
+  value="${value//,/__}"
+  value="${value// /}"
+  value="${value//\//_}"
+  value="${value//[^A-Za-z0-9._-]/_}"
+  printf '%s' "$value"
+}
+
+selection_tag="$(sanitize_tag "$SELECTION_METHODS")"
+reroute_tag="$(sanitize_tag "$REROUTE_METHODS")"
+default_label="selection_${selection_tag}_reroute_${reroute_tag}"
+if [[ "$REP" != "all" ]]; then
+  default_label="${default_label}_rep${REP}"
+fi
+if [[ "$HOP" != "all" ]]; then
+  default_label="${default_label}_hop${HOP}"
+fi
+
+LABEL="${LABEL:-$default_label}"
 OUT="${OUT:-$RESULTS_DIR/gro_ablation_${LABEL}.csv}"
+LOG="${LOG:-logs/bj_component_ablation_${LABEL}.log}"
+
+if [[ "$DRY_RUN" == "0" && -n "$LOG" ]]; then
+  mkdir -p "$(dirname "$LOG")"
+  exec > "$LOG" 2>&1
+fi
 
 if [[ ! -x ./gro_ablation_test ]]; then
   echo "Missing ./gro_ablation_test. Build it first with: make gro_ablation_test" >&2
@@ -104,6 +124,8 @@ if [[ "$NO_PROGRESS_LOG" != "0" ]]; then
   cmd+=(--no-progress-log)
 fi
 
+printf 'Output: %s\n' "$OUT"
+printf 'Log: %s\n' "$LOG"
 printf 'Running:'
 printf ' %q' "${cmd[@]}"
 printf '\n'
