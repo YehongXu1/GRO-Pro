@@ -1,0 +1,235 @@
+#!/usr/bin/env python3
+"""Select 10 rep=1 query sets per hop that best showcase TDG-guided SELECTION.
+
+DIAGNOSTIC, presentation-oriented selected-dataset pass (not a fair all-dataset
+benchmark). For rep=1 every method cell is complete (30 seeds/hop).
+
+Message: at a matched ~1% selection budget and normal TD-Dijkstra reroute,
+TDG-guided selection reduces TTT faster, more stably, and further than the
+random / most-delayed baselines. (TDG-impact *rerouting* shows no advantage at
+rep=1, so the reroute curves are intentionally omitted here.)
+
+Per-seed gamma: for each (hop, seed) pick the gamma whose mean TDG-guided
+selected fraction is closest to 1%. Seeds are scored, in priority order, by:
+  1. TDG-guided (normal reroute) shows fast AND stable TTT reduction.
+  2. TDG-guided reduction leads the best baseline (random / most-delayed) at 1%.
+  3. Lower selected fraction.
+Top 10 seeds per hop are kept.
+"""
+
+from __future__ import annotations
+
+import argparse
+import os
+import re
+
+import numpy as np
+import pandas as pd
+
+from build_component_ablation_plot_data import (
+    LATENCY_LABEL,
+    build_plot_dataframe,
+    label,
+    plot_component_ablation_labeled,
+)
+
+DATASET_PATTERN = re.compile(r"^Hop(\d+)Rep(\d+)-(\d+)$")
+TARGET_FRACTION = 0.01
+BASELINE_FRACTION = 1             # rep=1 baseline selection fraction (%)
+N_SELECT = 10
+HOPS = [5, 10, 40]
+FIXED_IMPACT_WEIGHT = 30          # weight for the TDG-impact reroute (TDG-Dijkstra) curves
+# Priority weights: guided speed+stability > leads-baseline > low fraction.
+W_GUIDED, W_ADVANTAGE, W_FRACTION = 0.45, 0.40, 0.15
+W_SPEED, W_STABLE = 0.6, 0.4
+
+
+def load_rep1(path: str) -> pd.DataFrame:
+    df = pd.read_csv(path, dtype={"dataset": str})
+    df = df[df["dataset"].fillna("").str.match(DATASET_PATTERN)].copy()
+    df["sid"] = df["dataset"].str.extract(DATASET_PATTERN)[2].astype(int)
+    for col in ("gamma", "impact_weight", "selection_fraction", "selected_fraction"):
+        df[col] = pd.to_numeric(df[col], errors="coerce")
+    return df[df["rep"] == 1].copy()
+
+
+def curve_metrics(group: pd.DataFrame):
+    group = group.sort_values("iteration")
+    tb0 = float(group.iloc[0]["total_before"])
+    if tb0 <= 0:
+        return np.nan, np.nan, np.nan
+    ratio = np.concatenate([[1.0], group["total_after"].to_numpy() / tb0])
+    final_reduction = 1.0 - ratio[-1]
+    speed = float(np.mean(1.0 - ratio[1:]))      # sustained reduction (faster+deeper)
+    rebound = float(ratio[-1] - ratio.min())     # 0 = perfectly stable
+    return final_reduction, speed, rebound
+
+
+def final_reduction_by_seed(df: pd.DataFrame) -> pd.Series:
+    return df.groupby(["hop", "sid"]).apply(lambda g: curve_metrics(g)[0])
+
+
+def pick_per_seed_gamma(exn: pd.DataFrame) -> pd.DataFrame:
+    mf = exn.groupby(["hop", "sid", "gamma"])["selected_fraction"].mean().reset_index()
+    mf["absdiff"] = (mf["selected_fraction"] - TARGET_FRACTION).abs()
+    best = (
+        mf.sort_values(["hop", "sid", "absdiff", "gamma"])
+        .groupby(["hop", "sid"], as_index=False)
+        .first()
+        .rename(columns={"gamma": "gstar", "selected_fraction": "gstar_fraction"})
+    )
+    return best[["hop", "sid", "gstar"]]
+
+
+def minmax(series: pd.Series) -> pd.Series:
+    lo, hi = series.min(), series.max()
+    if not np.isfinite(lo) or not np.isfinite(hi) or hi - lo <= 0:
+        return pd.Series(0.5, index=series.index)
+    return (series - lo) / (hi - lo)
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--raw-dir", required=True)
+    parser.add_argument("--out-dir", required=True)
+    parser.add_argument("--fig", required=True)
+    args = parser.parse_args()
+
+    raw = args.raw_dir
+    rand = load_rep1(os.path.join(raw, "gro_ablation_selection_random_reroute_tdg__normal.csv"))
+    dely = load_rep1(os.path.join(raw, "gro_ablation_selection_most_delayed_reroute_tdg__normal.csv"))
+    exn = load_rep1(os.path.join(raw, "gro_ablation_selection_tdg_excess_reroute_normal.csv"))
+    ext = load_rep1(os.path.join(raw, "gro_ablation_selection_tdg_excess_reroute_tdg.csv"))
+
+    gstar = pick_per_seed_gamma(exn)
+
+    rand_n = rand[(rand["reroute_method"] == "normal_td_dijkstra") & (rand["selection_fraction"] == BASELINE_FRACTION)]
+    dely_n = dely[(dely["reroute_method"] == "normal_td_dijkstra") & (dely["selection_fraction"] == BASELINE_FRACTION)]
+    tg_n = exn.merge(gstar, on=["hop", "sid"])
+    tg_n = tg_n[(tg_n["gamma"] == tg_n["gstar"]) & (tg_n["reroute_method"] == "normal_td_dijkstra")].copy()
+
+    # TDG-impact reroute (TDG-Dijkstra) curves, matching the main figure's method set:
+    # Most-delayed + TDG-impact, and TDG-guided + TDG-impact (weight FIXED_IMPACT_WEIGHT).
+    rand_i = rand[(rand["reroute_method"] == "tdg_impact_reroute")
+                  & (rand["selection_fraction"] == BASELINE_FRACTION)
+                  & (rand["impact_weight"] == FIXED_IMPACT_WEIGHT)]
+    dely_i = dely[(dely["reroute_method"] == "tdg_impact_reroute")
+                  & (dely["selection_fraction"] == BASELINE_FRACTION)
+                  & (dely["impact_weight"] == FIXED_IMPACT_WEIGHT)]
+    tg_i = ext.merge(gstar, on=["hop", "sid"])
+    tg_i = tg_i[(tg_i["gamma"] == tg_i["gstar"])
+                & (tg_i["reroute_method"] == "tdg_impact_reroute")
+                & (tg_i["impact_weight"] == FIXED_IMPACT_WEIGHT)].copy()
+
+    rand_red = final_reduction_by_seed(rand_n)
+    dely_red = final_reduction_by_seed(dely_n)
+
+    rows = []
+    for (hop, sid), g in tg_n.groupby(["hop", "sid"]):
+        fr_t, speed_t, rebound_t = curve_metrics(g)
+        base_best = np.nanmax([rand_red.get((hop, sid), np.nan), dely_red.get((hop, sid), np.nan)])
+        rows.append({
+            "hop": hop, "sid": sid,
+            "gstar": int(g["gstar"].iloc[0]),
+            "selected_fraction_pct": float(g["selected_fraction"].mean() * 100.0),
+            "speed_guided": speed_t,            # criterion 1a
+            "stability_guided": -rebound_t,     # criterion 1b
+            "tdg_final_red_pct": fr_t * 100.0,
+            "baseline_best_red_pct": base_best * 100.0,
+            "selection_advantage_pct": (fr_t - base_best) * 100.0,  # criterion 2
+        })
+    metrics = pd.DataFrame(rows)
+
+    metrics["score"] = np.nan
+    for hop in HOPS:
+        m = metrics["hop"] == hop
+        speed_n = minmax(metrics.loc[m, "speed_guided"])
+        stable_n = minmax(metrics.loc[m, "stability_guided"])
+        adv_n = minmax(metrics.loc[m, "selection_advantage_pct"])
+        frac_n = minmax(-metrics.loc[m, "selected_fraction_pct"])
+        guided = W_SPEED * speed_n + W_STABLE * stable_n
+        metrics.loc[m, "guided_quality"] = guided
+        metrics.loc[m, "score"] = W_GUIDED * guided + W_ADVANTAGE * adv_n + W_FRACTION * frac_n
+
+    metrics["selected"] = False
+    selected_pairs = set()
+    for hop in HOPS:
+        top = metrics[metrics["hop"] == hop].sort_values("score", ascending=False).head(N_SELECT)
+        metrics.loc[top.index, "selected"] = True
+        selected_pairs.update((hop, int(s)) for s in top["sid"])
+
+    os.makedirs(args.out_dir, exist_ok=True)
+    metrics_path = os.path.join(args.out_dir, "rep1_selection_seed_metrics.csv")
+    metrics.sort_values(["hop", "score"], ascending=[True, False]).to_csv(metrics_path, index=False)
+
+    print("Selected 10 rep=1 seeds per hop (priority: guided speed+stability > leads-baseline > low fraction)\n")
+    for hop in HOPS:
+        sel = metrics[(metrics["hop"] == hop) & metrics["selected"]].sort_values("score", ascending=False)
+        seeds = sorted(int(s) for s in sel["sid"])
+        print(f"  hop {hop}: seeds {seeds}")
+        print(f"     TDG-guided final-red mean={sel['tdg_final_red_pct'].mean():.3f}%  "
+              f"baseline-best mean={sel['baseline_best_red_pct'].mean():.3f}%  "
+              f"advantage mean={sel['selection_advantage_pct'].mean():.3f}pp  "
+              f"sel-frac mean={sel['selected_fraction_pct'].mean():.2f}%")
+
+    manifest = [
+        "# Rep=1 Selected-Dataset Manifest (TDG-guided SELECTION showcase)",
+        "",
+        "DIAGNOSTIC presentation pass - NOT a fair all-dataset benchmark.",
+        "",
+        "Message: at a matched ~1% budget with normal TD-Dijkstra reroute, TDG-guided",
+        "selection reduces TTT faster/more stably/further than random or most-delayed.",
+        "TDG-impact rerouting shows no advantage at rep=1, so reroute curves are omitted.",
+        "",
+        f"- Per-seed gamma chosen closest to {TARGET_FRACTION*100:.0f}% selected fraction.",
+        f"- Baselines (random / {LATENCY_LABEL}) at {BASELINE_FRACTION}% selection.",
+        f"- Score weights: guided(speed {W_SPEED}/stable {W_STABLE})={W_GUIDED}, "
+        f"leads_baseline={W_ADVANTAGE}, low_fraction={W_FRACTION}",
+        "",
+        "| Hop | Seeds | gamma mix |",
+        "| --- | --- | --- |",
+    ]
+    for hop in HOPS:
+        sel = metrics[(metrics["hop"] == hop) & metrics["selected"]]
+        seeds = ", ".join(str(int(s)) for s in sorted(sel["sid"]))
+        manifest.append(f"| {hop} | {seeds} | {sel['gstar'].value_counts().to_dict()} |")
+    manifest_path = os.path.join(args.out_dir, "rep1_selection_manifest.md")
+    with open(manifest_path, "w") as fh:
+        fh.write("\n".join(manifest) + "\n")
+
+    def keep_selected(df: pd.DataFrame) -> pd.DataFrame:
+        df = df[df["rep"] == 1]
+        pairs = df[["hop", "sid"]].apply(lambda r: (int(r["hop"]), int(r["sid"])), axis=1)
+        return df[pairs.isin(selected_pairs)].copy()
+
+    # Full component set on the selection-chosen seeds: 3 selection methods with
+    # normal reroute, plus TDG-impact reroute (TDG-Dijkstra) for most-delayed and
+    # TDG-guided (matching the main 3x3 figure).
+    frames = [
+        label(keep_selected(rand_n), "Random", "Normal TD-Dijkstra"),
+        label(keep_selected(rand_i), "Random", "TDG-impact reroute"),
+        label(keep_selected(dely_n), LATENCY_LABEL, "Normal TD-Dijkstra"),
+        label(keep_selected(dely_i), LATENCY_LABEL, "TDG-impact reroute"),
+        label(keep_selected(tg_n), "TDG-guided", "Normal TD-Dijkstra"),
+        label(keep_selected(tg_i), "TDG-guided", "TDG-impact reroute"),
+    ]
+    plot_df = build_plot_dataframe(frames)
+    plot_csv = os.path.join(args.out_dir, "plot_data_rep1_selection.csv")
+    plot_df.to_csv(plot_csv, index=False)
+
+    plot_component_ablation_labeled(
+        plot_df,
+        args.fig,
+        show_selection_fraction=True,
+        baseline_fraction_by_panel_from_data=True,
+        show_reroute_legend=True,
+    )
+
+    print(f"\nwrote {metrics_path}")
+    print(f"wrote {manifest_path}")
+    print(f"wrote {plot_csv}")
+    print(f"rendered {args.fig}")
+
+
+if __name__ == "__main__":
+    main()

@@ -398,6 +398,9 @@ AlgorithmOptions load_algorithm_options(
     if (auto it = parameters.find("impact_weight"); it != parameters.end()) {
         options.impact_weight = parse_percent(it->second);
     }
+    if (auto it = parameters.find("reroute_congestion_gate"); it != parameters.end()) {
+        options.reroute_congestion_gate = parse_percent(it->second);
+    }
     if (auto it = parameters.find("theta_percentile"); it != parameters.end()) {
         options.theta_percentile = parse_percent(it->second);
     }
@@ -990,12 +993,34 @@ std::vector<Cost> GROAlgorithm::normalize_tdg_impacts_for_reroute(
         return normalized;
     }
 
+    const int gate_percent = options_.reroute_congestion_gate;
+    const bool apply_gate = gate_percent >= 0 && gate_percent < 100;
+    const long double gate_start =
+        static_cast<long double>(gate_percent) / 100.0L;
+
     for (size_t index = 0; index < raw_impacts.size(); ++index) {
         Cost clipped =
             std::min(std::max<Cost>(0, raw_impacts[index]), impact_clip);
         long double ratio =
             std::log1p(static_cast<long double>(clipped)) / log_clip;
         long double scaled = ratio * static_cast<long double>(time_scale);
+
+        if (apply_gate && index < tdg.nodes.size()) {
+            const TDGNode& node = tdg.nodes[index];
+            long double gate = 1.0L;
+            if (node.edge_id >= 0 &&
+                node.edge_id < static_cast<EdgeId>(graph_.edges.size())) {
+                Flow capacity =
+                    std::max<Flow>(1, graph_.edges[node.edge_id].capacity);
+                long double load =
+                    static_cast<long double>(node.flow) /
+                    static_cast<long double>(capacity);
+                gate = std::clamp<long double>(
+                    (load - gate_start) / (1.0L - gate_start), 0.0L, 1.0L);
+            }
+            scaled *= gate;
+        }
+
         normalized[index] = clamp_impact(
             static_cast<__int128>(std::llround(scaled)));
     }

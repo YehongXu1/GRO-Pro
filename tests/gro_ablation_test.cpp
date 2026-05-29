@@ -60,6 +60,7 @@ struct Options {
     std::vector<int> tdg_gammas = {50};
     int candidate_theta = -1;
     std::vector<int> impact_weights = {30};
+    int reroute_congestion_gate = -1;
     std::string candidate_filter = "all";
     std::string tdg_mode = "fine";
     int conflict_threshold = -1;
@@ -213,6 +214,8 @@ Options parse_args(int argc, char** argv) {
             options.candidate_theta = parse_percent_value(require_value(arg));
         } else if (arg == "--impact-weights") {
             options.impact_weights = parse_percent_list(require_value(arg));
+        } else if (arg == "--reroute-congestion-gate") {
+            options.reroute_congestion_gate = parse_percent_value(require_value(arg));
         } else if (arg == "--candidate-filter") {
             options.candidate_filter = require_value(arg);
         } else if (arg == "--tdg-mode") {
@@ -1195,6 +1198,10 @@ int main(int argc, char** argv) {
         }
         if (options.candidate_theta >= 0) {
             algorithm_options.candidate_theta = options.candidate_theta;
+        }
+        if (options.reroute_congestion_gate >= 0) {
+            algorithm_options.reroute_congestion_gate =
+                options.reroute_congestion_gate;
         }
         algorithm_options.enable_timing_log = false;
         gro::TrafficOptions traffic_options =
