@@ -211,6 +211,15 @@ def main() -> int:
     parser.add_argument("--input-dir", default="data/BJ_Real_query_sets")
     parser.add_argument("--coords", default="data/BJ_NodeIDLonLat.txt")
     parser.add_argument(
+        "--dataset-prefix",
+        default="BJReal",
+        help=(
+            "Dataset filename prefix. The builder reads "
+            "{prefix}Rep1-{seed}.txt and writes {prefix}Rep{rep}-{seed}.txt."
+        ),
+    )
+    parser.add_argument("--source-label", default="bj_real_high_congestion_scalability")
+    parser.add_argument(
         "--output-dir",
         default="data/BJ_Real_query_sets_scalability_high_congestion",
     )
@@ -298,7 +307,7 @@ def main() -> int:
     summary_rows = []
 
     for seed in seeds:
-        source_path = input_dir / f"BJRealRep1-{seed}.txt"
+        source_path = input_dir / f"{args.dataset_prefix}Rep1-{seed}.txt"
         source_rows = read_queries(source_path)
 
         for query_count in query_counts:
@@ -354,7 +363,7 @@ def main() -> int:
                 rng,
             )
             rep = rep_label_for_query_count(query_count, args.base_scale)
-            output_path = output_dir / f"BJRealRep{rep}-{seed}.txt"
+            output_path = output_dir / f"{args.dataset_prefix}Rep{rep}-{seed}.txt"
             written = write_queries(output_path, rows)
 
             unique_od_count = len({(row[0], row[1]) for row in selected_rows})
@@ -415,12 +424,13 @@ def main() -> int:
         writer.writerows(summary_rows)
 
     metadata = {
-        "source_label": "bj_real_high_congestion_scalability",
+        "source_label": args.source_label,
+        "dataset_prefix": args.dataset_prefix,
         "input_dir": str(input_dir),
         "output_dir": str(output_dir),
         "derivation": (
             "For each seed and query count, sample source rows from the "
-            "T-Drive-derived BJRealRep1 file, repeat each selected source row "
+            f"real-derived {args.dataset_prefix}Rep1 file, repeat each selected source row "
             "copies_per_source times, optionally filter source rows by central "
             "OD radius, optionally rescale departures, and sort by departure "
             "time. This is a controlled congested peak workload for "

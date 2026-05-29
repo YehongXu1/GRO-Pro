@@ -1,0 +1,79 @@
+{
+  "source_label": "mh_real_high_congestion_scalability",
+  "dataset_prefix": "MHReal",
+  "input_dir": "data/MH_Real_query_sets",
+  "output_dir": "data/MH_Real_query_sets_scalability_inner_progressive_peak1h",
+  "derivation": "For each seed and query count, sample source rows from the real-derived MHRealRep1 file, repeat each selected source row copies_per_source times, optionally filter source rows by central OD radius, optionally rescale departures, and sort by departure time. This is a controlled congested peak workload for scalability experiments, not an independent raw taxi sample.",
+  "query_counts": [
+    10000,
+    20000,
+    30000,
+    50000,
+    70000,
+    100000
+  ],
+  "size_specs": [
+    {
+      "query_count": 10000,
+      "source_count": 800,
+      "od_center_radius_km": 2.0,
+      "departure_window_sec": 3600,
+      "jitter_sec": 0
+    },
+    {
+      "query_count": 20000,
+      "source_count": 1400,
+      "od_center_radius_km": 2.0,
+      "departure_window_sec": 3600,
+      "jitter_sec": 0
+    },
+    {
+      "query_count": 30000,
+      "source_count": 1800,
+      "od_center_radius_km": 2.0,
+      "departure_window_sec": 3600,
+      "jitter_sec": 0
+    },
+    {
+      "query_count": 50000,
+      "source_count": 3000,
+      "od_center_radius_km": 3.0,
+      "departure_window_sec": 3600,
+      "jitter_sec": 0
+    },
+    {
+      "query_count": 70000,
+      "source_count": 4500,
+      "od_center_radius_km": 3.0,
+      "departure_window_sec": 3600,
+      "jitter_sec": 0
+    },
+    {
+      "query_count": 100000,
+      "source_count": 7000,
+      "od_center_radius_km": 4.0,
+      "departure_window_sec": 3600,
+      "jitter_sec": 0
+    }
+  ],
+  "seeds": [
+    0,
+    1,
+    2,
+    3,
+    4
+  ],
+  "copies_per_source": 10,
+  "source_count_per_dataset": 0,
+  "jitter_sec": 0,
+  "departure_window_sec": 0,
+  "coordinates": "data/MH_NodeIDLonLat.txt",
+  "center": {
+    "lon": -73.9855,
+    "lat": 40.758
+  },
+  "od_center_radius_km": 0.0,
+  "base_scale": 10000,
+  "random_seed": 20260529,
+  "intended_congestion_gate": "Run shortest_path_congestion_diagnostic and keep only datasets with shortest-path inflation in the paper-facing high-congestion range, currently 10x to 100x."
+}
