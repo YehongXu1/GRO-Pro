@@ -318,7 +318,8 @@ because they mixed 10k, 50k, and 100k query counts.
 
 The proposed GRO scripts use `selection-methods=tdg_excess`, `reroute-methods=tdg`,
 `candidate-filter=score_top`, `tdg-mode=compressed`,
-`conflict-threshold=5000`, `tdg-gammas=50`, and `impact-weights=20`.
+`conflict-threshold=5000`, `candidate-theta=80`, `tdg-gammas=50`,
+and `impact-weights=20`.
 
 ## Current Experiment Layout
 
@@ -329,6 +330,22 @@ The preferred paper experiment order is:
    - Use lines for TTT over iterations.
    - Use second y-axis bars for TDG selected fraction.
    - Compare fixed-fraction random/latency baselines against TDG-guided.
+   - Add a compact runtime analysis next to or after this figure, but keep it
+     within the same component-ablation scope. Do not mix in TDG compression or
+     candidate query pruning here.
+   - The preferred runtime layout is a 3 x 3 matrix table with a hierarchical
+     column header: Rep #1, Rep #2, Rep #4 as the top-level columns, each split
+     into Short, Medium, and Long. Rows are the component-ablation methods
+     (`Random + Normal`, `Latency-based + Normal`, `TDG-guided + Normal`, and
+     `TDG-guided + TDG-impact`). Each cell should report mean runtime per
+     iteration, optionally with an overhead ratio relative to
+     `Latency-based + Normal` in the same Rep/length panel.
+   - A small companion pie chart can show runtime breakdown for
+     `TDG-guided + TDG-impact` aggregated over all BJ synthetic datasets and
+     iterations. Aggregate by summing wall-clock time per phase first
+     (`TDG build`, `selection`, `reroute`, `evaluation`, and any existing
+     measured core phases), then compute percentages. Do not average per-dataset
+     percentages.
    - Current presentation/exploration figures use selected datasets per panel.
      They are useful for shaping the ablation story, but they are not a fair
      all-dataset benchmark. The selected seeds and source files are recorded in
@@ -422,9 +439,31 @@ python/results/experiments/exp1_component_ablation/bj_synthetic_capacity2_cap10e
 - Existing scalability mock figure is only illustrative and uses fabricated
   data: `python/results/experiments/exp3_compression_scalability/mock/`.
   Do not cite it as an experimental result.
+- `src/gro.cpp` was updated with bug fixes after the previous scalability-style
+  runs. Treat older affected result CSVs/plots as stale until rerun. The old BJ
+  synthetic component/scalability-related data has been moved under:
+
+```text
+python/results/experiments/exp1_component_ablation/bj_synthetic_capacity2_cap10e8/archive
+```
+
+  Put newly rerun data in:
+
+```text
+python/results/experiments/exp1_component_ablation/bj_synthetic_capacity2_cap10e8/raw
+```
+
+  Do not mix `archive` and `raw` outputs in the same paper-facing analysis.
+  Any selected-dataset figures, runtime matrices, or pie-chart breakdowns that
+  were generated from the archived data should be regenerated after the rerun
+  before being cited.
 
 ## Current Implementation Notes
 
+- In `gro_ablation_test` and related debug/legacy runners, percentage CLI
+  arguments are now interpreted as percentage points. Use `--fixed-fractions 1`
+  for 1%, `10` for 10%, and `30` for 30%; do not use the old proportional
+  spelling `0.01`.
 - `tests/paper_baseline_test.cpp` is the current runner for one-shot paper
   baselines `svp,gor,sor,fahl`. It accepts `--query-file` or `--query-dir` and
   writes comparable route-quality/runtime CSVs.

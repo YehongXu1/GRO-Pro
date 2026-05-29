@@ -4,7 +4,7 @@ The original TDG selection method is still available through:
 
 ```text
 GROAlgorithm::select_queries(...)
-````
+```
 
 We added a separate selection method instead of replacing the original one:
 
@@ -18,6 +18,18 @@ high TDG impact. In particular, we do not want excessive removal, either in the
 number of selected queries or in the sense of over-clearing congested roads below
 their useful capacity. Roads whose flow has already dropped to capacity should no
 longer provide additional selection benefit.
+
+The current practical query-selection pipeline has two stages:
+
+```text
+1. Score-based candidate pruning, controlled by theta.
+2. Residual excess-relief selection, controlled by gamma.
+```
+
+These two parameters intentionally have different meanings. `theta` controls how
+much one-pass relief-score mass is kept in the candidate pool. `gamma` controls
+how much residual weighted excess congestion the dynamic selector tries to
+remove from the working TDG.
 
 ### Difference from the Original Selection Method
 
@@ -44,6 +56,19 @@ Selection continues only while the working TDG still has enough remaining
 weighted excess congestion to justify removing more routes.
 
 ### Node Relief Score
+
+TDG impact is first computed bottom-up. The propagation rule distributes a
+child's impact across its parents:
+
+```text
+I(v) = tau_hat(v) + lambda * sum_{u in child(v)} I(u) / |Parent(u)|
+```
+
+The division by `|Parent(u)|` is important. If a child TDG node has multiple
+parents, its downstream impact should be shared among those parents instead of
+being copied in full to every parent. Otherwise high-fan-in parts of the TDG
+inflate upstream impact scores and make both selection and rerouting penalties
+too aggressive.
 
 For each TDG node `v`, the method separates two factors:
 
@@ -142,7 +167,7 @@ Thus, `gamma` controls the desired reduction ratio of weighted excess congestion
 For example, `gamma = 25` means that the selection process tries to reduce about
 25% of the initial excess-relief mass. It does not mean selecting 25% of queries.
 
-The greedy loop is:
+Conceptually, the greedy loop is:
 
 ```text
 1. Compute the current excess-relief mass of the working TDG.
@@ -164,6 +189,48 @@ select the next query
 
 This is different from selecting a fixed percentage of queries. The number of
 selected queries is determined by how much weighted excess congestion remains.
+
+### Score-Based Candidate Pruning
+
+For large query sets, running the dynamic selector over all queries is expensive.
+The practical method therefore first builds a candidate set using a static
+one-pass score:
+
+```text
+score(q) =
+    sum node_relief(v)
+    over unique important TDG nodes v covered by q's current trajectory
+```
+
+The pruning rule is:
+
+```text
+1. Compute score(q) for every query with positive one-pass relief.
+2. Sort queries by score(q), descending.
+3. Keep the smallest prefix C whose cumulative score covers theta of the total
+   positive score mass.
+4. Run residual excess-relief selection only over C.
+```
+
+Equivalently:
+
+```text
+sum_{q in C} score(q) >= theta * sum_{q in Q+} score(q)
+```
+
+where `Q+` is the set of queries with positive one-pass relief score.
+
+This pruning step is a scalability reduction, not the main selection signal. It
+keeps a high-recall candidate pool for the later dynamic selector. In the code,
+this is exposed as:
+
+```text
+--candidate-filter score_top
+--candidate-theta 80
+```
+
+The paper should call this score-based or relief-based candidate pruning, not
+`score_top`.
 
 ### What Is Updated During Selection
 
@@ -199,40 +266,85 @@ The full structural TDG update is only necessary if the updated TDG will be used
 to recompute bottom-up impact, rerouting dependencies, or other structure-based
 operations.
 
-### Ranking Implementation Note
+### Batch Rerouting Impact Refresh
 
-The current implementation builds a ranking of all remaining candidate queries
-and sorts it in each greedy round. However, the method only uses the highest-score
-query in each round.
-
-Therefore, a full sort is not necessary. The same selection result can be
-obtained by scanning all remaining candidates once and keeping only the best
-query:
+TDG-impact rerouting uses the normalized impact vector as an edge penalty. Query
+batches are processed sequentially:
 
 ```text
-best_query = argmax route_score(q)
+for each batch:
+    reroute all queries in the batch using the current working TDG impact
+    insert the new trajectories into the working TDG
+    recompute TDG impact before the next batch
 ```
 
-This changes each greedy round from:
+Insertion should update existing TDG nodes covered by the new trajectory. It
+should not create new edge-time TDG nodes during rerouting. After the existing
+nodes' flow is updated, same-edge timeline dependencies around the changed
+events are refreshed. The recomputation after insertion is necessary because the
+newly inserted routes can change both TDG flow and same-edge dependencies.
+Reusing the original impact vector for all batches would make later batches
+ignore the congestion and dependency changes introduced by earlier batches.
+
+During TDG-impact rerouting, the BPR travel-time term should also read from the
+working TDG state when possible. For an explored edge-time pair, the
+implementation uses the latest timeline node at or before the current time as
+the current flow state, falling back to the original traffic profile only when
+the working TDG has no timeline for that edge.
+
+### Lazy-Greedy Implementation Note
+
+The original implementation recomputed every remaining candidate's route score
+in every greedy round. That is correct but expensive for large query sets,
+especially when the candidate pool contains thousands of queries.
+
+The current implementation uses an exact lazy-greedy priority queue. Since TDG
+flow only decreases during virtual removals, each route's excess-relief score is
+monotone non-increasing. A stale score in the priority queue is therefore an
+upper bound on that query's current score.
+
+The lazy loop is:
 
 ```text
-scan candidates + sort ranking
+1. Initialize a max-heap with every candidate's one-pass route_score.
+2. Pop the top candidate.
+3. Recompute only this candidate's current route_score.
+4. If no other heap entry has a larger upper-bound score, select it.
+5. Otherwise, push the refreshed score back and continue.
+6. After selecting a query, decrement working TDG flow on its trajectory.
+```
+
+This preserves the same greedy objective as full rescoring, but avoids repeatedly
+rescoring candidates that are clearly not competitive. The implementation also
+maintains the current weighted excess mass incrementally after each virtual
+removal, and only recomputes the full mass as a safety check when the incremental
+mass reaches the stopping target.
+
+The main cost changes from:
+
+```text
+selected_count * candidate_count * route_length
 ```
 
 to:
 
 ```text
-scan candidates and keep the maximum
+initial_candidate_scoring
++ number_of_refreshed_heap_entries * route_length
 ```
 
-The selection logic remains the same, but the implementation becomes cheaper.
+The selected set should remain consistent with the same lazy-greedy objective;
+the change is intended as an implementation speedup rather than a quality
+tradeoff.
 
 ### Summary
 
-The excess-relief selection method treats bottom-up TDG impact as a fixed
-importance weight and uses the current working TDG flow to decide whether a TDG
-node still needs relief. A candidate route is useful only if it helps explain
-remaining over-capacity congestion on important TDG nodes.
+The full practical method first applies theta-controlled score-based candidate
+pruning, then applies gamma-controlled residual excess-relief selection over the
+candidate set. The selector treats bottom-up TDG impact as a fixed importance
+weight and uses the current working TDG flow to decide whether a TDG node still
+needs relief. A candidate route is useful only if it helps explain remaining
+over-capacity congestion on important TDG nodes.
 
 Compared with the original selection method, this design is more directly aligned
 with the goal of avoiding excessive removal:
@@ -245,9 +357,7 @@ sufficiently reduced toward capacity
 The method is therefore better interpreted as congestion-status-driven selection,
 rather than rank-and-removability-driven selection.
 
-```
-
-我建议把最后一句作为你理解这个方法的核心：
+Core interpretation:
 
 > The method is congestion-status-driven: impact tells us which TDG nodes are important, while the current working flow tells us whether they still need relief.
 

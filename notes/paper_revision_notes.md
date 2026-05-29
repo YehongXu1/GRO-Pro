@@ -22,7 +22,7 @@ selection to the newer `tdg_excess` selection.
 The current main method should be described as:
 
 ```text
-TDG-guided excess-relief selection
+theta-pruned TDG-guided excess-relief selection
 ```
 
 High-level idea:
@@ -36,14 +36,45 @@ High-level idea:
    node_relief(v) = normalized_TDG_impact(v) * max(0, flow(v) / capacity(v) - 1)
    ```
 
-5. Greedily select routes that cover the largest remaining weighted excess
-   congestion.
-6. After selecting a route, update only working TDG flow for covered nodes.
-7. Stop when remaining weighted excess mass drops below the `gamma` target.
+   TDG impact propagation should share a child node's impact across its parents:
+
+   ```text
+   I(v) = tau_hat(v) + lambda * sum_{u in child(v)} I(u) / |Parent(u)|
+   ```
+
+5. Compute each query's one-pass relief score and keep the smallest prefix whose
+   cumulative score covers `theta` of the total positive score mass.
+6. Greedily select routes from this candidate set that cover the largest
+   remaining weighted excess congestion.
+7. After selecting a route, update only working TDG flow for covered nodes.
+8. Stop when remaining weighted excess mass drops below the `gamma` target.
+
+The parameters are deliberately separated:
+
+```text
+theta: candidate-pruning coverage threshold
+gamma: residual weighted-excess reduction target
+```
+
+For current experiments, use `theta=80` and `gamma=50` unless a sensitivity
+experiment says otherwise.
 
 This is different from the draft's original Algorithm 4, which ranks candidates
 by TDG impact, tests removability, updates the TDG structurally, and refreshes
 rankings when they become stale.
+
+Implementation note: the dynamic residual selector is now implemented with an
+exact lazy-greedy priority queue. Stale route scores are safe upper bounds
+because virtual removals only decrease working TDG flow, so route relief scores
+are monotone non-increasing.
+
+Rerouting note: after each reroute batch is inserted into the working TDG,
+recompute TDG impact before routing the next batch. Otherwise later batches use
+stale impact penalties and do not react to earlier batch insertions.
+Insertion updates only existing TDG nodes covered by the rerouted trajectory; it
+does not create new edge-time TDG nodes during rerouting.
+The reroute search's BPR travel-time term should use the working TDG flow state
+when available, not the stale pre-reroute `TrafficResult` profile.
 
 ## Candidate Identification Repositioning
 
@@ -128,7 +159,7 @@ The pruning rule is simple by design:
 ```text
 1. Compute one-pass route excess-relief score for each query.
 2. Sort queries by this score.
-3. Keep the smallest prefix whose cumulative score covers gamma of the total
+3. Keep the smallest prefix whose cumulative score covers theta of the total
    one-pass query relief mass.
 4. Run residual excess-relief selection only over this candidate set.
 ```
@@ -138,11 +169,37 @@ excess-relief objective, not as the main novelty. The main QS contribution is
 the combination of:
 
 ```text
-static relief-based pruning + dynamic residual-relief selection
+static theta-pruned relief candidates + dynamic gamma-driven residual selection
 ```
 
 The dynamic selector remains responsible for handling interaction among query
 removals by updating residual TDG flow after each virtual removal.
+
+Implementation names:
+
+```text
+paper theta      -> code/config candidate_theta, CLI --candidate-theta
+paper gamma      -> code/config gamma, CLI --tdg-gammas
+score pruning    -> implementation filter score_top
+```
+
+Do not describe `theta` as a query-count fraction. It is a cumulative relief
+coverage threshold. Do not describe `gamma` as a candidate-pruning threshold. It
+is the residual weighted-excess target for dynamic selection.
+
+Implementation and complexity note:
+
+```text
+Naive dynamic selection:
+  repeatedly rescore every remaining candidate.
+
+Current implementation:
+  exact lazy-greedy heap using stale route scores as upper bounds.
+```
+
+This optimization should be described as an implementation acceleration of the
+same greedy objective. It should not be framed as a new approximation unless
+future code intentionally changes the selection rule.
 
 ## Congestion Pattern Findings
 
@@ -260,7 +317,7 @@ Algorithm:
 
 ```text
 Input:
-  TDG, current trajectories, normalized TDG impacts, gamma
+  TDG, current trajectories, normalized TDG impacts, theta
 
 Output:
   Candidate query set C
@@ -269,7 +326,7 @@ Output:
 2. For every query q, scan its TDG nodes once and accumulate A(q, g).
 3. For each congestion component g independently:
      a. Sort queries touching g by A(q, g), descending.
-     b. Add queries to C until cumulative A(q, g) >= gamma * M(g).
+     b. Add queries to C until cumulative A(q, g) >= theta * M(g).
 4. Return the union C across all components.
 5. Run the existing iterative tdg_excess selection only on C.
 ```
@@ -277,13 +334,13 @@ Output:
 Parameter choice:
 
 ```text
-No new paper-facing parameter is introduced.
+Use theta for pruning and gamma for residual selection.
 ```
 
-The algorithm reuses the existing `gamma` from excess-relief selection. If
-`gamma=50`, candidate identification keeps enough component-local candidates
-to cover 50% of each component's one-pass relief mass. The later selector still
-decides which candidates to actually reroute.
+The pruning threshold should be independent from the residual selection target.
+If `theta=80`, candidate identification keeps enough candidates to cover 80% of
+the one-pass relief mass. The later selector still decides which candidates to
+actually reroute using `gamma`.
 
 Why this matches the intuition:
 
@@ -535,7 +592,8 @@ Recommended next implementation / analysis changes:
 
 ```text
 1. Keep `--candidate-filter all` for component ablation reproducibility.
-2. Use `--candidate-filter score_top` for candidate-pruned scalability.
+2. Use `--candidate-filter score_top --candidate-theta 80` for
+   candidate-pruned scalability.
 3. Add / run the combined score-pruned + compressed-TDG scalability experiment.
 4. If needed, write candidate_count, candidate_fraction, and candidate_sec into
    all scalability summaries.
@@ -554,7 +612,8 @@ component_balanced    component-balanced relief coverage filter
 component_marginal*   component-coverage / marginal diagnostic filters
 ```
 
-On `BJRealRep1-0` initial routes with `gamma=50`, the fast diagnostic reports:
+On `BJRealRep1-0` initial routes with the earlier coupled pruning threshold
+`gamma=50`, the fast diagnostic reports:
 
 ```text
 source_congestion_candidate_fraction = 94.93%
@@ -569,6 +628,7 @@ the paper as score-based or relief-based candidate pruning.
 Recommended CSV additions:
 
 ```text
+candidate_theta        already written by gro_ablation_test
 candidate_count
 candidate_fraction
 candidate_sec
@@ -581,9 +641,10 @@ select_scan_sec
 select_remove_sec
 ```
 
-The selection breakdown already exists internally in `src/gro.cpp` through
-`log_select_summary(...)`, but it is not currently written into
-`gro_ablation_test` CSV rows.
+The candidate-count fields and `candidate_theta` are now written by
+`gro_ablation_test`. The detailed selection breakdown already exists internally
+in `src/gro.cpp` through `log_select_summary(...)`, but it is not currently
+written into `gro_ablation_test` CSV rows.
 
 ## Writing Cautions
 

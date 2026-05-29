@@ -50,6 +50,7 @@ struct AlgorithmOptions {
     int max_iterations = 5;
     int lambda = 45; // in percent
     int gamma = 50; // in percent
+    int candidate_theta = 80; // in percent
     int impact_weight = 15; // in percent
     int theta_percentile = 90; // in percent
     int delta_min = 600; // in seconds

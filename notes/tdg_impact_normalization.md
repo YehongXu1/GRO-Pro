@@ -7,7 +7,9 @@ This note records the current change to the GRO rerouting score.
 Raw TDG impact is recursively accumulated over downstream TDG dependencies:
 
 ```text
-impact(v) = local_travel_time(v) + lambda * sum impact(child(v))
+impact(v) =
+    local_travel_time(v)
+    + lambda * sum_{u in child(v)} impact(u) / |Parent(u)|
 ```
 
 On dense synthetic instances this score is heavy-tailed. A small number of TDG

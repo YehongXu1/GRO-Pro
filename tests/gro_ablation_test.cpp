@@ -58,6 +58,7 @@ struct Options {
     };
     std::vector<std::string> reroute_methods = {"normal", "tdg"};
     std::vector<int> tdg_gammas = {50};
+    int candidate_theta = -1;
     std::vector<int> impact_weights = {30};
     std::string candidate_filter = "all";
     std::string tdg_mode = "fine";
@@ -73,6 +74,7 @@ struct SelectionRun {
     RemovalMode removal_mode = RemovalMode::AllNodes;
     int selection_fraction = -1;
     int gamma = -1;
+    int candidate_theta = -1;
     std::vector<gro::QueryId> selected_ids;
     long long important_node_count = 0;
     long long important_nodes_us = 0;
@@ -109,9 +111,7 @@ std::string trim(const std::string& text) {
 
 int parse_percent_value(const std::string& text) {
     double value = std::stod(text);
-    if (value >= -1.0 && value <= 1.0) {
-        value *= 100.0;
-    }
+    // CLI percentage arguments are percentage points: 1 means 1%, 10 means 10%.
     return static_cast<int>(std::llround(value));
 }
 
@@ -209,6 +209,8 @@ Options parse_args(int argc, char** argv) {
             options.reroute_methods = parse_string_list(require_value(arg));
         } else if (arg == "--tdg-gammas") {
             options.tdg_gammas = parse_percent_list(require_value(arg));
+        } else if (arg == "--candidate-theta") {
+            options.candidate_theta = parse_percent_value(require_value(arg));
         } else if (arg == "--impact-weights") {
             options.impact_weights = parse_percent_list(require_value(arg));
         } else if (arg == "--candidate-filter") {
@@ -233,7 +235,8 @@ Options parse_args(int argc, char** argv) {
                 << "[--query-file path | --query-dir path] [--output path] "
                 << "[--selection-methods random,most_delayed,tdg_anchor,tdg_excess,tdg_bpr_relief] "
                 << "[--reroute-methods normal,tdg,tdg_nobatch] "
-                << "[--fixed-fractions 10,30] [--tdg-gammas 50] "
+                << "[--fixed-fractions 1,10,30] [--tdg-gammas 50] "
+                << "[--candidate-theta 80] "
                 << "[--impact-weights 30] "
                 << "[--candidate-filter all|source_congestion|score_top|global_score|component_balanced|component_marginal|component_marginal_budget5|component_marginal_budget3|component_marginal_samek|component_marginal_major80_budget5|component_marginal_major90_budget5|component_marginal_major90_samek] "
                 << "[--tdg-mode fine|compressed] "
@@ -741,6 +744,7 @@ std::vector<SelectionRun> build_selection_runs(
                                      const gro::GROAlgorithm& selector,
                                      SelectionRun& run) {
         run.candidate_filter = options.candidate_filter;
+        run.candidate_theta = algorithm_options.candidate_theta;
         if (options.candidate_filter == "all") {
             run.candidate_count =
                 static_cast<long long>(all_query_set.size());
@@ -1048,7 +1052,7 @@ std::string selection_label(const SelectionRun& selection) {
 void write_header(std::ofstream& out) {
     out << "run_id,dataset,hop,rep,seed,query_count,"
         << "iteration,"
-        << "selection_method,removal_mode,selection_fraction,gamma,"
+        << "selection_method,removal_mode,selection_fraction,gamma,candidate_theta,"
         << "reroute_method,impact_weight,random_seed,"
         << "selected_count,selected_fraction,"
         << "candidate_filter,candidate_count,candidate_fraction,candidate_sec,"
@@ -1135,6 +1139,7 @@ void write_row(
         << (uses_tdg_selection ? removal_mode_name(selection.removal_mode) : "none") << ','
         << selection.selection_fraction << ','
         << selection.gamma << ','
+        << selection.candidate_theta << ','
         << reroute_method << ','
         << impact_weight << ','
         << random_seed << ','
@@ -1187,6 +1192,9 @@ int main(int argc, char** argv) {
         }
         if (options.anchor_threshold >= 0) {
             algorithm_options.anchor_threshold = options.anchor_threshold;
+        }
+        if (options.candidate_theta >= 0) {
+            algorithm_options.candidate_theta = options.candidate_theta;
         }
         algorithm_options.enable_timing_log = false;
         gro::TrafficOptions traffic_options =

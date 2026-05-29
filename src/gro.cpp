@@ -317,6 +317,7 @@ void log_reroute_summary(
     long long reroute_query_count,
     long long reroute_query_us,
     long long insert_trajectory_us,
+    long long recompute_impact_us,
     long long reroute_total_us) {
     if (!enabled) {
         return;
@@ -327,6 +328,7 @@ void log_reroute_summary(
               << "reroute_query_count=" << reroute_query_count << ','
               << "reroute_query_sec=" << seconds_text(reroute_query_us) << ','
               << "insert_trajectory_sec=" << seconds_text(insert_trajectory_us) << ','
+              << "recompute_impact_sec=" << seconds_text(recompute_impact_us) << ','
               << "reroute_total_sec=" << seconds_text(reroute_total_us) << '\n';
 }
 
@@ -389,6 +391,9 @@ AlgorithmOptions load_algorithm_options(
     }
     if (auto it = parameters.find("gamma"); it != parameters.end()) {
         options.gamma = parse_percent(it->second);
+    }
+    if (auto it = parameters.find("candidate_theta"); it != parameters.end()) {
+        options.candidate_theta = parse_percent(it->second);
     }
     if (auto it = parameters.find("impact_weight"); it != parameters.end()) {
         options.impact_weight = parse_percent(it->second);
@@ -897,6 +902,7 @@ std::vector<Cost> GROAlgorithm::compute_tdg_impact(
 
     std::vector<Cost> impacts(tdg.nodes.size(), 0);
     std::vector<int> child_count(tdg.nodes.size(), 0);
+    std::vector<int> parent_count(tdg.nodes.size(), 0);
     std::vector<TDGNodeId> ready;
     ready.reserve(tdg.nodes.size());
 
@@ -906,6 +912,7 @@ std::vector<Cost> GROAlgorithm::compute_tdg_impact(
             impacts[node_id] = bpr_travel_time(graph_.edges[node.edge_id], node.flow, traffic_options_);
         }
         child_count[node_id] = static_cast<int>(children(node_id).size());
+        parent_count[node_id] = static_cast<int>(parents(node_id).size());
         if (child_count[node_id] == 0) {
             ready.push_back(node_id);
         }
@@ -917,7 +924,10 @@ std::vector<Cost> GROAlgorithm::compute_tdg_impact(
 
         Cost child_impact = 0;
         for (TDGNodeId child_id : children(node_id)) {
-            child_impact = add_impact_saturated(child_impact, impacts[child_id]);
+            int divisor = std::max(1, parent_count[child_id]);
+            child_impact = add_impact_saturated(
+                child_impact,
+                impacts[child_id] / static_cast<Cost>(divisor));
         }
         impacts[node_id] = add_impact_saturated(
             impacts[node_id],
@@ -1169,16 +1179,106 @@ void GROAlgorithm::insert_trajectory_into_tdg(
         }
     };
 
-    for (TDGNodeId node_id : trajectory.tdg_node_ids) {
-        TDGNode& node = tdg.nodes[node_id];
-        EdgeId edge_id = node.edge_id;
+    auto add_route_arc = [&](TDGNodeId from, TDGNodeId to) {
+        if (from == kInvalidId || to == kInvalidId || from == to ||
+            from < 0 || to < 0 ||
+            from >= static_cast<TDGNodeId>(tdg.nodes.size()) ||
+            to >= static_cast<TDGNodeId>(tdg.nodes.size())) {
+            return;
+        }
+        auto& outgoing = tdg.route_outgoing[from];
+        if (std::find(outgoing.begin(), outgoing.end(), to) == outgoing.end()) {
+            outgoing.push_back(to);
+        }
+        auto& incoming = tdg.route_incoming[to];
+        if (std::find(incoming.begin(), incoming.end(), from) == incoming.end()) {
+            incoming.push_back(from);
+        }
+    };
+
+#if 0
+    // Disabled by design: reroute insertion should not create new TDG nodes.
+    auto ensure_node = [&](EdgeId edge_id, Time time) -> TDGNodeId {
+        if (edge_id < 0 ||
+            edge_id >= static_cast<EdgeId>(tdg.edge_timelines.size())) {
+            return kInvalidId;
+        }
+
+        Key key = {edge_id, time};
+        auto node_it = tdg.key_to_node_id.find(key);
+        if (node_it != tdg.key_to_node_id.end()) {
+            return node_it->second;
+        }
+
+        TDGNode node;
+        node.id = static_cast<TDGNodeId>(tdg.nodes.size());
+        node.edge_id = edge_id;
+        node.time = time;
+        node.flow = 0;
+        node.original_flow = 0;
+        tdg.nodes.push_back(node);
+        while (tdg.route_outgoing.size() <= static_cast<size_t>(node.id)) {
+            tdg.route_outgoing.emplace_back();
+        }
+        while (tdg.route_incoming.size() <= static_cast<size_t>(node.id)) {
+            tdg.route_incoming.emplace_back();
+        }
+        tdg.key_to_node_id[key] = node.id;
+
         auto& timeline = tdg.edge_timelines[edge_id];
+        auto timeline_it = timeline.insert_or_assign(
+            time,
+            TimeLineEvent{time, node.id, 0, kInvalidId, kInvalidId}).first;
+        recompute_around(edge_id, timeline, timeline_it);
+        return node.id;
+    };
+#endif
+
+    std::vector<TDGNodeId> route_nodes;
+    std::vector<TDGNodeId> touched_nodes;
+    std::vector<char> touched_seen(tdg.nodes.size(), 0);
+
+    auto mark_touched = [&](TDGNodeId node_id) {
+        if (node_id == kInvalidId ||
+            node_id < 0 ||
+            node_id >= static_cast<TDGNodeId>(tdg.nodes.size())) {
+            return;
+        }
+        if (static_cast<size_t>(node_id) >= touched_seen.size()) {
+            touched_seen.resize(static_cast<size_t>(node_id) + 1, 0);
+        }
+        if (!touched_seen[node_id]) {
+            touched_seen[node_id] = 1;
+            touched_nodes.push_back(node_id);
+        }
+    };
+
+    route_nodes = trajectory.tdg_node_ids;
+    for (TDGNodeId node_id : route_nodes) {
+        mark_touched(node_id);
+    }
+
+    for (TDGNodeId node_id : touched_nodes) {
+        TDGNode& node = tdg.nodes[node_id];
+        auto& timeline = tdg.edge_timelines[node.edge_id];
         auto timeline_it = timeline.find(node.time);
         if (timeline_it != timeline.end()) {
             node.flow += 1;
             timeline_it->second.flow = node.flow;
-            recompute_around(edge_id, timeline, timeline_it);
         }
+    }
+
+    for (TDGNodeId node_id : touched_nodes) {
+        const TDGNode& node = tdg.nodes[node_id];
+        auto& timeline = tdg.edge_timelines[node.edge_id];
+        auto timeline_it = timeline.find(node.time);
+        if (timeline_it != timeline.end()) {
+            recompute_around(node.edge_id, timeline, timeline_it);
+        }
+    }
+
+    for (size_t index = 1; index < route_nodes.size(); ++index) {
+        add_route_arc(route_nodes[index - 1], route_nodes[index]);
     }
 }
 
@@ -1327,14 +1427,14 @@ std::unordered_set<QueryId> GROAlgorithm::select_candidates_by_score(
             return lhs.second < rhs.second;
         });
 
-    int clamped_gamma = std::clamp(options_.gamma, 0, 100);
-    if (clamped_gamma <= 0) {
+    int clamped_theta = std::clamp(options_.candidate_theta, 0, 100);
+    if (clamped_theta <= 0) {
         return candidate_ids;
     }
 
     long double target_score =
         total_score *
-        static_cast<long double>(clamped_gamma) /
+        static_cast<long double>(clamped_theta) /
         100.0L;
     long double covered_score = 0.0L;
     for (const auto& item : ranking) {
@@ -2160,13 +2260,15 @@ std::vector<QueryId> GROAlgorithm::select_queries_by_excess_relief(
 
     std::vector<int> updated(tdg.nodes.size(), 0);
     int update_epoch = 0;
-    auto decrease_trajectory_flow_only = [&](const Trajectory& trajectory) {
+    auto decrease_trajectory_flow_only =
+        [&](const Trajectory& trajectory) -> long double {
         ++update_epoch;
         if (update_epoch == std::numeric_limits<int>::max()) {
             std::fill(updated.begin(), updated.end(), 0);
             update_epoch = 1;
         }
 
+        long double removed_mass = 0.0L;
         for (TDGNodeId node_id : trajectory.tdg_node_ids) {
             if (node_id < 0 ||
                 node_id >= static_cast<TDGNodeId>(working_tdg.nodes.size()) ||
@@ -2176,10 +2278,16 @@ std::vector<QueryId> GROAlgorithm::select_queries_by_excess_relief(
             }
             updated[node_id] = update_epoch;
             TDGNode& node = working_tdg.nodes[node_id];
+            long double before = node_relief(node_id);
             if (node.flow > 0) {
                 node.flow -= 1;
             }
+            long double after = node_relief(node_id);
+            if (before > after) {
+                removed_mass += before - after;
+            }
         }
+        return removed_mass;
     };
 
     long double initial_mass = congestion_mass();
@@ -2207,44 +2315,132 @@ std::vector<QueryId> GROAlgorithm::select_queries_by_excess_relief(
     long long scan_us = 0;
     long long remove_us = 0;
 
-    while (selected.size() < candidate_ids.size()) {
-        auto scan_start = Clock::now();
-        long double current_mass = congestion_mass();
-        scan_us += elapsed_us(scan_start);
-        if (current_mass <= target_mass) {
-            break;
+    // Route relief scores only decrease as flows are removed, so stale heap
+    // entries are safe upper bounds for an exact lazy-greedy scan.
+    struct CandidateScoreEntry {
+        long double score = 0.0L;
+        QueryId query_id = kInvalidId;
+    };
+
+    struct CandidateScoreLess {
+        bool operator()(
+            const CandidateScoreEntry& lhs,
+            const CandidateScoreEntry& rhs) const {
+            if (lhs.score != rhs.score) {
+                return lhs.score < rhs.score;
+            }
+            return lhs.query_id > rhs.query_id;
+        }
+    };
+
+    auto outranks = [](
+                        const CandidateScoreEntry& lhs,
+                        const CandidateScoreEntry& rhs) {
+        if (lhs.score != rhs.score) {
+            return lhs.score > rhs.score;
+        }
+        return lhs.query_id < rhs.query_id;
+    };
+
+    std::priority_queue<
+        CandidateScoreEntry,
+        std::vector<CandidateScoreEntry>,
+        CandidateScoreLess>
+        queue;
+    std::vector<long double> cached_scores(result.trajectories.size(), 0.0L);
+    std::vector<char> selected_flags(result.trajectories.size(), 0);
+
+    auto rank_start = Clock::now();
+    for (QueryId query_id : candidate_ids) {
+        if (query_id < 0 ||
+            query_id >= static_cast<QueryId>(result.trajectories.size())) {
+            continue;
         }
 
-        auto rank_start = Clock::now();
-        QueryId best_query_id = kInvalidId;
-        long double best_score = 0.0L;
-        for (QueryId query_id : candidate_ids) {
-            if (selected.find(query_id) != selected.end() ||
-                query_id < 0 ||
-                query_id >= static_cast<QueryId>(result.trajectories.size())) {
+        long double score = route_score(result.trajectories[query_id]);
+        if (score <= 0.0L) {
+            continue;
+        }
+        cached_scores[query_id] = score;
+        queue.push({score, query_id});
+    }
+    rank_us += elapsed_us(rank_start);
+
+    auto discard_invalid_top = [&]() {
+        while (!queue.empty()) {
+            const CandidateScoreEntry& entry = queue.top();
+            if (entry.query_id < 0 ||
+                entry.query_id >= static_cast<QueryId>(cached_scores.size()) ||
+                selected_flags[entry.query_id] ||
+                entry.score != cached_scores[entry.query_id]) {
+                queue.pop();
                 continue;
             }
+            break;
+        }
+    };
 
-            long double score = route_score(result.trajectories[query_id]);
-            if (score > best_score ||
-                (score == best_score &&
-                 best_query_id != kInvalidId &&
-                 query_id < best_query_id)) {
-                best_score = score;
-                best_query_id = query_id;
+    long double current_mass = initial_mass;
+    while (selected.size() < candidate_ids.size()) {
+        if (current_mass <= target_mass) {
+            auto scan_start = Clock::now();
+            current_mass = congestion_mass();
+            scan_us += elapsed_us(scan_start);
+            if (current_mass <= target_mass) {
+                break;
             }
         }
-        rank_us += elapsed_us(rank_start);
 
-        if (best_query_id == kInvalidId || best_score <= 0.0L) {
+        auto scan_start = Clock::now();
+        discard_invalid_top();
+        bool has_candidate = !queue.empty();
+        scan_us += elapsed_us(scan_start);
+        if (!has_candidate) {
             break;
         }
 
-        QueryId query_id = best_query_id;
+        CandidateScoreEntry entry = queue.top();
+        queue.pop();
+        QueryId query_id = entry.query_id;
+        if (query_id < 0 ||
+            query_id >= static_cast<QueryId>(result.trajectories.size()) ||
+            selected_flags[query_id]) {
+            continue;
+        }
+
+        rank_start = Clock::now();
+        long double refreshed_score =
+            route_score(result.trajectories[query_id]);
+        rank_us += elapsed_us(rank_start);
+        if (refreshed_score <= 0.0L) {
+            cached_scores[query_id] = 0.0L;
+            continue;
+        }
+
+        CandidateScoreEntry refreshed{refreshed_score, query_id};
+        cached_scores[query_id] = refreshed_score;
+
+        scan_start = Clock::now();
+        discard_invalid_top();
+        bool next_outranks =
+            !queue.empty() && outranks(queue.top(), refreshed);
+        scan_us += elapsed_us(scan_start);
+        if (next_outranks) {
+            queue.push(refreshed);
+            continue;
+        }
+
         selected.insert(query_id);
+        selected_flags[query_id] = 1;
+        cached_scores[query_id] = 0.0L;
 
         auto remove_start = Clock::now();
-        decrease_trajectory_flow_only(result.trajectories[query_id]);
+        long double removed_mass =
+            decrease_trajectory_flow_only(result.trajectories[query_id]);
+        if (removed_mass > 0.0L) {
+            current_mass =
+                std::max<long double>(0.0L, current_mass - removed_mass);
+        }
         remove_us += elapsed_us(remove_start);
     }
 
@@ -2692,6 +2888,8 @@ Trajectory GROAlgorithm::reroute_query(
     const TrafficResult& result,
     const TrafficDependencyGraph& tdg,
     const std::vector<Cost>& impacts) const {
+    (void)result;
+
     struct Predecessor {
         NodeId previous_node = kInvalidId;
         EdgeId edge_id = kInvalidId;
@@ -2721,6 +2919,26 @@ Trajectory GROAlgorithm::reroute_query(
     scores[query.origin] = 0;
     heap.push_or_update(query.origin, 0);
 
+    auto working_edge_flow = [&](EdgeId edge_id, Time time) -> Flow {
+        if (edge_id < 0 ||
+            edge_id >= static_cast<EdgeId>(tdg.edge_timelines.size())) {
+            assert(false);
+            return 0;
+        }
+
+        const auto& timeline = tdg.edge_timelines[edge_id];
+        if (timeline.empty()) {
+            return 0;
+        }
+
+        auto timeline_it = timeline.upper_bound(time);
+        if (timeline_it == timeline.begin()) {
+            return 0;
+        }
+        --timeline_it;
+        return timeline_it->second.flow;
+    };
+
     while (!heap.empty()) {
         auto element = heap.extract_min();
         NodeId node_id = element.id;
@@ -2740,7 +2958,7 @@ Trajectory GROAlgorithm::reroute_query(
                 continue;
             }
 
-            Flow flow = get_edge_flow(result, edge_id, time);
+            Flow flow = working_edge_flow(edge_id, time);
             Cost travel_time = bpr_travel_time(edge, flow, traffic_options_);
             Time next_time = time + travel_time;
 
@@ -2801,17 +3019,21 @@ std::vector<Route> GROAlgorithm::reroute_queries(
     auto total_start = Clock::now();
     std::vector<Route> routes;
     TrafficDependencyGraph working_tdg = tdg;
+    std::vector<Cost> working_impacts = node_impacts;
     long long reroute_query_us = 0;
     long long reroute_query_count = 0;
     long long insert_trajectory_us = 0;
+    long long recompute_impact_us = 0;
 
-    for (const auto& batch : query_batches) {
+    for (size_t batch_index = 0; batch_index < query_batches.size(); ++batch_index) {
+        const auto& batch = query_batches[batch_index];
         std::vector<Trajectory> batch_trajectories(batch.size());
 
         auto reroute_start = Clock::now();
         #pragma omp parallel for
         for (size_t i = 0; i < batch.size(); ++i) {
-            batch_trajectories[i] = reroute_query(queries[batch[i]], result, working_tdg, node_impacts);
+            batch_trajectories[i] =
+                reroute_query(queries[batch[i]], result, working_tdg, working_impacts);
         }
         reroute_query_us += elapsed_us(reroute_start);
         reroute_query_count += static_cast<long long>(batch.size());
@@ -2829,6 +3051,14 @@ std::vector<Route> GROAlgorithm::reroute_queries(
             insert_trajectory_into_tdg(working_tdg, trajectory, result);
         }
         insert_trajectory_us += elapsed_us(insert_start);
+
+        if (batch_index + 1 < query_batches.size()) {
+            auto impact_start = Clock::now();
+            std::vector<Cost> raw_impacts = compute_tdg_impact(working_tdg);
+            working_impacts =
+                normalize_tdg_impacts_for_reroute(working_tdg, raw_impacts);
+            recompute_impact_us += elapsed_us(impact_start);
+        }
     }
     log_reroute_summary(
         options_.enable_timing_log,
@@ -2836,6 +3066,7 @@ std::vector<Route> GROAlgorithm::reroute_queries(
         reroute_query_count,
         reroute_query_us,
         insert_trajectory_us,
+        recompute_impact_us,
         elapsed_us(total_start));
     return routes;
 }

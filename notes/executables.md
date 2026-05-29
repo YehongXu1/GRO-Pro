@@ -240,9 +240,9 @@ nohup make run-ablation-tdg-bpr-relief-full ABLATION_CONFIG=config/config_bj_cap
 
 BJ Synthetic Rep1 baseline-selection ablation with 1% reroute fraction. This
 runs random and latency-based selection with both normal TD-Dijkstra reroute and
-TDG-impact reroute. Use `--fixed-fractions 0.01` for 1%; passing `1` means
-100% because the parser treats values in `[0, 1]` as proportions. `--tdg-gammas`
-is ignored by the baseline selection methods but is still passed because the
+TDG-impact reroute. Percentage CLI arguments are percentage points: use
+`--fixed-fractions 1` for 1%, `10` for 10%, and `30` for 30%. `--tdg-gammas` is
+ignored by the baseline selection methods but is still passed because the
 ablation parser requires it.
 
 ```bash
@@ -253,17 +253,17 @@ mkdir -p python/results/experiments/exp1_component_ablation/bj_synthetic_capacit
 nohup ./gro_ablation_test config/config_bj_capacity2_cap10e8.yaml \
   --query-dir data/BJ_Synthetic_query_sets \
   --rep 1 \
-  --output python/results/experiments/exp1_component_ablation/bj_synthetic_capacity2_cap10e8/raw/gro_ablation_baseline_random_delayed_fraction001_rep1_normal_tdgimpact15_capacity2_cap10e8.csv \
+  --output python/results/experiments/exp1_component_ablation/bj_synthetic_capacity2_cap10e8/raw/gro_ablation_baseline_random_delayed_fraction1pct_rep1_normal_tdgimpact15_capacity2_cap10e8.csv \
   --selection-methods random,most_delayed \
   --reroute-methods normal,tdg \
-  --fixed-fractions 0.01 \
+  --fixed-fractions 1 \
   --tdg-gammas 25 \
   --impact-weights 15 \
   --random-seed 0 \
-  > logs/bj_ablation_baseline_random_delayed_fraction001_rep1_normal_tdgimpact15_capacity2_cap10e8.log 2>&1 &
+  > logs/bj_ablation_baseline_random_delayed_fraction1pct_rep1_normal_tdgimpact15_capacity2_cap10e8.log 2>&1 &
 
-tail -f logs/bj_ablation_baseline_random_delayed_fraction001_rep1_normal_tdgimpact15_capacity2_cap10e8.log
-wc -l python/results/experiments/exp1_component_ablation/bj_synthetic_capacity2_cap10e8/raw/gro_ablation_baseline_random_delayed_fraction001_rep1_normal_tdgimpact15_capacity2_cap10e8.csv
+tail -f logs/bj_ablation_baseline_random_delayed_fraction1pct_rep1_normal_tdgimpact15_capacity2_cap10e8.log
+wc -l python/results/experiments/exp1_component_ablation/bj_synthetic_capacity2_cap10e8/raw/gro_ablation_baseline_random_delayed_fraction1pct_rep1_normal_tdgimpact15_capacity2_cap10e8.csv
 ```
 
 Expected complete output size:

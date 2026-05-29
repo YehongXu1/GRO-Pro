@@ -81,9 +81,7 @@ void require(bool condition, const std::string& message) {
 
 int parse_percent_value(const std::string& text) {
     double value = std::stod(text);
-    if (value >= -1.0 && value <= 1.0) {
-        value *= 100.0;
-    }
+    // CLI percentage arguments are percentage points: 1 means 1%, 10 means 10%.
     return static_cast<int>(std::llround(value));
 }
 

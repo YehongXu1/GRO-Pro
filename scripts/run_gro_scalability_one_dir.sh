@@ -21,6 +21,7 @@ fi
 if [[ ! ${RESULTS_DIR+x} || -z "$RESULTS_DIR" ]]; then RESULTS_DIR=python/results/scalability; fi
 if [[ ! ${REPS+x} || -z "$REPS" ]]; then REPS=1,2,3,5,7,10; fi
 if [[ ! ${TDG_GAMMAS+x} || -z "$TDG_GAMMAS" ]]; then TDG_GAMMAS=50; fi
+if [[ ! ${CANDIDATE_THETA+x} || -z "$CANDIDATE_THETA" ]]; then CANDIDATE_THETA=80; fi
 if [[ ! ${IMPACT_WEIGHTS+x} || -z "$IMPACT_WEIGHTS" ]]; then IMPACT_WEIGHTS=20; fi
 if [[ ! ${RANDOM_SEED+x} || -z "$RANDOM_SEED" ]]; then RANDOM_SEED=0; fi
 if [[ ! ${SELECTION_METHODS+x} || -z "$SELECTION_METHODS" ]]; then SELECTION_METHODS=tdg_excess; fi
@@ -78,7 +79,7 @@ for rep in "${REP_VALUES[@]}"; do
   fi
 
   REP_OUT="$TMPDIR/rep${rep}.csv"
-  echo "[run] label=$LABEL rep=$rep candidate_filter=$CANDIDATE_FILTER tdg_mode=$TDG_MODE conflict_threshold=${CONFLICT_THRESHOLD:-config} delta_compress=${DELTA_COMPRESS:-config} anchor_window=${ANCHOR_WINDOW:-config} anchor_threshold=${ANCHOR_THRESHOLD:-config} query_dir=$QUERY_DIR output=$REP_OUT"
+  echo "[run] label=$LABEL rep=$rep candidate_filter=$CANDIDATE_FILTER candidate_theta=$CANDIDATE_THETA tdg_mode=$TDG_MODE conflict_threshold=${CONFLICT_THRESHOLD:-config} delta_compress=${DELTA_COMPRESS:-config} anchor_window=${ANCHOR_WINDOW:-config} anchor_threshold=${ANCHOR_THRESHOLD:-config} query_dir=$QUERY_DIR output=$REP_OUT"
   EXTRA_ARGS=()
   if [[ -n "$CONFLICT_THRESHOLD" ]]; then
     EXTRA_ARGS+=(--conflict-threshold "$CONFLICT_THRESHOLD")
@@ -100,6 +101,7 @@ for rep in "${REP_VALUES[@]}"; do
     --reroute-methods "$REROUTE_METHODS" \
     --fixed-fractions "$FIXED_FRACTIONS" \
     --tdg-gammas "$TDG_GAMMAS" \
+    --candidate-theta "$CANDIDATE_THETA" \
     --impact-weights "$IMPACT_WEIGHTS" \
     --candidate-filter "$CANDIDATE_FILTER" \
     --tdg-mode "$TDG_MODE" \

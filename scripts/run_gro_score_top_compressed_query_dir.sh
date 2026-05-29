@@ -14,6 +14,7 @@ RESULTS_DIR="${RESULTS_DIR:-python/results/experiments/exp5_overall_effectivenes
 REP="${REP:-all}"
 MAX_FILES="${MAX_FILES:-0}"
 TDG_GAMMAS="${TDG_GAMMAS:-50}"
+CANDIDATE_THETA="${CANDIDATE_THETA:-80}"
 IMPACT_WEIGHTS="${IMPACT_WEIGHTS:-20}"
 FIXED_FRACTIONS="${FIXED_FRACTIONS:-10}"
 RANDOM_SEED="${RANDOM_SEED:-0}"
@@ -32,6 +33,7 @@ cmd=(
   --reroute-methods tdg
   --fixed-fractions "$FIXED_FRACTIONS"
   --tdg-gammas "$TDG_GAMMAS"
+  --candidate-theta "$CANDIDATE_THETA"
   --impact-weights "$IMPACT_WEIGHTS"
   --candidate-filter score_top
   --tdg-mode compressed
