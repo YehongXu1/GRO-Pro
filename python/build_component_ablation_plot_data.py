@@ -60,7 +60,11 @@ ORACLE_TIEBREAK = ["total_after", "selected_fraction", "gamma", "impact_weight"]
 
 def load_clean(path: str) -> pd.DataFrame:
     """Read a raw CSV and drop rows whose dataset is not a valid HopXRepY-Z id."""
-    df = pd.read_csv(path, dtype={"dataset": str})
+    try:
+        df = pd.read_csv(path, dtype={"dataset": str})
+    except pd.errors.ParserError:
+        df = pd.read_csv(path, dtype={"dataset": str},
+                         on_bad_lines="skip", engine="python")
     valid = df["dataset"].fillna("").str.match(DATASET_PATTERN)
     dropped = int((~valid).sum())
     if dropped:
@@ -116,7 +120,7 @@ def plot_component_ablation_labeled(
     baseline_fraction_by_panel_from_data: bool = False,
     show_reroute_legend: bool = True,
     fig_width: float = 13.8,
-    row_height: float = 2.35,
+    row_height: float = 1.95,
     h_pad: float = 0.55,
     w_pad: float = 1.2,
 ) -> None:
@@ -190,7 +194,7 @@ def plot_component_ablation_labeled(
                     selection_fraction_axis_top(fraction_curve, panel_baseline_fraction),
                 )
                 ax2.grid(False)
-                ax2.tick_params(axis="y", labelsize=9, pad=2, colors="#666666")
+                ax2.tick_params(axis="y", labelsize=11, pad=2, colors="#666666")
                 ax.set_zorder(ax2.get_zorder() + 1)
                 ax.patch.set_visible(False)
 
@@ -220,7 +224,7 @@ def plot_component_ablation_labeled(
                     zorder=3,
                 )
 
-        ax.set_title(format_panel_title_labeled(panel_index, rep, hop), fontsize=12, pad=5)
+        ax.set_title(format_panel_title_labeled(panel_index, rep, hop), fontsize=14, pad=5)
         ax.set_xlim(0, max_iter)
         ticks = list(range(0, max_iter + 1))
         if ticks[-1] != max_iter:
@@ -238,10 +242,10 @@ def plot_component_ablation_labeled(
         ax.ticklabel_format(axis="y", style="plain", useOffset=False)
         if rep == 1:
             ax.yaxis.set_major_formatter(mticker.FormatStrFormatter("%.3f"))
-        ax.tick_params(axis="both", labelsize=10, pad=2)
+        ax.tick_params(axis="both", labelsize=12, pad=2)
 
         if row == n_rows - 1:
-            ax.set_xlabel("Iteration number", fontsize=12)
+            ax.set_xlabel("Iteration number", fontsize=14)
 
     for panel_index in range(len(combos), n_rows * n_cols):
         axes[panel_index // n_cols][panel_index % n_cols].set_visible(False)
@@ -265,44 +269,48 @@ def plot_component_ablation_labeled(
         for label_text, style in REROUTE_STYLE.items()
     ]
 
-    if show_reroute_legend:
-        section_handles = [
-            Line2D([], [], linestyle="None", marker=None, color="none"),
-            *selection_handles,
-            Line2D([], [], linestyle="None", marker=None, color="none"),
-            *reroute_handles,
-        ]
-        section_labels = [
-            "Selection method:",
-            *[handle.get_label() for handle in selection_handles],
-            "Reroute method:",
-            *[handle.get_label() for handle in reroute_handles],
-        ]
-    else:
-        section_handles = [
-            Line2D([], [], linestyle="None", marker=None, color="none"),
-            *selection_handles,
-        ]
-        section_labels = [
-            "Selection method:",
-            *[handle.get_label() for handle in selection_handles],
-        ]
-    legend = fig.legend(
-        section_handles,
-        section_labels,
-        loc="upper center",
-        bbox_to_anchor=(0.5, 0.965),
-        ncol=len(section_labels),
-        frameon=False,
-        fontsize=11,
-        columnspacing=1.25,
-        handlelength=2.2,
-        handleheight=0.85,
-        handletextpad=0.55,
+    # Build two compact legends side-by-side. The section labels are added as
+    # plain fig.text so they sit tight against the first legend entry without the
+    # extra handle-width gap that a dummy legend entry would create.
+    legend_fontsize = 14
+    legend_y = 0.955
+    fig.text(
+        0.025, legend_y, "Selection method:",
+        ha="left", va="center", fontsize=legend_fontsize, fontweight="semibold",
     )
-    for text in legend.get_texts():
-        if text.get_text().endswith(":"):
-            text.set_weight("semibold")
+    sel_legend = fig.legend(
+        selection_handles,
+        [handle.get_label() for handle in selection_handles],
+        loc="center left",
+        bbox_to_anchor=(0.175, legend_y),
+        ncol=len(selection_handles),
+        frameon=False,
+        fontsize=legend_fontsize,
+        columnspacing=0.7,
+        handlelength=1.4,
+        handleheight=0.85,
+        handletextpad=0.35,
+    )
+    fig.add_artist(sel_legend)
+    if show_reroute_legend:
+        fig.text(
+            0.535, legend_y, "Reroute method:",
+            ha="left", va="center", fontsize=legend_fontsize, fontweight="semibold",
+        )
+        rer_legend = fig.legend(
+            reroute_handles,
+            [handle.get_label() for handle in reroute_handles],
+            loc="center left",
+            bbox_to_anchor=(0.685, legend_y),
+            ncol=len(reroute_handles),
+            frameon=False,
+            fontsize=legend_fontsize,
+            columnspacing=0.7,
+            handlelength=1.4,
+            handleheight=0.85,
+            handletextpad=0.35,
+        )
+        fig.add_artist(rer_legend)
 
     fig.text(
         0.052, 0.48, "Log. Total travel time (h)",
@@ -345,6 +353,8 @@ def main() -> None:
     # Baselines + latency are identical in both figures (oracle only touches TDG-guided).
     shared = [
         label(baseline_per_rep(rand, "normal_td_dijkstra"), "Random", "Normal TD-Dijkstra"),
+        label(baseline_per_rep(rand, "tdg_impact_reroute", impact_weight=lw),
+              "Random", "TDG-impact reroute"),
         label(baseline_per_rep(dely, "normal_td_dijkstra"), LATENCY_LABEL, "Normal TD-Dijkstra"),
         label(baseline_per_rep(dely, "tdg_impact_reroute", impact_weight=lw),
               LATENCY_LABEL, "TDG-impact reroute"),

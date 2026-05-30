@@ -6,7 +6,7 @@ if [[ -n "${LOG:-}" ]]; then
   exec > "$LOG" 2>&1
 fi
 
-if [[ ! ${OMP_NUM_THREADS+x} || -z "$OMP_NUM_THREADS" ]]; then OMP_NUM_THREADS=24; fi
+if [[ ! ${OMP_NUM_THREADS+x} || -z "$OMP_NUM_THREADS" ]]; then OMP_NUM_THREADS=80; fi
 export OMP_NUM_THREADS
 
 if [[ ! ${CONFIG+x} || -z "$CONFIG" ]]; then CONFIG=config/config_bj_capacity2_cap10e8_iter5.yaml; fi
