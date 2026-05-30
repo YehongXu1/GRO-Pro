@@ -93,6 +93,17 @@ def main() -> None:
     parser.add_argument("--raw-dir", required=True)
     parser.add_argument("--out-dir", required=True)
     parser.add_argument("--fig", required=True)
+    parser.add_argument(
+        "--reroute-tdg-file", default=None,
+        help="Optional CSV to source the TDG-impact reroute (triangle) curves from "
+             "(e.g. the congestion-gated run). Normal reroute + seed selection stay "
+             "from --raw-dir.")
+    parser.add_argument(
+        "--fixed-gamma", type=int, default=None,
+        help="Use a single gamma for TDG-guided instead of the per-seed ~1% pick.")
+    parser.add_argument(
+        "--impact-weight", type=int, default=FIXED_IMPACT_WEIGHT,
+        help="impact_weight for the TDG-impact reroute curves.")
     args = parser.parse_args()
 
     raw = args.raw_dir
@@ -102,24 +113,35 @@ def main() -> None:
     ext = load_rep1(os.path.join(raw, "gro_ablation_selection_tdg_excess_reroute_tdg.csv"))
 
     gstar = pick_per_seed_gamma(exn)
+    if args.fixed_gamma is not None:
+        gstar = gstar.assign(gstar=args.fixed_gamma)
 
     rand_n = rand[(rand["reroute_method"] == "normal_td_dijkstra") & (rand["selection_fraction"] == BASELINE_FRACTION)]
     dely_n = dely[(dely["reroute_method"] == "normal_td_dijkstra") & (dely["selection_fraction"] == BASELINE_FRACTION)]
     tg_n = exn.merge(gstar, on=["hop", "sid"])
     tg_n = tg_n[(tg_n["gamma"] == tg_n["gstar"]) & (tg_n["reroute_method"] == "normal_td_dijkstra")].copy()
 
-    # TDG-impact reroute (TDG-Dijkstra) curves, matching the main figure's method set:
-    # Most-delayed + TDG-impact, and TDG-guided + TDG-impact (weight FIXED_IMPACT_WEIGHT).
-    rand_i = rand[(rand["reroute_method"] == "tdg_impact_reroute")
-                  & (rand["selection_fraction"] == BASELINE_FRACTION)
-                  & (rand["impact_weight"] == FIXED_IMPACT_WEIGHT)]
-    dely_i = dely[(dely["reroute_method"] == "tdg_impact_reroute")
-                  & (dely["selection_fraction"] == BASELINE_FRACTION)
-                  & (dely["impact_weight"] == FIXED_IMPACT_WEIGHT)]
-    tg_i = ext.merge(gstar, on=["hop", "sid"])
+    # TDG-impact reroute (TDG-Dijkstra) curves. Optionally sourced from a separate
+    # run (e.g. the congestion-gated run); normal reroute and seed selection always
+    # come from --raw-dir (the gate does not affect them).
+    weight = args.impact_weight
+    if args.reroute_tdg_file:
+        src = load_rep1(args.reroute_tdg_file)
+        rand_src = src[src["selection_method"] == "random"]
+        dely_src = src[src["selection_method"] == "most_delayed"]
+        ext_src = src[src["selection_method"] == "tdg_excess"]
+    else:
+        rand_src, dely_src, ext_src = rand, dely, ext
+    rand_i = rand_src[(rand_src["reroute_method"] == "tdg_impact_reroute")
+                      & (rand_src["selection_fraction"] == BASELINE_FRACTION)
+                      & (rand_src["impact_weight"] == weight)]
+    dely_i = dely_src[(dely_src["reroute_method"] == "tdg_impact_reroute")
+                      & (dely_src["selection_fraction"] == BASELINE_FRACTION)
+                      & (dely_src["impact_weight"] == weight)]
+    tg_i = ext_src.merge(gstar, on=["hop", "sid"])
     tg_i = tg_i[(tg_i["gamma"] == tg_i["gstar"])
                 & (tg_i["reroute_method"] == "tdg_impact_reroute")
-                & (tg_i["impact_weight"] == FIXED_IMPACT_WEIGHT)].copy()
+                & (tg_i["impact_weight"] == weight)].copy()
 
     rand_red = final_reduction_by_seed(rand_n)
     dely_red = final_reduction_by_seed(dely_n)
