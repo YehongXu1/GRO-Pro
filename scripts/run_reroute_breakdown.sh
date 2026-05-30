@@ -16,6 +16,23 @@ LOG_DIR="${LOG_DIR:-logs/reroute_breakdown}"
 OMP="${OMP_NUM_THREADS:-24}"
 BIN="${BIN:-./gro_ablation_test}"
 
+# NUMA / thread pinning. Defaults are aimed at the 4-socket 80-physical-core box.
+# Override:
+#   OMP_PROC_BIND=spread          to spread threads across sockets
+#   OMP_PLACES=threads            to bind on hw threads (HT) instead of cores
+#   NUMACTL=""                    to disable numactl wrapping (e.g. if not installed)
+#   NUMACTL="numactl --cpunodebind=0 --membind=0"   to pin to one socket
+OMP_PROC_BIND="${OMP_PROC_BIND:-close}"
+OMP_PLACES="${OMP_PLACES:-cores}"
+export OMP_PROC_BIND OMP_PLACES
+if [[ -z "${NUMACTL+x}" ]]; then
+  if command -v numactl >/dev/null 2>&1; then
+    NUMACTL="numactl --interleave=all"
+  else
+    NUMACTL=""
+  fi
+fi
+
 # Default tasks: size:dataset_basename (extension .txt assumed)
 TASKS_DEFAULT=(
   "10k:BJRealRep1-0"
@@ -64,8 +81,8 @@ for entry in "${TASK_LIST[@]}"; do
     tag="${mode}_${size}_${file}"
     out_csv="$OUT_DIR/breakdown_${tag}.csv"
     log_file="$LOG_DIR/${tag}.log"
-    echo "[run] $tag (OMP=$OMP) -> $log_file"
-    OMP_NUM_THREADS="$OMP" "$BIN" "$CFG" \
+    echo "[run] $tag (OMP=$OMP PROC_BIND=$OMP_PROC_BIND PLACES=$OMP_PLACES NUMACTL='${NUMACTL}') -> $log_file"
+    OMP_NUM_THREADS="$OMP" $NUMACTL "$BIN" "$CFG" \
       --query-file "$qfile" \
       --output    "$out_csv" \
       --tdg-mode  "$mode" \
