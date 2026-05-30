@@ -1203,7 +1203,6 @@ int main(int argc, char** argv) {
             algorithm_options.reroute_congestion_gate =
                 options.reroute_congestion_gate;
         }
-        algorithm_options.enable_timing_log = false;
         gro::TrafficOptions traffic_options =
             gro::load_traffic_options(options.config_path);
 
@@ -1530,7 +1529,6 @@ int main(int argc, char** argv) {
                                     gro::AlgorithmOptions run_options =
                                         algorithm_options;
                                     run_options.impact_weight = impact_weight;
-                                    run_options.enable_timing_log = false;
                                     gro::GROAlgorithm rerouter(
                                         graph,
                                         run_options,
