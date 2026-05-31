@@ -557,13 +557,15 @@ TrafficDependencyGraph GROAlgorithm::build_tdg(
 
             previous_timeline_it = timeline_it;
             previous_node_id = node_id;
-        
+
         }
-        
+
     }
 
-    for (Trajectory& trajectory : result.trajectories) {
-        collect_trajectory_tdg_nodes(tdg, trajectory);
+    // Each iteration writes only to its own trajectory.tdg_node_ids; tdg is read-only here.
+    #pragma omp parallel for schedule(dynamic, 64)
+    for (size_t ti = 0; ti < result.trajectories.size(); ++ti) {
+        collect_trajectory_tdg_nodes(tdg, result.trajectories[ti]);
     }
 
     return tdg;
@@ -585,11 +587,19 @@ std::vector<std::map<Time, Cost>> GROAlgorithm::compute_anchor_scores(
     int anchor_threshold = std::max(0, options_.anchor_threshold);
 
     std::vector<std::map<Time, Cost>> anchor_scores(graph_.edges.size());
+    // Edge profile sizes vary widely (hot arterials carry thousands of events, cold
+    // edges a handful), so use dynamic scheduling for load balance. Each iteration
+    // writes only to its own anchor_scores[edge_id] slot — no shared mutation.
+    // Track the slowest single-edge time as a critical-path estimate for the
+    // infinite-thread lower bound of this phase.
+    long long anchor_max_us = 0;
+    #pragma omp parallel for schedule(dynamic, 64) reduction(max:anchor_max_us)
     for (EdgeId edge_id = 0; edge_id < static_cast<EdgeId>(result.edge_profiles.size()); ++edge_id) {
         const auto& profile = result.edge_profiles[edge_id];
         if (profile.empty()) {
             continue;
         }
+        auto edge_start = Clock::now();
 
         std::vector<__int128> cumulative_flow(profile.size(), 0);
         for (size_t i = 1; i < profile.size(); ++i) {
@@ -661,7 +671,10 @@ std::vector<std::map<Time, Cost>> GROAlgorithm::compute_anchor_scores(
                 anchor_scores[edge_id][time] = score;
             }
         }
+        long long edge_us = elapsed_us(edge_start);
+        if (edge_us > anchor_max_us) anchor_max_us = edge_us;
     }
+    last_anchor_score_max_us_ = anchor_max_us;
     return anchor_scores;
 }
 
@@ -857,8 +870,10 @@ TrafficDependencyGraph GROAlgorithm::compress_tdg(
         }
     }
 
-    for (Trajectory& trajectory : result.trajectories) {
-        collect_trajectory_tdg_nodes(tdg, trajectory);
+    // Each iteration writes only to its own trajectory.tdg_node_ids; tdg is read-only here.
+    #pragma omp parallel for schedule(dynamic, 64)
+    for (size_t ti = 0; ti < result.trajectories.size(); ++ti) {
+        collect_trajectory_tdg_nodes(tdg, result.trajectories[ti]);
     }
 
     return tdg;
@@ -3049,19 +3064,27 @@ std::vector<Route> GROAlgorithm::reroute_queries(
     long long reroute_query_count = 0;
     long long insert_trajectory_us = 0;
     long long recompute_impact_us = 0;
+    // Sum of (slowest single-query reroute) across batches — reroute wall under
+    // infinite threads, assuming each batch still runs sequentially.
+    long long reroute_critical_us = 0;
 
     for (size_t batch_index = 0; batch_index < query_batches.size(); ++batch_index) {
         const auto& batch = query_batches[batch_index];
         std::vector<Trajectory> batch_trajectories(batch.size());
 
         auto reroute_start = Clock::now();
-        #pragma omp parallel for
+        long long batch_max_us = 0;
+        #pragma omp parallel for reduction(max:batch_max_us)
         for (size_t i = 0; i < batch.size(); ++i) {
+            auto q_start = Clock::now();
             batch_trajectories[i] =
                 reroute_query(queries[batch[i]], result, working_tdg, working_impacts);
+            long long q_us = elapsed_us(q_start);
+            if (q_us > batch_max_us) batch_max_us = q_us;
         }
         reroute_query_us += elapsed_us(reroute_start);
         reroute_query_count += static_cast<long long>(batch.size());
+        reroute_critical_us += batch_max_us;
 
         auto insert_start = Clock::now();
         for (const Trajectory& trajectory : batch_trajectories) {
@@ -3085,6 +3108,7 @@ std::vector<Route> GROAlgorithm::reroute_queries(
             recompute_impact_us += elapsed_us(impact_start);
         }
     }
+    last_reroute_critical_us_ = reroute_critical_us;
     log_reroute_summary(
         options_.enable_timing_log,
         iteration,
@@ -3177,10 +3201,17 @@ std::vector<Route> GROAlgorithm::baseline_reroute_queries(
 
     std::vector<Route> routes(query_ids.size());
 
-    #pragma omp parallel for 
+    // Baseline reroute runs a single parallel batch over all selected queries,
+    // so the infinite-thread wall is just the slowest single query.
+    long long reroute_max_us = 0;
+    #pragma omp parallel for reduction(max:reroute_max_us)
     for (size_t i = 0; i < query_ids.size(); ++i) {
+        auto q_start = Clock::now();
         routes[i] = reroute_one(queries[query_ids[i]]);
+        long long q_us = elapsed_us(q_start);
+        if (q_us > reroute_max_us) reroute_max_us = q_us;
     }
+    last_reroute_critical_us_ = reroute_max_us;
 
     return routes;
 }

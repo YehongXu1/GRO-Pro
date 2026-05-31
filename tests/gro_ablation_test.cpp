@@ -1066,7 +1066,8 @@ void write_header(std::ofstream& out) {
         << "normalize_sec,batch_sec,reroute_sec,evaluate_after_sec,"
         << "method_total_sec,cumulative_sec,"
         << "mean_selected_impact_score,mean_all_query_impact_score,"
-        << "tdg_node_count,tdg_edge_timeline_count\n";
+        << "tdg_node_count,tdg_edge_timeline_count,"
+        << "anchor_score_max_sec,reroute_critical_sec\n";
 }
 
 void write_row(
@@ -1093,7 +1094,9 @@ void write_row(
     const ScoreStats& all_scores,
     std::size_t tdg_node_count,
     std::size_t tdg_edge_timeline_count,
-    long long cumulative_us) {
+    long long cumulative_us,
+    long long anchor_score_max_us,
+    long long reroute_critical_us) {
     bool uses_tdg_selection = is_tdg_selection_method(selection.method);
     bool uses_tdg_reroute =
         reroute_method == "tdg_impact_reroute" ||
@@ -1170,7 +1173,9 @@ void write_row(
         << static_cast<double>(selected_scores.mean) << ','
         << static_cast<double>(all_scores.mean) << ','
         << tdg_node_count << ','
-        << tdg_edge_timeline_count << '\n';
+        << tdg_edge_timeline_count << ','
+        << static_cast<double>(anchor_score_max_us) / 1000000.0 << ','
+        << static_cast<double>(reroute_critical_us) / 1000000.0 << '\n';
     out.flush();
 }
 
@@ -1364,6 +1369,11 @@ int main(int argc, char** argv) {
                                               traffic_result);
                                 long long build_tdg_us =
                                     gro::elapsed_us(tdg_start);
+                                long long anchor_score_max_us =
+                                    options.tdg_mode == "compressed"
+                                        ? base_algorithm
+                                              .last_anchor_score_max_us()
+                                        : 0;
                                 std::size_t tdg_edges =
                                     tdg_edge_timeline_count(tdg);
                                 log_progress(
@@ -1491,6 +1501,7 @@ int main(int argc, char** argv) {
                                 std::size_t batch_count = 0;
                                 long long batch_us = 0;
                                 long long reroute_us = 0;
+                                long long reroute_critical_us = 0;
                                 std::string reroute_method_name;
                                 int logged_impact_weight = 0;
 
@@ -1511,6 +1522,8 @@ int main(int argc, char** argv) {
                                             traffic_result);
                                     reroute_us =
                                         gro::elapsed_us(reroute_start);
+                                    reroute_critical_us =
+                                        base_algorithm.last_reroute_critical_us();
                                     log_progress(
                                         options,
                                         "[stage done] " + iter_context +
@@ -1590,6 +1603,8 @@ int main(int argc, char** argv) {
                                             reroute_impacts);
                                     reroute_us =
                                         gro::elapsed_us(reroute_start);
+                                    reroute_critical_us =
+                                        rerouter.last_reroute_critical_us();
                                     log_progress(
                                         options,
                                         "[stage done] " + iter_context +
@@ -1693,7 +1708,9 @@ int main(int argc, char** argv) {
                                     all_scores,
                                     tdg.nodes.size(),
                                     tdg_edges,
-                                    cumulative_us);
+                                    cumulative_us,
+                                    anchor_score_max_us,
+                                    reroute_critical_us);
                                 ++rows_written;
                                 log_progress(
                                     options,

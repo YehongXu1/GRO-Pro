@@ -71,7 +71,6 @@ mkdir -p "$TMPDIR" "$RESULTS_DIR"
 
 IFS=',' read -r -a REP_VALUES <<< "$REPS"
 
-first=1
 for rep in "${REP_VALUES[@]}"; do
   rep="$(echo "$rep" | xargs)"
   if [[ -z "$rep" ]]; then
@@ -108,13 +107,28 @@ for rep in "${REP_VALUES[@]}"; do
     --random-seed "$RANDOM_SEED" \
     "${EXTRA_ARGS[@]}"
 
-  if [[ "$first" -eq 1 ]]; then
-    head -n 1 "$REP_OUT" > "$OUT"
-    first=0
-  fi
-  tail -n +2 "$REP_OUT" >> "$OUT"
   echo "[done] label=$LABEL rep=$rep rows=$(wc -l < "$REP_OUT")"
 done
+
+# Rebuild OUT from every rep*.csv in TMPDIR, sorted by numeric rep so partial
+# runs (e.g. REPS=3,5,7,10) merge with earlier completed reps instead of
+# overwriting them.
+SORTED_LIST="$(
+  find "$TMPDIR" -maxdepth 1 -name 'rep*.csv' -print |
+    while read -r path; do
+      base="${path##*/rep}"
+      base="${base%.csv}"
+      printf '%s\t%s\n' "$base" "$path"
+    done | sort -n -k1,1 | cut -f2-
+)"
+if [[ -n "$SORTED_LIST" ]]; then
+  first_path="$(printf '%s\n' "$SORTED_LIST" | head -n 1)"
+  head -n 1 "$first_path" > "$OUT"
+  printf '%s\n' "$SORTED_LIST" | while IFS= read -r path; do
+    [[ -z "$path" ]] && continue
+    tail -n +2 "$path" >> "$OUT"
+  done
+fi
 
 echo "[merged] $OUT"
 wc -l "$OUT"

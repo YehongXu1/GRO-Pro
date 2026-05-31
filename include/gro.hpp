@@ -254,10 +254,22 @@ public:
     AlgorithmResult run_tdg_reroute_baseline(
         const std::vector<Query>& queries) const;
 
+    // Critical-path timings for the parallel hot spots, captured during the
+    // most recent call. Used for infinite-thread runtime estimates (each
+    // parallel region's wall under infinite threads ≈ its slowest single unit).
+    //
+    // anchor_score_max_us: slowest per-edge time across compute_anchor_scores.
+    // reroute_critical_us: sum over batches of (slowest per-query reroute time
+    //   in that batch) — i.e. the reroute wall under infinite threads.
+    long long last_anchor_score_max_us() const { return last_anchor_score_max_us_; }
+    long long last_reroute_critical_us() const { return last_reroute_critical_us_; }
+
 private:
     Graph graph_;
     AlgorithmOptions options_;
     TrafficOptions traffic_options_;
+    mutable long long last_anchor_score_max_us_ = 0;
+    mutable long long last_reroute_critical_us_ = 0;
 };
 
 }  // namespace gro

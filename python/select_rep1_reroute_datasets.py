@@ -28,6 +28,8 @@ import pandas as pd
 
 from build_component_ablation_plot_data import (
     LATENCY_LABEL,
+    NORMAL_REROUTE_LABEL,
+    TDG_REROUTE_LABEL,
     build_plot_dataframe,
     label,
     plot_component_ablation_labeled,
@@ -640,12 +642,12 @@ def main() -> None:
     # normal reroute, plus TDG-impact reroute (TDG-Dijkstra) for most-delayed and
     # TDG-guided (matching the main 3x3 figure).
     frames = [
-        label(keep_selected(rand_n), "Random", "Normal TD-Dijkstra"),
-        label(keep_selected(rand_i), "Random", "TDG-impact reroute"),
-        label(keep_selected(dely_n), LATENCY_LABEL, "Normal TD-Dijkstra"),
-        label(keep_selected(dely_i), LATENCY_LABEL, "TDG-impact reroute"),
-        label(keep_selected(tg_n), "TDG-guided", "Normal TD-Dijkstra"),
-        label(keep_selected(tg_i), "TDG-guided", "TDG-impact reroute"),
+        label(keep_selected(rand_n), "Random", NORMAL_REROUTE_LABEL),
+        label(keep_selected(rand_i), "Random", TDG_REROUTE_LABEL),
+        label(keep_selected(dely_n), LATENCY_LABEL, NORMAL_REROUTE_LABEL),
+        label(keep_selected(dely_i), LATENCY_LABEL, TDG_REROUTE_LABEL),
+        label(keep_selected(tg_n), "TDG-guided", NORMAL_REROUTE_LABEL),
+        label(keep_selected(tg_i), "TDG-guided", TDG_REROUTE_LABEL),
     ]
     plot_df = build_plot_dataframe(frames)
     # Always plot the full curve (all iterations) so stability across all 10 iters

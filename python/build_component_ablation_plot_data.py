@@ -50,6 +50,25 @@ SELECTION_STYLE = {
     for key, color in SELECTION_STYLE.items()
 }
 
+# Reroute method display names. Frozen script uses "TDG-impact reroute"; we drop
+# the redundant "reroute" word (section label already says "Reroute method:")
+# and surface the batched-per-iteration nature of the algorithm.
+NORMAL_REROUTE_LABEL = "Normal TD-Dijkstra"
+TDG_REROUTE_LABEL = "Batched TDG-Dijkstra"
+REROUTE_STYLE = {
+    NORMAL_REROUTE_LABEL: REROUTE_STYLE["Normal TD-Dijkstra"],
+    TDG_REROUTE_LABEL: REROUTE_STYLE["TDG-impact reroute"],
+}
+
+# Per-selection markersize so that perfectly overlapping curves (e.g. when all
+# three methods give an identical no-change curve, as on rep=1/hop=40) still
+# appear as concentric hollow rings instead of hiding behind the last drawn one.
+SELECTION_MARKERSIZE = {
+    "Random": 12,
+    LATENCY_LABEL: 10,
+    "TDG-guided": 8,
+}
+
 DATASET_PATTERN = re.compile(r"^Hop(\d+)Rep(\d+)-(\d+)$")
 REP_FRACTION = {1: 1, 2: 10, 4: 30}
 # How the raw rep value is displayed in panel titles.
@@ -120,7 +139,7 @@ def plot_component_ablation_labeled(
     baseline_fraction_by_panel_from_data: bool = False,
     show_reroute_legend: bool = True,
     fig_width: float = 13.8,
-    row_height: float = 1.95,
+    row_height: float = 2.30,
     h_pad: float = 0.55,
     w_pad: float = 1.2,
 ) -> None:
@@ -216,7 +235,7 @@ def plot_component_ablation_labeled(
                     marker=style["marker"],
                     linestyle=style["linestyle"],
                     linewidth=style["linewidth"],
-                    markersize=8,
+                    markersize=SELECTION_MARKERSIZE.get(selection_label, 8),
                     markerfacecolor="none",
                     markeredgecolor=SELECTION_STYLE[selection_label],
                     markeredgewidth=1.75,
@@ -275,14 +294,14 @@ def plot_component_ablation_labeled(
     legend_fontsize = 14
     legend_y = 0.955
     fig.text(
-        0.025, legend_y, "Selection method:",
+        0.075, legend_y, "Selection:",
         ha="left", va="center", fontsize=legend_fontsize, fontweight="semibold",
     )
     sel_legend = fig.legend(
         selection_handles,
         [handle.get_label() for handle in selection_handles],
         loc="center left",
-        bbox_to_anchor=(0.175, legend_y),
+        bbox_to_anchor=(0.160, legend_y),
         ncol=len(selection_handles),
         frameon=False,
         fontsize=legend_fontsize,
@@ -294,14 +313,14 @@ def plot_component_ablation_labeled(
     fig.add_artist(sel_legend)
     if show_reroute_legend:
         fig.text(
-            0.535, legend_y, "Reroute method:",
+            0.515, legend_y, "Reroute:",
             ha="left", va="center", fontsize=legend_fontsize, fontweight="semibold",
         )
         rer_legend = fig.legend(
             reroute_handles,
             [handle.get_label() for handle in reroute_handles],
             loc="center left",
-            bbox_to_anchor=(0.685, legend_y),
+            bbox_to_anchor=(0.585, legend_y),
             ncol=len(reroute_handles),
             frameon=False,
             fontsize=legend_fontsize,
@@ -313,13 +332,13 @@ def plot_component_ablation_labeled(
         fig.add_artist(rer_legend)
 
     fig.text(
-        0.052, 0.48, "Log. Total travel time (h)",
-        rotation=90, va="center", ha="center", fontsize=15,
+        0.060, 0.48, "Log. Total travel time (h)",
+        rotation=90, va="center", ha="center", fontsize=17,
     )
     if has_selection_fraction_axis:
         fig.text(
-            0.958, 0.48, "TDG selected queries (%)",
-            rotation=270, va="center", ha="center", fontsize=15, color="#666666",
+            0.948, 0.48, "TDG selected queries (%)",
+            rotation=270, va="center", ha="center", fontsize=17, color="#666666",
         )
 
     output_dir = os.path.dirname(output)
@@ -354,22 +373,22 @@ def main() -> None:
     shared = [
         label(baseline_per_rep(rand, "normal_td_dijkstra"), "Random", "Normal TD-Dijkstra"),
         label(baseline_per_rep(rand, "tdg_impact_reroute", impact_weight=lw),
-              "Random", "TDG-impact reroute"),
+              "Random", TDG_REROUTE_LABEL),
         label(baseline_per_rep(dely, "normal_td_dijkstra"), LATENCY_LABEL, "Normal TD-Dijkstra"),
         label(baseline_per_rep(dely, "tdg_impact_reroute", impact_weight=lw),
-              LATENCY_LABEL, "TDG-impact reroute"),
+              LATENCY_LABEL, TDG_REROUTE_LABEL),
     ]
 
     fixed_frames = shared + [
         label(exn[(exn["reroute_method"] == "normal_td_dijkstra") & (exn["gamma"] == g)],
               "TDG-guided", "Normal TD-Dijkstra"),
         label(ext[(ext["reroute_method"] == "tdg_impact_reroute") & (ext["gamma"] == g) & (ext["impact_weight"] == w)],
-              "TDG-guided", "TDG-impact reroute"),
+              "TDG-guided", TDG_REROUTE_LABEL),
     ]
 
     diag_frames = shared + [
         label(tdg_best_param(exn, "normal_td_dijkstra"), "TDG-guided", "Normal TD-Dijkstra"),
-        label(tdg_best_param(ext, "tdg_impact_reroute"), "TDG-guided", "TDG-impact reroute"),
+        label(tdg_best_param(ext, "tdg_impact_reroute"), "TDG-guided", TDG_REROUTE_LABEL),
     ]
 
     for tag, frames, out, fig_out in (
