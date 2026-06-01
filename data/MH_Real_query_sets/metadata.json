@@ -27,18 +27,18 @@
   "min_duration_min": 2.0,
   "max_duration_min": 60.0,
   "min_distance_km": 0.5,
-  "max_distance_km": 1.5,
+  "max_distance_km": 3.0,
   "amplify_time_jitter_sec": 0,
   "random_seed": 0,
   "time_origin_seconds": 1356969660,
   "counters": {
     "rows_seen": 1999999,
-    "candidates_seen": 562272,
+    "candidates_seen": 1158773,
     "bad_duration": 29292,
-    "bad_haversine": 1159431,
+    "bad_trip_distance": 12167,
+    "bad_haversine": 556662,
     "outside_bbox": 210551,
-    "bad_trip_distance": 6937,
     "bad_coordinate": 31062,
-    "snap_failed": 454
+    "snap_failed": 1492
   }
 }
