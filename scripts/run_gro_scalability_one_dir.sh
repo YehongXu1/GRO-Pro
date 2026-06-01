@@ -34,6 +34,8 @@ if [[ ! ${CONFLICT_THRESHOLD+x} ]]; then CONFLICT_THRESHOLD=""; fi
 if [[ ! ${DELTA_COMPRESS+x} ]]; then DELTA_COMPRESS=""; fi
 if [[ ! ${ANCHOR_WINDOW+x} ]]; then ANCHOR_WINDOW=""; fi
 if [[ ! ${ANCHOR_THRESHOLD+x} ]]; then ANCHOR_THRESHOLD=""; fi
+if [[ ! ${GRAPH_PATH+x} ]]; then GRAPH_PATH=""; fi
+if [[ ! ${COORDINATES_PATH+x} ]]; then COORDINATES_PATH=""; fi
 
 if [[ "$CANDIDATE_FILTER" == "all" ]]; then
   CANDIDATE_TAG=full
@@ -91,6 +93,12 @@ for rep in "${REP_VALUES[@]}"; do
   fi
   if [[ -n "$ANCHOR_THRESHOLD" ]]; then
     EXTRA_ARGS+=(--anchor-threshold "$ANCHOR_THRESHOLD")
+  fi
+  if [[ -n "$GRAPH_PATH" ]]; then
+    EXTRA_ARGS+=(--graph-path "$GRAPH_PATH")
+  fi
+  if [[ -n "$COORDINATES_PATH" ]]; then
+    EXTRA_ARGS+=(--coordinates-path "$COORDINATES_PATH")
   fi
   ./gro_ablation_test "$CONFIG" \
     --query-dir "$QUERY_DIR" \

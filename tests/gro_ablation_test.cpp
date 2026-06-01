@@ -41,6 +41,8 @@ struct DatasetInput {
 
 struct Options {
     std::string config_path = "config/config.yaml";
+    std::string graph_path_override;          // empty = use config's graph_path
+    std::string coordinates_path_override;    // empty = use config's coordinates_path
     std::filesystem::path query_file;
     std::filesystem::path query_dir;
     std::unordered_set<std::string> dataset_filter;
@@ -185,6 +187,10 @@ Options parse_args(int argc, char** argv) {
         std::string arg = argv[index++];
         if (arg == "--query-file") {
             options.query_file = require_value(arg);
+        } else if (arg == "--graph-path") {
+            options.graph_path_override = require_value(arg);
+        } else if (arg == "--coordinates-path") {
+            options.coordinates_path_override = require_value(arg);
         } else if (arg == "--query-dir") {
             options.query_dir = require_value(arg);
         } else if (arg == "--datasets") {
@@ -237,6 +243,7 @@ Options parse_args(int argc, char** argv) {
         } else if (arg == "--help") {
             std::cout
                 << "Usage: ./gro_ablation_test [config] "
+                << "[--graph-path path] [--coordinates-path path] "
                 << "[--query-file path | --query-dir path] [--output path] "
                 << "[--selection-methods random,most_delayed,tdg_anchor,tdg_excess,tdg_bpr_relief] "
                 << "[--reroute-methods normal,tdg,tdg_nobatch] "
@@ -1189,6 +1196,12 @@ int main(int argc, char** argv) {
         Options options = parse_args(argc, argv);
 
         gro::InputConfig input = gro::load_input_config(options.config_path);
+        if (!options.graph_path_override.empty()) {
+            input.graph_path = options.graph_path_override;
+        }
+        if (!options.coordinates_path_override.empty()) {
+            input.coordinates_path = options.coordinates_path_override;
+        }
         gro::Graph graph = gro::read_graph(input);
         gro::AlgorithmOptions algorithm_options =
             gro::load_algorithm_options(options.config_path);

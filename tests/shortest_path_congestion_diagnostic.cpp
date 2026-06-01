@@ -30,6 +30,8 @@ struct DatasetInput {
 
 struct Options {
     std::string config_path = "config/config.yaml";
+    std::string graph_path_override;          // empty = use config's graph_path
+    std::string coordinates_path_override;    // empty = use config's coordinates_path
     std::filesystem::path query_file;
     std::filesystem::path query_dir;
     std::filesystem::path output_path =
@@ -115,6 +117,10 @@ Options parse_args(int argc, char** argv) {
         std::string arg = argv[index++];
         if (arg == "--query-file") {
             options.query_file = require_value(arg);
+        } else if (arg == "--graph-path") {
+            options.graph_path_override = require_value(arg);
+        } else if (arg == "--coordinates-path") {
+            options.coordinates_path_override = require_value(arg);
         } else if (arg == "--query-dir") {
             options.query_dir = require_value(arg);
         } else if (arg == "--output") {
@@ -132,6 +138,7 @@ Options parse_args(int argc, char** argv) {
         } else if (arg == "--help") {
             std::cout
                 << "Usage: ./shortest_path_congestion_diagnostic [config] "
+                << "[--graph-path path] [--coordinates-path path] "
                 << "[--query-file path | --query-dir path] [--output path] "
                 << "[--datasets name1,name2] [--dataset-list path] "
                 << "[--hop n] [--rep n] [--max-files n]\n";
@@ -275,6 +282,12 @@ int main(int argc, char** argv) {
         Options options = parse_args(argc, argv);
 
         gro::InputConfig input = gro::load_input_config(options.config_path);
+        if (!options.graph_path_override.empty()) {
+            input.graph_path = options.graph_path_override;
+        }
+        if (!options.coordinates_path_override.empty()) {
+            input.coordinates_path = options.coordinates_path_override;
+        }
         gro::Graph graph = gro::read_graph(input);
         gro::AlgorithmOptions algorithm_options =
             gro::load_algorithm_options(options.config_path);
