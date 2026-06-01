@@ -74,6 +74,6 @@
   },
   "od_center_radius_km": 0.0,
   "base_scale": 10000,
-  "random_seed": 20260529,
+  "random_seed": 20260601,
   "intended_congestion_gate": "Run shortest_path_congestion_diagnostic and keep only datasets with shortest-path inflation in the paper-facing high-congestion range, currently 10x to 100x."
 }
