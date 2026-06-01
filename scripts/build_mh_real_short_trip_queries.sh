@@ -6,12 +6,14 @@
 #   data/MH_Real_query_sets_scalability_inner_progressive_peak1h/...
 #
 # Required env var:
-#   TLC_FILE    Path to NYC TLC yellow-taxi CSV (.csv, .csv.gz, or .zip).
-#               If you have multiple files, set TLC_DIR + TLC_PATTERN instead.
+#   TLC_FILE    Path to NYC TLC raw CSV (.csv, .csv.gz, or .zip). Default below
+#               points at the local copy used by previous MH generations.
 #   TLC_DIR     Alternative to TLC_FILE: directory containing TLC CSVs.
 #   TLC_PATTERN Glob inside TLC_DIR (default '*.csv*').
 #
 # Optional env vars:
+#   TLC_INPUT_FORMAT       'ncl-anondata' (default, matches the local anondata.csv)
+#                          or 'header' (for modern yellow_tripdata coordinate-level CSVs)
 #   MAX_DIST_KM            haversine cap on OD distance, in km (default 1.5)
 #   MIN_DIST_KM            minimum OD distance, in km (default 0.5)
 #   QUERIES_PER_SET        rows per seed (default 10000)
@@ -46,10 +48,16 @@ if [[ -n "${LOG:-}" ]]; then
 fi
 
 if [[ -z "${TLC_FILE:-}" && -z "${TLC_DIR:-}" ]]; then
-  echo "ERROR: set TLC_FILE=<path> or TLC_DIR=<dir> to point at NYC TLC yellow-taxi data" >&2
-  exit 2
+  TLC_FILE="data/MH_Real_query_sets/nyc_tlc/anondata.csv"
+  if [[ ! -f "$TLC_FILE" ]]; then
+    echo "ERROR: set TLC_FILE=<path> or TLC_DIR=<dir> to point at NYC TLC data" >&2
+    echo "  default was $TLC_FILE but it doesn't exist" >&2
+    exit 2
+  fi
+  echo "[config] TLC_FILE not set; using default $TLC_FILE"
 fi
 
+TLC_INPUT_FORMAT="${TLC_INPUT_FORMAT:-ncl-anondata}"
 MAX_DIST_KM="${MAX_DIST_KM:-1.5}"
 MIN_DIST_KM="${MIN_DIST_KM:-0.5}"
 QUERIES_PER_SET="${QUERIES_PER_SET:-10000}"
@@ -85,7 +93,7 @@ fi
 
 python python/generate_mh_real_queries_from_tlc.py \
   "${TLC_ARGS[@]}" \
-  --input-format header \
+  --input-format "$TLC_INPUT_FORMAT" \
   --graph data/MH.txt \
   --coordinates data/MH_NodeIDLonLat.txt \
   --output-dir "$SOURCE_DIR" \
