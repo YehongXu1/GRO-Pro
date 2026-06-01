@@ -53,8 +53,13 @@ The rerouting score is now:
 ```text
 score(e, t) =
     travel_time(e, t)
-    + impact_weight * max_normalized_impact_on_edge_interval(e, t) / 100
+    + impact_weight * congestion_gate(e, t)
+        * max_normalized_impact_on_edge_interval(e, t) / 100
 ```
+
+`congestion_gate(e, t)` defaults to a 50%-capacity ramp: zero at 50% load, full
+strength at capacity, and clamped between. Set `reroute_congestion_gate < 0` or
+`>= 100` to disable the gate.
 
 `impact_weight = 0` still behaves like normal time-dependent Dijkstra except
 for the shared reroute implementation path.

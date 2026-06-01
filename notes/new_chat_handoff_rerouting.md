@@ -19,7 +19,9 @@ TDG-guided **selection**; rerouting is a secondary component.
 
 A recent commit (`d8b1b22`, 2026-05-29) added three things to selection/reroute:
 lazy-greedy selection, a separate `candidate_theta`, and per-batch impact
-recompute during rerouting (plus a `reroute_congestion_gate` option). The
+recompute during rerouting (plus a `reroute_congestion_gate` option). The gate is
+now enabled by default at 50% capacity so TDG-impact reroute does not strongly
+penalize high-impact but locally low-flow nodes. The
 **lazy-greedy update made query selection ~84-371x faster** on BJ peak1h (it is an
 exact CELF speedup; same selected set, only faster). 
 
@@ -82,8 +84,9 @@ recommendation):
 - `conflict_threshold` (`include/gro.hpp:65`, run at 5000) controls batch count and
   thus how many inter-batch recomputes happen; it is near-unlimited now.
 - `impact_weight` / `reroute_congestion_gate` (`include/gro.hpp:54,60`) change which
-  route is chosen; the per-edge timeline scan in `reroute_query` runs regardless of
-  their values.
+  route is chosen; the gate defaults to 50% capacity and scales the TDG-impact
+  penalty from zero at that load to full strength at capacity. The per-edge
+  timeline scan in `reroute_query` runs regardless of these values.
 
 ## Open Problem: uncompressed 50k instability
 

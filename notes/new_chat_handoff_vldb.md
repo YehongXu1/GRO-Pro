@@ -464,6 +464,11 @@ python/results/experiments/exp1_component_ablation/bj_synthetic_capacity2_cap10e
   arguments are now interpreted as percentage points. Use `--fixed-fractions 1`
   for 1%, `10` for 10%, and `30` for 30%; do not use the old proportional
   spelling `0.01`.
+- TDG-impact reroute now enables the local congestion gate by default:
+  `reroute_congestion_gate = 50`, meaning the TDG-impact penalty ramps from zero
+  at 50% edge load to full strength at capacity. This is meant to avoid
+  over-penalizing high-impact TDG nodes whose local flow is too low for an added
+  rerouted query to propagate meaningful delay.
 - `tests/paper_baseline_test.cpp` is the current runner for one-shot paper
   baselines `svp,gor,sor,fahl`. It accepts `--query-file` or `--query-dir` and
   writes comparable route-quality/runtime CSVs.

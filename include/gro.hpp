@@ -57,7 +57,7 @@ struct AlgorithmOptions {
     // up to 100%. Below the threshold the reroute reduces to plain travel-time
     // Dijkstra (no spurious detours where there is no congestion); at/above
     // capacity the original penalty is preserved. <0 or >=100 disables the gate.
-    int reroute_congestion_gate = -1; // in percent of capacity
+    int reroute_congestion_gate = 50; // in percent of capacity
     int theta_percentile = 90; // in percent
     int delta_min = 600; // in seconds
     int delta_initial = 1200; // in seconds

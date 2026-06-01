@@ -23,7 +23,7 @@ MAX_FILES="${MAX_FILES:-0}"
 
 CANDIDATE_FILTER="${CANDIDATE_FILTER:-all}"
 CANDIDATE_THETA="${CANDIDATE_THETA:-}"
-REROUTE_CONGESTION_GATE="${REROUTE_CONGESTION_GATE:-}"
+REROUTE_CONGESTION_GATE="${REROUTE_CONGESTION_GATE:-50}"
 TDG_MODE="${TDG_MODE:-fine}"
 CONFLICT_THRESHOLD="${CONFLICT_THRESHOLD:-}"
 DELTA_COMPRESS="${DELTA_COMPRESS:-}"
@@ -44,6 +44,10 @@ sanitize_tag() {
 selection_tag="$(sanitize_tag "$SELECTION_METHODS")"
 reroute_tag="$(sanitize_tag "$REROUTE_METHODS")"
 default_label="selection_${selection_tag}_reroute_${reroute_tag}"
+if [[ -n "$REROUTE_CONGESTION_GATE" ]]; then
+  gate_tag="$(sanitize_tag "$REROUTE_CONGESTION_GATE")"
+  default_label="${default_label}_gate${gate_tag}"
+fi
 if [[ "$REP" != "all" ]]; then
   default_label="${default_label}_rep${REP}"
 fi

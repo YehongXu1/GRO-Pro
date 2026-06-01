@@ -61,6 +61,7 @@ struct Options {
     int candidate_theta = -1;
     std::vector<int> impact_weights = {30};
     int reroute_congestion_gate = -1;
+    bool reroute_congestion_gate_set = false;
     std::string candidate_filter = "all";
     std::string tdg_mode = "fine";
     int conflict_threshold = -1;
@@ -216,6 +217,7 @@ Options parse_args(int argc, char** argv) {
             options.impact_weights = parse_percent_list(require_value(arg));
         } else if (arg == "--reroute-congestion-gate") {
             options.reroute_congestion_gate = parse_percent_value(require_value(arg));
+            options.reroute_congestion_gate_set = true;
         } else if (arg == "--candidate-filter") {
             options.candidate_filter = require_value(arg);
         } else if (arg == "--tdg-mode") {
@@ -241,6 +243,7 @@ Options parse_args(int argc, char** argv) {
                 << "[--fixed-fractions 1,10,30] [--tdg-gammas 50] "
                 << "[--candidate-theta 80] "
                 << "[--impact-weights 30] "
+                << "[--reroute-congestion-gate 50] "
                 << "[--candidate-filter all|source_congestion|score_top|global_score|component_balanced|component_marginal|component_marginal_budget5|component_marginal_budget3|component_marginal_samek|component_marginal_major80_budget5|component_marginal_major90_budget5|component_marginal_major90_samek] "
                 << "[--tdg-mode fine|compressed] "
                 << "[--conflict-threshold n] "
@@ -995,7 +998,7 @@ void replace_routes(
     }
 }
 
-gro::Cost evaluate_total_after(
+gro::TrafficResult evaluate_after_routes(
     const gro::Graph& graph,
     const std::vector<gro::Query>& queries,
     std::vector<gro::Route> routes,
@@ -1007,7 +1010,7 @@ gro::Cost evaluate_total_after(
     gro::TrafficResult result =
         gro::evaluate_traffic(graph, queries, routes, traffic_options);
     evaluate_us = gro::elapsed_us(start);
-    return result.total_travel_time;
+    return result;
 }
 
 std::size_t tdg_edge_timeline_count(
@@ -1204,7 +1207,7 @@ int main(int argc, char** argv) {
         if (options.candidate_theta >= 0) {
             algorithm_options.candidate_theta = options.candidate_theta;
         }
-        if (options.reroute_congestion_gate >= 0) {
+        if (options.reroute_congestion_gate_set) {
             algorithm_options.reroute_congestion_gate =
                 options.reroute_congestion_gate;
         }
@@ -1313,6 +1316,12 @@ int main(int argc, char** argv) {
 
                                 std::vector<gro::Route> routes = initial_routes;
                                 long long cumulative_us = 0;
+                                // Cache the traffic result from each iter's evaluate_after.
+                                // From iter 1 onward, this is exactly the input to the
+                                // next iter's evaluate_before — so we skip the redundant
+                                // re-evaluation and reuse the cached result.
+                                bool has_cached_traffic = false;
+                                gro::TrafficResult cached_traffic;
 
                                 for (int iteration = 0;
                                      iteration < algorithm_options.max_iterations;
@@ -1331,15 +1340,20 @@ int main(int argc, char** argv) {
                                     options,
                                     "[stage start] " + iter_context +
                                         " stage=evaluate_before");
-                                auto evaluate_before_start = gro::Clock::now();
-                                gro::TrafficResult traffic_result =
-                                    gro::evaluate_traffic(
-                                        graph,
-                                        queries,
-                                        routes,
-                                        traffic_options);
-                                long long evaluate_before_us =
-                                    gro::elapsed_us(evaluate_before_start);
+                                long long evaluate_before_us = 0;
+                                gro::TrafficResult traffic_result;
+                                if (has_cached_traffic) {
+                                    // Routes haven't changed since the previous iter's
+                                    // evaluate_after, so the simulator result is identical.
+                                    traffic_result = std::move(cached_traffic);
+                                    has_cached_traffic = false;
+                                } else {
+                                    auto evaluate_before_start = gro::Clock::now();
+                                    traffic_result = gro::evaluate_traffic(
+                                        graph, queries, routes, traffic_options);
+                                    evaluate_before_us =
+                                        gro::elapsed_us(evaluate_before_start);
+                                }
                                 gro::Cost total_before =
                                     traffic_result.total_travel_time;
                                 log_progress(
@@ -1350,7 +1364,10 @@ int main(int argc, char** argv) {
                                             seconds_from_us(
                                                 evaluate_before_us)) +
                                         " total_before=" +
-                                        std::to_string(total_before));
+                                        std::to_string(total_before) +
+                                        (evaluate_before_us == 0
+                                            ? " (reused from previous evaluate_after)"
+                                            : ""));
 
                                 std::string tdg_stage =
                                     options.tdg_mode == "compressed"
@@ -1622,14 +1639,20 @@ int main(int argc, char** argv) {
                                     "[stage start] " + iter_context +
                                         " stage=evaluate_after");
                                 long long evaluate_after_us = 0;
-                                gro::Cost total_after =
-                                    evaluate_total_after(
+                                gro::TrafficResult after_traffic =
+                                    evaluate_after_routes(
                                         graph,
                                         queries,
                                         routes,
                                         new_routes,
                                         traffic_options,
                                         evaluate_after_us);
+                                gro::Cost total_after =
+                                    after_traffic.total_travel_time;
+                                // Cache for next iter's evaluate_before — routes will
+                                // be updated to match (replace_routes call below).
+                                cached_traffic = std::move(after_traffic);
+                                has_cached_traffic = true;
                                 log_progress(
                                     options,
                                     "[stage done] " + iter_context +
