@@ -1,8 +1,9 @@
 {
   "source_label": "bj_real_high_congestion_scalability",
-  "input_dir": "data/BJ_Real_query_sets",
+  "dataset_prefix": "BJReal",
+  "input_dir": "data/BJ_Real_query_sets_scalability_original",
   "output_dir": "data/BJ_Real_query_sets_scalability_inner_progressive_peak1h",
-  "derivation": "For each seed and query count, sample source rows from the T-Drive-derived BJRealRep1 file, repeat each selected source row copies_per_source times, optionally filter source rows by central OD radius, optionally rescale departures, and sort by departure time. This is a controlled congested peak workload for scalability experiments, not an independent raw taxi sample.",
+  "derivation": "For each seed and query count, sample source rows from the real-derived BJRealRep1 file, repeat each selected source row copies_per_source times, optionally filter source rows by central OD radius, optionally rescale departures, and sort by departure time. This is a controlled congested peak workload for scalability experiments, not an independent raw taxi sample.",
   "query_counts": [
     10000,
     20000,
@@ -28,15 +29,15 @@
     },
     {
       "query_count": 30000,
-      "source_count": 1800,
-      "od_center_radius_km": 4.0,
+      "source_count": 2400,
+      "od_center_radius_km": 4.5,
       "departure_window_sec": 3600,
       "jitter_sec": 0
     },
     {
       "query_count": 50000,
-      "source_count": 3000,
-      "od_center_radius_km": 5.0,
+      "source_count": 4000,
+      "od_center_radius_km": 5.5,
       "departure_window_sec": 3600,
       "jitter_sec": 0
     },
@@ -73,6 +74,6 @@
   },
   "od_center_radius_km": 0.0,
   "base_scale": 10000,
-  "random_seed": 20260523,
+  "random_seed": 20260601,
   "intended_congestion_gate": "Run shortest_path_congestion_diagnostic and keep only datasets with shortest-path inflation in the paper-facing high-congestion range, currently 10x to 100x."
 }
