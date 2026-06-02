@@ -15,8 +15,8 @@
   "size_specs": [
     {
       "query_count": 10000,
-      "source_count": 800,
-      "od_center_radius_km": 2.0,
+      "source_count": 400,
+      "od_center_radius_km": 1.0,
       "departure_window_sec": 3600,
       "jitter_sec": 0
     },
