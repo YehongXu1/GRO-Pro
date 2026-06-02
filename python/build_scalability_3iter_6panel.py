@@ -26,7 +26,7 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import LogLocator, FuncFormatter
 
 
-N_ITER = 3        # runtime / TDG / TTT aggregation window
+N_ITER = 4        # runtime / TDG / TTT aggregation window
 BASE = "python/results/experiments/exp3_compression_scalability"
 PATHS = {
     ("BJ", "fine"): f"{BASE}/bj_peak1h/gro_scalability_bj_peak1h_tdg_excess_full_conflict5000_capacity2_cap10e8.csv",
@@ -49,8 +49,22 @@ def aggregate(path):
     if not os.path.isfile(path):
         tmp_dir = path.replace("/gro_scalability_", "/tmp_gro_scalability_").rsplit(".csv", 1)[0]
         rep_files = sorted(glob.glob(f"{tmp_dir}/rep*.csv"))
+        # First pass: check whether every rep file has arc columns.
+        all_have_arcs = True
+        for fp in rep_files:
+            with open(fp) as f:
+                header = csv.DictReader(f).fieldnames or []
+                if "tdg_route_arc_count" not in header:
+                    all_have_arcs = False
+                    break
+        if not all_have_arcs:
+            print(f"  [aggregate] {tmp_dir}: arc columns missing in some rep files; "
+                  f"falling back to TDG nodes only for consistency.")
         rows_iter = (row for fp in rep_files for row in csv.DictReader(open(fp)))
     else:
+        with open(path) as f:
+            header = csv.DictReader(f).fieldnames or []
+        all_have_arcs = "tdg_route_arc_count" in header
         rows_iter = csv.DictReader(open(path))
     for row in rows_iter:
         it = int(row["iteration"])
@@ -67,9 +81,12 @@ def aggregate(path):
             float(row["reroute_critical_sec"])
         )
         nodes = float(row["tdg_node_count"])
-        route_arcs = float(row.get("tdg_route_arc_count") or 0)
-        same_edge_arcs = float(row.get("tdg_same_edge_arc_count") or 0)
-        s["tdg_acc"].append(nodes + route_arcs + same_edge_arcs)
+        if all_have_arcs:
+            route_arcs = float(row.get("tdg_route_arc_count") or 0)
+            same_edge_arcs = float(row.get("tdg_same_edge_arc_count") or 0)
+            s["tdg_acc"].append(nodes + route_arcs + same_edge_arcs)
+        else:
+            s["tdg_acc"].append(nodes)
         if it == 0:
             s["init"] = float(row["total_before"])
         s["afters"].append(float(row["total_after"]))
@@ -182,31 +199,13 @@ def main():
         ax.grid(False)
         if log_y:
             ax.set_yscale("log")
-            if simple_ticks:
-                # Major ticks only (decades), simple labels.
-                ax.yaxis.set_major_locator(LogLocator(base=10.0, numticks=10))
-                ax.yaxis.set_minor_locator(
-                    LogLocator(base=10.0, subs=(2.0, 5.0), numticks=20)
-                )
-                ax.yaxis.set_minor_formatter(plt.NullFormatter())
-                if count_fmt:
-                    ax.yaxis.set_major_formatter(FuncFormatter(fmt_count))
-                else:
-                    ax.yaxis.set_major_formatter(FuncFormatter(lambda v, _: f"{v:g}"))
+            # 3-4 major ticks only, no minor labels.
+            ax.yaxis.set_major_locator(LogLocator(base=10.0, numticks=4))
+            ax.yaxis.set_minor_locator(plt.NullLocator())
+            if count_fmt:
+                ax.yaxis.set_major_formatter(FuncFormatter(fmt_count))
             else:
-                # Runtime panels: keep the denser 2/3/5/7 minor ticks.
-                ax.yaxis.set_major_locator(LogLocator(base=10.0, numticks=10))
-                ax.yaxis.set_minor_locator(
-                    LogLocator(base=10.0, subs=(2.0, 3.0, 5.0, 7.0), numticks=20)
-                )
-                ax.yaxis.set_major_formatter(
-                    FuncFormatter(lambda v, _: f"{v:g}" if v >= 1 else f"{v:.2g}")
-                )
-                ax.yaxis.set_minor_formatter(
-                    FuncFormatter(lambda v, _: f"{v:g}" if v >= 1 else f"{v:.2g}")
-                )
-                ax.tick_params(axis="y", which="minor", labelsize=10, length=3)
-            ax.tick_params(axis="y", which="major", labelsize=12)
+                ax.yaxis.set_major_formatter(FuncFormatter(lambda v, _: f"{v:g}"))
         ax.tick_params(axis="y", which="major", labelsize=12)
         ax.set_xticks([s / 1000.0 for s in sizes])
         ax.set_xticklabels(
@@ -215,22 +214,26 @@ def main():
             rotation=30,
         )
 
-    # Panel 1-3: BJ
-    plot_panel(axes[0], "BJ", "gro_inf",  "Runtime (s)",         True,  "(a) Beijing — Runtime")
+    # Panel 1-3: BJ — runtime now linear (was log).
+    plot_panel(axes[0], "BJ", "gro_inf",  "Runtime (s)",         False, "(a) Beijing — Runtime")
     plot_panel(axes[1], "BJ", "tdg",      "TDG nodes + arcs",    True,  "(b) Beijing — TDG nodes + arcs",
                simple_ticks=True, count_fmt=True)
     plot_panel(axes[2], "BJ", "ttt_best", "TTT reduction (%)",   False, "(c) Beijing — TTT reduction")
 
-    # Panel 4-6: MH
-    plot_panel(axes[3], "MH", "gro_inf",  "Runtime (s)",         True,  "(d) Manhattan — Runtime")
+    # Panel 4-6: MH — runtime now linear.
+    plot_panel(axes[3], "MH", "gro_inf",  "Runtime (s)",         False, "(d) Manhattan — Runtime")
     plot_panel(axes[4], "MH", "tdg",      "TDG nodes + arcs",    True,  "(e) Manhattan — TDG nodes + arcs",
                simple_ticks=True, count_fmt=True)
     plot_panel(axes[5], "MH", "ttt_best", "TTT reduction (%)",   False, "(f) Manhattan — TTT reduction")
 
-    # TTT panels: tighten y range so lines aren't pinned at top.
-    # Data lives in roughly 90-99.5%; show 88-100 with small headroom.
+    # TTT panels: data lives in 95-99.5%; show 95-100 with 3 ticks.
     for ax in (axes[2], axes[5]):
-        ax.set_ylim(88, 100)
+        ax.set_ylim(95, 100)
+        ax.set_yticks([95, 97, 99])
+
+    # Runtime panels (linear): 3-4 evenly spaced ticks (0, 20, 40, 60).
+    for ax in (axes[0], axes[3]):
+        ax.set_yticks([0, 20, 40, 60])
 
     # Single shared legend just above the row, no suptitle (to avoid overlap).
     handles, labels = axes[0].get_legend_handles_labels()
