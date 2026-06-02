@@ -29,15 +29,15 @@
     },
     {
       "query_count": 30000,
-      "source_count": 1800,
-      "od_center_radius_km": 2.0,
+      "source_count": 2400,
+      "od_center_radius_km": 2.5,
       "departure_window_sec": 3600,
       "jitter_sec": 0
     },
     {
       "query_count": 50000,
-      "source_count": 3000,
-      "od_center_radius_km": 3.0,
+      "source_count": 4000,
+      "od_center_radius_km": 3.5,
       "departure_window_sec": 3600,
       "jitter_sec": 0
     },

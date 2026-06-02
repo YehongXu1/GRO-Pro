@@ -1029,6 +1029,26 @@ std::size_t tdg_edge_timeline_count(
     return count;
 }
 
+std::size_t tdg_route_arc_count(
+    const gro::TrafficDependencyGraph& tdg) {
+    std::size_t count = 0;
+    for (const auto& out : tdg.route_outgoing) {
+        count += out.size();
+    }
+    return count;
+}
+
+std::size_t tdg_same_edge_arc_count(
+    const gro::TrafficDependencyGraph& tdg) {
+    std::size_t count = 0;
+    for (const auto& timeline : tdg.edge_timelines) {
+        for (const auto& [t, ev] : timeline) {
+            if (ev.same_edge_child != gro::kInvalidId) ++count;
+        }
+    }
+    return count;
+}
+
 void ensure_parent_dir(const std::filesystem::path& path) {
     std::filesystem::path parent = path.parent_path();
     if (!parent.empty()) {
@@ -1077,6 +1097,7 @@ void write_header(std::ofstream& out) {
         << "method_total_sec,cumulative_sec,"
         << "mean_selected_impact_score,mean_all_query_impact_score,"
         << "tdg_node_count,tdg_edge_timeline_count,"
+        << "tdg_route_arc_count,tdg_same_edge_arc_count,"
         << "anchor_score_max_sec,reroute_critical_sec\n";
 }
 
@@ -1104,6 +1125,8 @@ void write_row(
     const ScoreStats& all_scores,
     std::size_t tdg_node_count,
     std::size_t tdg_edge_timeline_count,
+    std::size_t tdg_route_arc_count,
+    std::size_t tdg_same_edge_arc_count,
     long long cumulative_us,
     long long anchor_score_max_us,
     long long reroute_critical_us) {
@@ -1184,6 +1207,8 @@ void write_row(
         << static_cast<double>(all_scores.mean) << ','
         << tdg_node_count << ','
         << tdg_edge_timeline_count << ','
+        << tdg_route_arc_count << ','
+        << tdg_same_edge_arc_count << ','
         << static_cast<double>(anchor_score_max_us) / 1000000.0 << ','
         << static_cast<double>(reroute_critical_us) / 1000000.0 << '\n';
     out.flush();
@@ -1406,6 +1431,10 @@ int main(int argc, char** argv) {
                                         : 0;
                                 std::size_t tdg_edges =
                                     tdg_edge_timeline_count(tdg);
+                                std::size_t tdg_route_arcs =
+                                    tdg_route_arc_count(tdg);
+                                std::size_t tdg_same_edge_arcs =
+                                    tdg_same_edge_arc_count(tdg);
                                 log_progress(
                                     options,
                                     "[stage done] " + iter_context +
@@ -1744,6 +1773,8 @@ int main(int argc, char** argv) {
                                     all_scores,
                                     tdg.nodes.size(),
                                     tdg_edges,
+                                    tdg_route_arcs,
+                                    tdg_same_edge_arcs,
                                     cumulative_us,
                                     anchor_score_max_us,
                                     reroute_critical_us);
