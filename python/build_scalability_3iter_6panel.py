@@ -215,16 +215,16 @@ def main():
         )
 
     # Panel 1-3: BJ — runtime now linear (was log).
-    plot_panel(axes[0], "BJ", "gro_inf",  "Runtime (s)",         False, "(a) Beijing — Runtime")
-    plot_panel(axes[1], "BJ", "tdg",      "TDG nodes + arcs",    True,  "(b) Beijing — TDG nodes + arcs",
+    plot_panel(axes[0], "BJ", "gro_inf",  "Runtime (s)",          False, "(a) Beijing — Runtime")
+    plot_panel(axes[1], "BJ", "tdg",      "TDG nodes + links",    True,  "(b) Beijing — TDG size",
                simple_ticks=True, count_fmt=True)
-    plot_panel(axes[2], "BJ", "ttt_best", "TTT reduction (%)",   False, "(c) Beijing — TTT reduction")
+    plot_panel(axes[2], "BJ", "ttt_best", "TTT reduction (%)",    False, "(c) Beijing — TTT reduction")
 
     # Panel 4-6: MH — runtime now linear.
-    plot_panel(axes[3], "MH", "gro_inf",  "Runtime (s)",         False, "(d) Manhattan — Runtime")
-    plot_panel(axes[4], "MH", "tdg",      "TDG nodes + arcs",    True,  "(e) Manhattan — TDG nodes + arcs",
+    plot_panel(axes[3], "MH", "gro_inf",  "Runtime (s)",          False, "(d) Manhattan — Runtime")
+    plot_panel(axes[4], "MH", "tdg",      "TDG nodes + links",    True,  "(e) Manhattan — TDG size",
                simple_ticks=True, count_fmt=True)
-    plot_panel(axes[5], "MH", "ttt_best", "TTT reduction (%)",   False, "(f) Manhattan — TTT reduction")
+    plot_panel(axes[5], "MH", "ttt_best", "TTT reduction (%)",    False, "(f) Manhattan — TTT reduction")
 
     # TTT panels: data lives in 95-99.5%; show 95-100 with 3 ticks.
     for ax in (axes[2], axes[5]):
