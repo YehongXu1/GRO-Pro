@@ -2779,45 +2779,85 @@ std::vector<std::vector<QueryId>> GROAlgorithm::batch_queries(
     const TrafficDependencyGraph &tdg,
     const TrafficResult &result,
     int iteration) const {
+    (void)tdg;
     (void)iteration;
     if (selected_query_ids.empty()) {
         return {};
     }
 
-    std::vector<Cost> node_ratios(tdg.nodes.size(), 0);
-    std::vector<Cost> sorted_ratios;
-    sorted_ratios.reserve(tdg.nodes.size());
-    for (size_t node_id = 0; node_id < tdg.nodes.size(); ++node_id) {
-        const TDGNode& node = tdg.nodes[node_id]; 
-        node_ratios[node_id] =
-            congestion_ratio_key(node.flow, graph_.edges[node.edge_id].capacity);
-        sorted_ratios.push_back(node_ratios[node_id]);
+    // Paper-aligned sketch (Sec. 7.1): for each query q, S(q) is the set of
+    // edge-slots covering (a) the first entry of q's annotated route, (b) the
+    // last entry, and (c) every entry whose flow strictly exceeds capacity
+    // (overload x_{e@t} > 0 per Eqn. 3). Each entry e@t coarsens to e@s with
+    // s = floor(t / Delta), Delta = delta_compress (the paper's shared slot /
+    // compression interval). Slot coarsening is what makes c(q, B) meaningful
+    // when two queries enter the same edge a few seconds apart.
+    int slot_width = options_.delta_compress > 0
+        ? options_.delta_compress
+        : (options_.delta_initial > 0 ? options_.delta_initial : 1);
+    if (slot_width <= 0) {
+        slot_width = 1;
     }
 
-    std::sort(sorted_ratios.begin(), sorted_ratios.end());
-    size_t theta_index = percentile_index(sorted_ratios.size(), options_.theta_percentile);
-    Cost theta = sorted_ratios[theta_index];
+    using SlotKey = std::pair<EdgeId, Time>;  // (edge_id, slot = floor(t / Delta))
+    struct SlotKeyHash {
+        size_t operator()(const SlotKey& key) const noexcept {
+            uint64_t mixed =
+                (static_cast<uint64_t>(key.first) * 0x9E3779B97F4A7C15ULL) ^
+                static_cast<uint64_t>(key.second);
+            return static_cast<size_t>(mixed);
+        }
+    };
 
-    std::vector<char> important(tdg.nodes.size(), 0);
-    for (size_t node_id = 0; node_id < tdg.nodes.size(); ++node_id) {
-        important[node_id] = node_ratios[node_id] >= theta;
-    }
+    std::vector<std::vector<SlotKey>> sketches(result.trajectories.size());
 
-    std::vector<std::vector<TDGNodeId>> sketches(result.trajectories.size());
-    std::vector<int> seen(tdg.nodes.size(), 0);
-    int seen_epoch = 0; // We use seen_epoch to avoid clearing the seen array for each query
+    auto add_slot = [&](std::vector<SlotKey>& sketch,
+                        std::unordered_set<SlotKey, SlotKeyHash>& seen,
+                        EdgeId edge_id, Time time) {
+        SlotKey key{edge_id, time / slot_width};
+        if (seen.insert(key).second) {
+            sketch.push_back(key);
+        }
+    };
+
+    std::unordered_set<SlotKey, SlotKeyHash> seen_per_query;
 
     for (const QueryId& query_id : selected_query_ids) {
-        ++seen_epoch;
         const Trajectory& trajectory = result.trajectories[query_id];
-        auto& sketch = sketches[query_id];
+        if (trajectory.edge_ids.empty() ||
+            trajectory.schedule.size() < trajectory.edge_ids.size() + 1) {
+            continue;
+        }
 
-        for (TDGNodeId node_id : trajectory.tdg_node_ids) {
-            if (important[node_id] && seen[node_id] != seen_epoch) {
-                seen[node_id] = seen_epoch;
-                sketch.push_back(node_id);
+        auto& sketch = sketches[query_id];
+        seen_per_query.clear();
+
+        const size_t step_count = trajectory.edge_ids.size();
+        EdgeId first_edge = trajectory.edge_ids.front();
+        Time first_time = trajectory.schedule.front();
+        EdgeId last_edge = trajectory.edge_ids.back();
+        Time last_time = trajectory.schedule[step_count - 1];
+
+        add_slot(sketch, seen_per_query, first_edge, first_time);
+
+        for (size_t step = 0; step < step_count; ++step) {
+            EdgeId edge_id = trajectory.edge_ids[step];
+            Time entry_time = trajectory.schedule[step];
+            if (edge_id < 0 ||
+                edge_id >= static_cast<EdgeId>(graph_.edges.size())) {
+                continue;
+            }
+            Flow capacity = graph_.edges[edge_id].capacity;
+            Flow flow = get_edge_flow(result, edge_id, entry_time);
+            // Paper's overload condition x_{e@t} > 0, i.e. f_{e@t} > c_e.
+            // Capacity <= 0 means the edge has no defined cap; skip overload
+            // here (first/last still cover it).
+            if (capacity > 0 && flow > capacity) {
+                add_slot(sketch, seen_per_query, edge_id, entry_time);
             }
         }
+
+        add_slot(sketch, seen_per_query, last_edge, last_time);
     }
 
     std::vector<QueryId> query_order;
@@ -2836,9 +2876,11 @@ std::vector<std::vector<QueryId>> GROAlgorithm::batch_queries(
         });
 
     std::vector<std::vector<QueryId>> batches;
-    std::vector<std::unordered_map<TDGNodeId, int>> batch_loads; // stores for each batch, how many queries in that batch already cover each important TDG node 
-    std::vector<std::vector<int>> node_to_batches(tdg.nodes.size()); // gives the list of batch ids that contain this node in their sketch
-    std::vector<int> batch_seen; // batch_seen[batch_id] is the last candidate_epoch in which batch_id was considered as a candidate for a query
+    // For each batch, L_B(e@s) = number of queries in B whose sketches contain slot e@s.
+    std::vector<std::unordered_map<SlotKey, int, SlotKeyHash>> batch_loads;
+    // For each slot e@s, the batches whose loads contain it (used to enumerate candidates).
+    std::unordered_map<SlotKey, std::vector<int>, SlotKeyHash> slot_to_batches;
+    std::vector<int> batch_seen;  // batch_seen[batch_id] = last candidate_epoch when this batch was considered for a query
     std::vector<int> candidate_batches;
     int candidate_epoch = 0;
 
@@ -2847,7 +2889,7 @@ std::vector<std::vector<QueryId>> GROAlgorithm::batch_queries(
         for (size_t batch_index = 0; batch_index < batches.size(); ++batch_index) {
             int batch_id = static_cast<int>(batch_index);
             if (batch_seen[batch_id] == candidate_epoch) {
-                continue; // This batch has already been considered as a candidate for the current query
+                continue;  // already in candidate_batches (conflict > 0 with this query)
             }
             if (best_batch == kInvalidId ||
                 batches[batch_id].size() < batches[best_batch].size()) {
@@ -2857,12 +2899,13 @@ std::vector<std::vector<QueryId>> GROAlgorithm::batch_queries(
         return best_batch;
     };
 
-    // conflict_delta calculates how many nodes in the sketch of the current query are already present in the candidate batch
-    auto conflict_delta = [&](int batch_id, const std::vector<TDGNodeId>& sketch) {
-        int delta = 0; 
-        for (TDGNodeId node_id : sketch) {
-            auto load_it = batch_loads[batch_id].find(node_id);
-            if (load_it != batch_loads[batch_id].end()) {
+    // c(q, B) = sum over slots in S(q) of L_B(slot) (Eqn. 12).
+    auto conflict_delta = [&](int batch_id, const std::vector<SlotKey>& sketch) {
+        int delta = 0;
+        const auto& loads = batch_loads[batch_id];
+        for (const SlotKey& slot : sketch) {
+            auto load_it = loads.find(slot);
+            if (load_it != loads.end()) {
                 delta += load_it->second;
             }
         }
@@ -2874,10 +2917,14 @@ std::vector<std::vector<QueryId>> GROAlgorithm::batch_queries(
         ++candidate_epoch;
         candidate_batches.clear();
 
-        for (TDGNodeId node_id : sketch) {
-            for (int batch_id : node_to_batches[node_id]) {
+        for (const SlotKey& slot : sketch) {
+            auto it = slot_to_batches.find(slot);
+            if (it == slot_to_batches.end()) {
+                continue;
+            }
+            for (int batch_id : it->second) {
                 if (batch_seen[batch_id] != candidate_epoch) {
-                    batch_seen[batch_id] = candidate_epoch; // Mark this batch as seen for the current query
+                    batch_seen[batch_id] = candidate_epoch;
                     candidate_batches.push_back(batch_id);
                 }
             }
@@ -2886,6 +2933,7 @@ std::vector<std::vector<QueryId>> GROAlgorithm::batch_queries(
         int best_batch = kInvalidId;
         int best_delta = 0;
         if (!batches.empty()) {
+            // Prefer a zero-conflict batch (smallest by size) when one exists.
             best_batch = smallest_batch_not_seen();
             if (best_batch == kInvalidId) {
                 for (int batch_id : candidate_batches) {
@@ -2900,21 +2948,23 @@ std::vector<std::vector<QueryId>> GROAlgorithm::batch_queries(
             }
         }
 
+        // Paper test: assign q to B* iff c(q, B*) <= kappa * |S(q)|.
+        // In code units, conflict_threshold is kappa * 100.
         int conflict_limit =
             options_.conflict_threshold * static_cast<int>(sketch.size()) / 100;
         if (best_batch == kInvalidId || best_delta > conflict_limit) {
-            best_batch = batches.size();
+            best_batch = static_cast<int>(batches.size());
             batches.emplace_back();
             batch_loads.emplace_back();
-            batch_seen.push_back(0); // Initialize batch_seen for the new batch
+            batch_seen.push_back(0);
         }
 
         batches[best_batch].push_back(query_id);
-        for (TDGNodeId node_id : sketch) {
-            int& load = batch_loads[best_batch][node_id]; // number of queries in best_batch that cover node_id
+        auto& loads = batch_loads[best_batch];
+        for (const SlotKey& slot : sketch) {
+            int& load = loads[slot];
             if (load == 0) {
-                // This is the first time this node is being added to the batch, so we add the batch to node_to_batches for this node   
-                node_to_batches[node_id].push_back(best_batch);
+                slot_to_batches[slot].push_back(best_batch);
             }
             ++load;
         }

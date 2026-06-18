@@ -70,6 +70,7 @@ struct Options {
     int delta_compress = -1;
     int anchor_window = -1;
     int anchor_threshold = -1;
+    int lambda = -1;
     bool progress_log = true;
 };
 
@@ -236,6 +237,8 @@ Options parse_args(int argc, char** argv) {
             options.anchor_window = std::stoi(require_value(arg));
         } else if (arg == "--anchor-threshold") {
             options.anchor_threshold = std::stoi(require_value(arg));
+        } else if (arg == "--lambda") {
+            options.lambda = parse_percent_value(require_value(arg));
         } else if (arg == "--max-files") {
             options.max_files = std::stoi(require_value(arg));
         } else if (arg == "--no-progress-log") {
@@ -256,6 +259,7 @@ Options parse_args(int argc, char** argv) {
                 << "[--conflict-threshold n] "
                 << "[--delta-compress seconds] [--anchor-window seconds] "
                 << "[--anchor-threshold percent] "
+                << "[--lambda percent] "
                 << "[--hop 10] [--rep 1] "
                 << "[--datasets Hop10Rep1-0,BJRealRep10-0] "
                 << "[--dataset-list path] [--random-seed n] [--max-files n] "
@@ -302,6 +306,9 @@ Options parse_args(int argc, char** argv) {
     require(
         options.anchor_threshold == -1 || options.anchor_threshold >= 0,
         "anchor threshold must be non-negative");
+    require(
+        options.lambda == -1 || options.lambda >= 0,
+        "lambda must be non-negative");
     return options;
 }
 
@@ -1241,6 +1248,9 @@ int main(int argc, char** argv) {
         }
         if (options.anchor_threshold >= 0) {
             algorithm_options.anchor_threshold = options.anchor_threshold;
+        }
+        if (options.lambda >= 0) {
+            algorithm_options.lambda = options.lambda;
         }
         if (options.candidate_theta >= 0) {
             algorithm_options.candidate_theta = options.candidate_theta;

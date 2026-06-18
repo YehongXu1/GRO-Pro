@@ -167,15 +167,15 @@ def main():
         data[(net, "comp")] = comp_out
         picks_by_net[net] = picks
 
-    # Flatter aspect (wider/shorter): 26 × 3.4 inches.
-    fig, axes = plt.subplots(1, 6, figsize=(26, 3.4))
+    # Taller panels; width unchanged so fonts keep their relative size.
+    fig, axes = plt.subplots(1, 6, figsize=(26, 4.6))
 
     # Colors borrowed from python/plot_gro_component_ablation.py (frozen):
     #   #64BEE8 (blue, used there for "Latency-based") for uncompressed baseline
     #   #8F6CCF (purple, used there for "Random") for our compressed variant
     style = {
-        "fine": dict(color="#64BEE8", marker="o", label="Uncompressed", linewidth=2.8, markersize=11),
-        "comp": dict(color="#8F6CCF", marker="s", label="Compressed",   linewidth=2.8, markersize=11),
+        "fine": dict(color="#64BEE8", marker="o", label="Uncompressed", linewidth=4.0, markersize=18),
+        "comp": dict(color="#8F6CCF", marker="s", label="Compressed",   linewidth=4.0, markersize=18),
     }
 
     def fmt_count(v, _=None):
@@ -193,9 +193,8 @@ def main():
                     xs.append(q / 1000.0)
                     ys.append(data[(net, mode)][q][metric])
             ax.plot(xs, ys, **style[mode])
-        ax.set_xlabel("Query count (×1000)", fontsize=14)
-        ax.set_ylabel(ylabel, fontsize=14)
-        ax.set_title(title, fontsize=15, fontweight="bold")
+        ax.set_xlabel("Query count (×1000)", fontsize=26)
+        ax.set_title(title, fontsize=26, fontweight="bold")
         ax.grid(False)
         if log_y:
             ax.set_yscale("log")
@@ -206,25 +205,26 @@ def main():
                 ax.yaxis.set_major_formatter(FuncFormatter(fmt_count))
             else:
                 ax.yaxis.set_major_formatter(FuncFormatter(lambda v, _: f"{v:g}"))
-        ax.tick_params(axis="y", which="major", labelsize=12)
+        ax.tick_params(axis="y", which="major", labelsize=22)
         ax.set_xticks([s / 1000.0 for s in sizes])
         ax.set_xticklabels(
-            [f"{s // 1000}k" for s in sizes],
-            fontsize=12,
-            rotation=30,
+            [f"{s // 1000}" for s in sizes],
+            fontsize=22,
+            rotation=60,
+            ha="right",
         )
 
     # Panel 1-3: BJ — runtime now linear (was log).
-    plot_panel(axes[0], "BJ", "gro_inf",  "Runtime (s)",          False, "(a) Beijing — Runtime")
-    plot_panel(axes[1], "BJ", "tdg",      "TDG nodes + links",    True,  "(b) Beijing — TDG size",
+    plot_panel(axes[0], "BJ", "gro_inf",  "Runtime (s)",          False, "(a)BJ: Runtime (s)")
+    plot_panel(axes[1], "BJ", "tdg",      "TDG size",    True,  "(b)BJ: TDG size",
                simple_ticks=True, count_fmt=True)
-    plot_panel(axes[2], "BJ", "ttt_best", "TTT reduction (%)",    False, "(c) Beijing — TTT reduction")
+    plot_panel(axes[2], "BJ", "ttt_best", "TTT reduction (%)",    False, "(c)BJ: TTT reduction (%)")
 
     # Panel 4-6: MH — runtime now linear.
-    plot_panel(axes[3], "MH", "gro_inf",  "Runtime (s)",          False, "(d) Manhattan — Runtime")
-    plot_panel(axes[4], "MH", "tdg",      "TDG nodes + links",    True,  "(e) Manhattan — TDG size",
+    plot_panel(axes[3], "MH", "gro_inf",  "Runtime (s)",          False, "(d)MH: Runtime (s)")
+    plot_panel(axes[4], "MH", "tdg",      "TDG size",    True,  "(e)MH: TDG size",
                simple_ticks=True, count_fmt=True)
-    plot_panel(axes[5], "MH", "ttt_best", "TTT reduction (%)",    False, "(f) Manhattan — TTT reduction")
+    plot_panel(axes[5], "MH", "ttt_best", "TTT reduction (%)",    False, "(f)MH: TTT reduction (%)")
 
     # TTT panels: data lives in 95-99.5%; show 95-100 with 3 ticks.
     for ax in (axes[2], axes[5]):
@@ -241,16 +241,21 @@ def main():
         handles, labels,
         loc="upper center",
         ncol=2,
-        bbox_to_anchor=(0.5, 1.05),
-        fontsize=15,
+        bbox_to_anchor=(0.5, 1.06),
+        fontsize=26,
         frameon=False,
         handletextpad=0.5,
         columnspacing=2.5,
     )
 
-    fig.tight_layout(rect=[0, 0, 1, 0.92])
+    fig.tight_layout(rect=[0, 0, 1, 0.90])
     # Tighten inter-panel horizontal spacing.
-    plt.subplots_adjust(wspace=0.36)
+    plt.subplots_adjust(wspace=0.22)
+
+    # Nudge the (b)(c)(e)(f) subtitles leftward so they sit closer to the y-axis,
+    # without changing the panel positions.
+    for ax in (axes[1], axes[2], axes[4], axes[5]):
+        ax.title.set_position((0.35, 1.0))
 
     out_png = Path(BASE) / "scalability_3iter_6panel.png"
     out_pdf = Path(BASE) / "scalability_3iter_6panel.pdf"
