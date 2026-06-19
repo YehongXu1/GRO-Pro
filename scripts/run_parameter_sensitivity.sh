@@ -92,7 +92,6 @@ base_cmd=(
   --reroute-methods tdg
   --candidate-filter all
   --tdg-mode compressed
-  --reroute-congestion-gate 50
   --random-seed 0
 )
 

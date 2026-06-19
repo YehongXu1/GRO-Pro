@@ -62,8 +62,6 @@ struct Options {
     std::vector<int> tdg_gammas = {50};
     int candidate_theta = -1;
     std::vector<int> impact_weights = {30};
-    int reroute_congestion_gate = -1;
-    bool reroute_congestion_gate_set = false;
     std::string candidate_filter = "all";
     std::string tdg_mode = "fine";
     int conflict_threshold = -1;
@@ -222,9 +220,6 @@ Options parse_args(int argc, char** argv) {
             options.candidate_theta = parse_percent_value(require_value(arg));
         } else if (arg == "--impact-weights") {
             options.impact_weights = parse_percent_list(require_value(arg));
-        } else if (arg == "--reroute-congestion-gate") {
-            options.reroute_congestion_gate = parse_percent_value(require_value(arg));
-            options.reroute_congestion_gate_set = true;
         } else if (arg == "--candidate-filter") {
             options.candidate_filter = require_value(arg);
         } else if (arg == "--tdg-mode") {
@@ -253,7 +248,6 @@ Options parse_args(int argc, char** argv) {
                 << "[--fixed-fractions 1,10,30] [--tdg-gammas 50] "
                 << "[--candidate-theta 80] "
                 << "[--impact-weights 30] "
-                << "[--reroute-congestion-gate 50] "
                 << "[--candidate-filter all|source_congestion|score_top|global_score|component_balanced|component_marginal|component_marginal_budget5|component_marginal_budget3|component_marginal_samek|component_marginal_major80_budget5|component_marginal_major90_budget5|component_marginal_major90_samek] "
                 << "[--tdg-mode fine|compressed] "
                 << "[--conflict-threshold n] "
@@ -1254,10 +1248,6 @@ int main(int argc, char** argv) {
         }
         if (options.candidate_theta >= 0) {
             algorithm_options.candidate_theta = options.candidate_theta;
-        }
-        if (options.reroute_congestion_gate_set) {
-            algorithm_options.reroute_congestion_gate =
-                options.reroute_congestion_gate;
         }
         gro::TrafficOptions traffic_options =
             gro::load_traffic_options(options.config_path);
