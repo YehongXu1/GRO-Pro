@@ -1005,11 +1005,36 @@ std::vector<Cost> GROAlgorithm::normalize_tdg_impacts_for_reroute(
         return normalized;
     }
 
-    // Paper Eqn. 14: iota_{e@t} = I_hat_{e@t} * x_{e@t}, where
-    //   x_{e@t} = max(0, f_{e@t} / c_e - 1)   (Eqn. 3, the overload).
-    // Below capacity the overload is zero, so the penalty vanishes and QR
-    // does not detour around uncongested edges. Above capacity it scales
-    // linearly with the excess. No soft "gate" lookup is involved.
+    // Penalty: iota = I_hat * overload, where overload = max(0, load - 1).
+    // Clip overload at its 99th percentile (across all TDG nodes, including
+    // zeros) so a few extremely overloaded entries can't dominate the
+    // per-edge max-penalty inside the reroute Dijkstra. Mirrors the 99th-
+    // percentile clip already applied to the impact magnitude above.
+    constexpr long double kOverloadScale = 1000.0L;
+    std::vector<Cost> overload_scaled;
+    overload_scaled.reserve(tdg.nodes.size());
+    for (const TDGNode& node : tdg.nodes) {
+        long double x = 0.0L;
+        if (node.edge_id >= 0 &&
+            node.edge_id < static_cast<EdgeId>(graph_.edges.size())) {
+            Flow capacity =
+                std::max<Flow>(1, graph_.edges[node.edge_id].capacity);
+            long double load =
+                static_cast<long double>(node.flow) /
+                static_cast<long double>(capacity);
+            x = std::max<long double>(0.0L, load - 1.0L);
+        }
+        overload_scaled.push_back(
+            static_cast<Cost>(std::llround(x * kOverloadScale)));
+    }
+    Cost overload_clip_scaled = overload_scaled.empty()
+        ? 0
+        : percentile_value(std::move(overload_scaled), 99);
+    long double overload_clip =
+        overload_clip_scaled > 0
+            ? static_cast<long double>(overload_clip_scaled) / kOverloadScale
+            : std::numeric_limits<long double>::infinity();  // no clip if all zero
+
     for (size_t index = 0; index < raw_impacts.size(); ++index) {
         Cost clipped =
             std::min(std::max<Cost>(0, raw_impacts[index]), impact_clip);
@@ -1028,6 +1053,7 @@ std::vector<Cost> GROAlgorithm::normalize_tdg_impacts_for_reroute(
                     static_cast<long double>(node.flow) /
                     static_cast<long double>(capacity);
                 overload = std::max<long double>(0.0L, load - 1.0L);
+                overload = std::min(overload, overload_clip);
             }
         }
         scaled *= overload;
