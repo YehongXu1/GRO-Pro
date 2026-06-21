@@ -1029,7 +1029,7 @@ std::vector<Cost> GROAlgorithm::normalize_tdg_impacts_for_reroute(
     }
     Cost overload_clip_scaled = overload_scaled.empty()
         ? 0
-        : percentile_value(std::move(overload_scaled), 99);
+        : percentile_value(std::move(overload_scaled), 80);
     long double overload_clip =
         overload_clip_scaled > 0
             ? static_cast<long double>(overload_clip_scaled) / kOverloadScale
