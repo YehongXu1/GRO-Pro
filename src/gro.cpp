@@ -3085,9 +3085,19 @@ Trajectory GROAlgorithm::reroute_query(
                 }
             }
 
+            // Blend form: edge_cost = (1 - psi) * travel_time + psi * impact,
+            // where psi = impact_weight / 100 in [0, 1]. At psi=0 reduces to
+            // pure TD-Dijkstra; at psi=1 ignores travel time entirely and
+            // routes purely by impact penalty. psi has a natural unit-free
+            // interpretation as the weight between the two cost terms.
+            int psi_pct = std::clamp(options_.impact_weight, 0, 100);
+            Cost weighted_travel =
+                scale_impact_percent_saturated(travel_time, 100 - psi_pct);
+            Cost weighted_penalty =
+                scale_impact_percent_saturated(impact, psi_pct);
             Cost next_score = add_impact_saturated(
-                add_impact_saturated(scores[node_id], travel_time),
-                scale_impact_percent_saturated(impact, options_.impact_weight));
+                add_impact_saturated(scores[node_id], weighted_travel),
+                weighted_penalty);
             if (next_score < scores[edge.to]) {
                 arrival[edge.to] = next_time;
                 scores[edge.to] = next_score;
