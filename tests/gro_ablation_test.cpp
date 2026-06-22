@@ -70,6 +70,17 @@ struct Options {
     int anchor_threshold = -1;
     int lambda = -1;
     bool progress_log = true;
+    // Per-iteration gamma schedule. If non-empty, overrides --tdg-gammas for the
+    // inner iteration loop: schedule[i] is used at iter i (last value reused for
+    // iter beyond schedule length). Allows "warm start + refine" patterns like
+    // 50,30,20,15,10 — high gamma first iter for big initial sweep, then drop.
+    std::vector<int> tdg_gamma_schedule;
+    // Monotone-improvement constraint. When true, an iteration whose
+    // evaluate_after TTT does not beat the best-so-far is rejected: routes are
+    // not updated, and next iter resumes from the best-so-far state. Prevents
+    // mid-trajectory catastrophes (e.g. within-batch competition spikes) from
+    // poisoning later iters.
+    bool monotone_constraint = false;
 };
 
 struct SelectionRun {
@@ -216,6 +227,10 @@ Options parse_args(int argc, char** argv) {
             options.reroute_methods = parse_string_list(require_value(arg));
         } else if (arg == "--tdg-gammas") {
             options.tdg_gammas = parse_percent_list(require_value(arg));
+        } else if (arg == "--tdg-gamma-schedule") {
+            options.tdg_gamma_schedule = parse_percent_list(require_value(arg));
+        } else if (arg == "--monotone-constraint") {
+            options.monotone_constraint = true;
         } else if (arg == "--candidate-theta") {
             options.candidate_theta = parse_percent_value(require_value(arg));
         } else if (arg == "--impact-weights") {
@@ -250,6 +265,8 @@ Options parse_args(int argc, char** argv) {
                 << "[--impact-weights 30] "
                 << "[--candidate-filter all|source_congestion|score_top|global_score|component_balanced|component_marginal|component_marginal_budget5|component_marginal_budget3|component_marginal_samek|component_marginal_major80_budget5|component_marginal_major90_budget5|component_marginal_major90_samek] "
                 << "[--tdg-mode fine|compressed] "
+                << "[--tdg-gamma-schedule g0,g1,...] "
+                << "[--monotone-constraint] "
                 << "[--conflict-threshold n] "
                 << "[--delta-compress seconds] [--anchor-window seconds] "
                 << "[--anchor-threshold percent] "
@@ -1360,6 +1377,11 @@ int main(int argc, char** argv) {
                                 // re-evaluation and reuse the cached result.
                                 bool has_cached_traffic = false;
                                 gro::TrafficResult cached_traffic;
+                                // Monotone-constraint state: when enabled, an iter whose
+                                // evaluate_after TTT is worse than best_so_far is rejected
+                                // (routes stay, cached_traffic restored to pre-iter state).
+                                gro::Cost best_so_far =
+                                    std::numeric_limits<gro::Cost>::max();
 
                                 for (int iteration = 0;
                                      iteration < algorithm_options.max_iterations;
@@ -1490,6 +1512,18 @@ int main(int argc, char** argv) {
                                         traffic_result,
                                         reroute_impacts);
 
+                                // Per-iter gamma: schedule overrides outer-loop gamma
+                                // when --tdg-gamma-schedule is set. The last value is
+                                // reused for iterations beyond the schedule length.
+                                int iter_gamma = gamma;
+                                if (!options.tdg_gamma_schedule.empty()) {
+                                    std::size_t sched_idx = std::min(
+                                        static_cast<std::size_t>(iteration),
+                                        options.tdg_gamma_schedule.size() - 1);
+                                    iter_gamma =
+                                        options.tdg_gamma_schedule[sched_idx];
+                                }
+
                                 Options selection_options = options;
                                 selection_options.selection_methods = {
                                     selection_method};
@@ -1499,7 +1533,7 @@ int main(int argc, char** argv) {
                                         fixed_fraction};
                                 }
                                 if (is_tdg_selection_method(selection_method)) {
-                                    selection_options.tdg_gammas = {gamma};
+                                    selection_options.tdg_gammas = {iter_gamma};
                                 }
 
                                 log_progress(
@@ -1691,10 +1725,28 @@ int main(int argc, char** argv) {
                                         evaluate_after_us);
                                 gro::Cost total_after =
                                     after_traffic.total_travel_time;
-                                // Cache for next iter's evaluate_before — routes will
-                                // be updated to match (replace_routes call below).
-                                cached_traffic = std::move(after_traffic);
-                                has_cached_traffic = true;
+                                // Monotone constraint: when enabled, only accept the
+                                // iter if total_after beats the best-so-far. On reject,
+                                // routes are NOT updated and the next iter resumes from
+                                // the pre-iter state (cached_traffic = traffic_result).
+                                bool iter_accepted = true;
+                                if (options.monotone_constraint) {
+                                    iter_accepted = (total_after < best_so_far);
+                                }
+                                if (iter_accepted) {
+                                    if (total_after < best_so_far) {
+                                        best_so_far = total_after;
+                                    }
+                                    // Cache for next iter's evaluate_before — routes will
+                                    // be updated to match (replace_routes call below).
+                                    cached_traffic = std::move(after_traffic);
+                                    has_cached_traffic = true;
+                                } else {
+                                    // Reject: restore pre-iter traffic_result as the
+                                    // cached state, so next iter sees the best-so-far.
+                                    cached_traffic = std::move(traffic_result);
+                                    has_cached_traffic = true;
+                                }
                                 log_progress(
                                     options,
                                     "[stage done] " + iter_context +
@@ -1706,7 +1758,12 @@ int main(int argc, char** argv) {
                                         std::to_string(total_after) +
                                         " reduction=" +
                                         std::to_string(
-                                            total_before - total_after));
+                                            total_before - total_after) +
+                                        (options.monotone_constraint
+                                             ? (iter_accepted
+                                                    ? " monotone=accepted"
+                                                    : " monotone=rejected")
+                                             : ""));
 
                                 bool uses_tdg_selection =
                                     is_tdg_selection_method(selection.method);
@@ -1791,7 +1848,9 @@ int main(int argc, char** argv) {
                                         std::to_string(
                                             seconds_from_us(cumulative_us)));
 
-                                replace_routes(routes, new_routes);
+                                if (iter_accepted) {
+                                    replace_routes(routes, new_routes);
+                                }
                             }
                                 log_progress(
                                     options,
