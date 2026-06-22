@@ -28,14 +28,42 @@ QueryRow = Tuple[int, int, int]
 
 
 def load_candidates(path: Path) -> List[Tuple[int, int, int]]:
+    """Load candidates from a CSV (with header origin/destination/departure_*)
+    or a plain whitespace-separated text file (origin destination departure).
+    """
     rows: List[Tuple[int, int, int]] = []
     with path.open() as file:
-        reader = csv.DictReader(file)
-        for row in reader:
-            origin = int(row["origin"])
-            destination = int(row["destination"])
-            dep = int(float(row["departure_abs_seconds"]))
-            rows.append((origin, destination, dep))
+        first = file.readline()
+        if first.startswith("origin"):
+            file.seek(0)
+            reader = csv.DictReader(file)
+            for row in reader:
+                origin = int(row["origin"])
+                destination = int(row["destination"])
+                dep_col = (
+                    row.get("departure_abs_seconds")
+                    or row.get("departure_seconds")
+                    or row.get("departure")
+                )
+                dep = int(float(dep_col))
+                rows.append((origin, destination, dep))
+        else:
+            file.seek(0)
+            for line in file:
+                line = line.strip()
+                if not line or line.startswith("#"):
+                    continue
+                parts = line.split()
+                if len(parts) < 3:
+                    continue
+                rows.append((int(parts[0]), int(parts[1]), int(parts[2])))
+    return rows
+
+
+def load_candidates_multi(paths: List[Path]) -> List[Tuple[int, int, int]]:
+    rows: List[Tuple[int, int, int]] = []
+    for path in paths:
+        rows.extend(load_candidates(path))
     return rows
 
 
@@ -67,7 +95,16 @@ def amplify(rows: List[QueryRow], query_count: int) -> List[QueryRow]:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--candidates-csv", required=True)
+    parser.add_argument(
+        "--candidates-csv",
+        required=True,
+        help=(
+            "Comma-separated list of candidate files. Each is either a CSV "
+            "(header includes 'origin', 'destination', and a departure column) "
+            "or a plain 'origin destination departure' text file. Multiple "
+            "files are concatenated."
+        ),
+    )
     parser.add_argument("--output-dir", required=True)
     parser.add_argument("--dataset-prefix", default="BJReal")
     parser.add_argument("--seeds", default="0,1,2,3,4")
@@ -84,7 +121,10 @@ def main() -> int:
     seeds = [int(s) for s in args.seeds.split(",") if s.strip()]
     out_dir = Path(args.output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
-    candidates = load_candidates(Path(args.candidates_csv))
+    candidate_paths = [
+        Path(p.strip()) for p in args.candidates_csv.split(",") if p.strip()
+    ]
+    candidates = load_candidates_multi(candidate_paths)
     if args.source_count > len(candidates):
         raise ValueError(
             f"source_count={args.source_count} > available candidates={len(candidates)}"
@@ -120,7 +160,7 @@ def main() -> int:
         )
 
     meta = {
-        "candidates_csv": str(args.candidates_csv),
+        "candidates_csv": [str(p) for p in candidate_paths],
         "dataset_prefix": args.dataset_prefix,
         "source_count": args.source_count,
         "query_count": args.query_count,
