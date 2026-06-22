@@ -132,6 +132,23 @@ def filter_rows_by_center_radius(
     return filtered
 
 
+def filter_rows_by_min_od_distance(
+    rows: Sequence[QueryRow],
+    coordinates: Dict[int, Coordinate],
+    min_od_distance_km: float,
+) -> List[QueryRow]:
+    if min_od_distance_km <= 0:
+        return list(rows)
+
+    filtered: List[QueryRow] = []
+    for origin, destination, departure in rows:
+        if origin not in coordinates or destination not in coordinates:
+            continue
+        if haversine_km(coordinates[origin], coordinates[destination]) >= min_od_distance_km:
+            filtered.append((origin, destination, departure))
+    return filtered
+
+
 def maybe_rescale_departures(rows: Sequence[QueryRow], window_sec: int) -> List[QueryRow]:
     if window_sec <= 0:
         return list(rows)
@@ -275,6 +292,12 @@ def main() -> int:
         default=0.0,
         help="If positive, keep rows whose origin and destination are inside this radius.",
     )
+    parser.add_argument(
+        "--min-od-distance-km",
+        type=float,
+        default=0.0,
+        help="If positive, keep rows whose origin/destination haversine distance is at least this value.",
+    )
     parser.add_argument("--random-seed", type=int, default=20260523)
     args = parser.parse_args()
 
@@ -286,6 +309,8 @@ def main() -> int:
         raise ValueError("--jitter-sec must be non-negative")
     if args.od_center_radius_km < 0:
         raise ValueError("--od-center-radius-km must be non-negative")
+    if args.min_od_distance_km < 0:
+        raise ValueError("--min-od-distance-km must be non-negative")
 
     input_dir = Path(args.input_dir)
     output_dir = Path(args.output_dir)
@@ -332,6 +357,15 @@ def main() -> int:
             if not filtered_rows:
                 raise ValueError(
                     f"No rows left after OD radius filter for {source_path}"
+                )
+            filtered_rows = filter_rows_by_min_od_distance(
+                filtered_rows,
+                coordinates,
+                args.min_od_distance_km,
+            )
+            if not filtered_rows:
+                raise ValueError(
+                    f"No rows left after min-OD-distance filter for {source_path}"
                 )
 
             if spec is not None:
