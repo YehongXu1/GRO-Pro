@@ -1,3 +1,4 @@
+#include "external_flow.hpp"
 #include "fahl.hpp"
 #include "gor.hpp"
 #include "sor.hpp"
@@ -55,6 +56,13 @@ struct Options {
     int fahl_alpha_percent = 50;
     gro::Time fahl_time_step = 60;
     int fahl_order_beta_percent = 70;
+    // Varying-external-flow split. `controllable_fraction` ∈ [0.0, 1.0]:
+    // 1.0 = all queries are controllable (no background, identical to prior
+    // behavior). Lower values peel off (1 - f) of the queries as fixed-route
+    // background traffic; methods only optimize the controllable subset, and
+    // the reported TTT and runtime only cover that subset.
+    double controllable_fraction = 1.0;
+    unsigned int background_seed = 42;
 };
 
 struct RunStats {
@@ -167,6 +175,11 @@ Options parse_args(int argc, char** argv) {
                 static_cast<gro::Time>(std::stoll(require_value(arg)));
         } else if (arg == "--fahl-order-beta-percent") {
             options.fahl_order_beta_percent = std::stoi(require_value(arg));
+        } else if (arg == "--controllable-fraction") {
+            options.controllable_fraction = std::stod(require_value(arg));
+        } else if (arg == "--background-seed") {
+            options.background_seed =
+                static_cast<unsigned int>(std::stoul(require_value(arg)));
         } else if (arg == "--help") {
             std::cout
                 << "Usage: ./paper_baseline_test [config] "
@@ -174,7 +187,8 @@ Options parse_args(int argc, char** argv) {
                 << "[--output path] [--methods svp,gor,sor,fahl] "
                 << "[--rep n] [--max-files n] [--max-queries n] "
                 << "[--sor-lower-bound-cache-size n] "
-                << "[--fahl-time-step sec] [--fahl-order-beta-percent n]\n";
+                << "[--fahl-time-step sec] [--fahl-order-beta-percent n] "
+                << "[--controllable-fraction 0.0..1.0] [--background-seed n]\n";
             std::exit(0);
         } else {
             throw std::runtime_error("Unknown argument: " + arg);
@@ -344,11 +358,47 @@ gro::Cost evaluate_total(
     const std::vector<gro::Query>& queries,
     std::vector<gro::Route> routes,
     const gro::TrafficOptions& traffic_options,
-    long long& evaluate_us) {
+    long long& evaluate_us,
+    const std::vector<gro::Query>* background_queries = nullptr,
+    const std::vector<gro::Route>* background_routes = nullptr) {
     auto start = gro::Clock::now();
-    gro::TrafficResult result =
-        gro::evaluate_traffic(graph, queries, routes, traffic_options);
+    gro::TrafficResult result;
+    if (background_queries == nullptr || background_queries->empty()) {
+        result = gro::evaluate_traffic(graph, queries, routes, traffic_options);
+    } else {
+        // Merge controllable + background into a dense [0, n_ctrl + n_bg) id
+        // space; only the first n_ctrl entries contribute to result.total_travel_time.
+        const std::size_t n_ctrl = queries.size();
+        const std::size_t n_bg = background_queries->size();
+        std::vector<gro::Query> all_queries;
+        std::vector<gro::Route> all_routes;
+        all_queries.reserve(n_ctrl + n_bg);
+        all_routes.reserve(n_ctrl + n_bg);
+        all_queries.insert(all_queries.end(), queries.begin(), queries.end());
+        all_routes.insert(all_routes.end(), routes.begin(), routes.end());
+        for (std::size_t i = 0; i < n_bg; ++i) {
+            gro::Query bq = (*background_queries)[i];
+            bq.id = static_cast<gro::QueryId>(n_ctrl + i);
+            all_queries.push_back(bq);
+            gro::Route br = (*background_routes)[i];
+            br.query_id = static_cast<gro::QueryId>(n_ctrl + i);
+            all_routes.push_back(br);
+        }
+        result = gro::evaluate_traffic(
+            graph, all_queries, all_routes, traffic_options,
+            static_cast<int>(n_ctrl));
+    }
     evaluate_us = gro::elapsed_us(start);
+    const char* dump_path = std::getenv("DUMP_PER_QUERY_TIMES_PATH");
+    if (dump_path && *dump_path) {
+        std::ofstream out(dump_path);
+        if (out) {
+            out << "query_id,travel_time\n";
+            for (const auto& traj : result.trajectories) {
+                out << traj.query_id << ',' << traj.travel_time << '\n';
+            }
+        }
+    }
     return result.total_travel_time;
 }
 
@@ -374,7 +424,9 @@ RunStats run_svp(
     const gro::Graph& graph,
     const std::vector<gro::Query>& queries,
     const gro::TrafficOptions& traffic_options,
-    const Options& options) {
+    const Options& options,
+    const std::vector<gro::Query>* background_queries = nullptr,
+    const std::vector<gro::Route>* background_routes = nullptr) {
     RunStats stats;
     std::cerr << "  [phase] svp route_start queries=" << queries.size()
               << " unique_od=" << unique_od_count(queries)
@@ -390,8 +442,9 @@ RunStats run_svp(
               << "\n";
     stats.unreachable_count = count_unreachable(graph, queries, routes);
     std::cerr << "  [phase] svp evaluate_start\n";
-    stats.final_total_travel_time =
-        evaluate_total(graph, queries, routes, traffic_options, stats.evaluate_us);
+    stats.final_total_travel_time = evaluate_total(
+        graph, queries, routes, traffic_options, stats.evaluate_us,
+        background_queries, background_routes);
     std::cerr << "  [phase] svp evaluate_done sec="
               << seconds(stats.evaluate_us) << "\n";
     return stats;
@@ -400,7 +453,9 @@ RunStats run_svp(
 RunStats run_gor(
     const gro::Graph& graph,
     const std::vector<gro::Query>& queries,
-    const gro::TrafficOptions& traffic_options) {
+    const gro::TrafficOptions& traffic_options,
+    const std::vector<gro::Query>* background_queries = nullptr,
+    const std::vector<gro::Route>* background_routes = nullptr) {
     RunStats stats;
     std::cerr << "  [phase] gor route_start queries=" << queries.size()
               << "\n";
@@ -412,8 +467,9 @@ RunStats run_gor(
               << "\n";
     stats.unreachable_count = count_unreachable(graph, queries, routes);
     std::cerr << "  [phase] gor evaluate_start\n";
-    stats.final_total_travel_time =
-        evaluate_total(graph, queries, routes, traffic_options, stats.evaluate_us);
+    stats.final_total_travel_time = evaluate_total(
+        graph, queries, routes, traffic_options, stats.evaluate_us,
+        background_queries, background_routes);
     std::cerr << "  [phase] gor evaluate_done sec="
               << seconds(stats.evaluate_us) << "\n";
     return stats;
@@ -423,7 +479,9 @@ RunStats run_sor(
     const gro::Graph& graph,
     const std::vector<gro::Query>& queries,
     const gro::TrafficOptions& traffic_options,
-    const Options& options) {
+    const Options& options,
+    const std::vector<gro::Query>* background_queries = nullptr,
+    const std::vector<gro::Route>* background_routes = nullptr) {
     RunStats stats;
     gro::SOROptions sor_options;
     sor_options.detour_percent = options.sor_detour_percent;
@@ -454,8 +512,9 @@ RunStats run_sor(
               << "\n";
     stats.unreachable_count = count_unreachable(graph, queries, routes);
     std::cerr << "  [phase] sor evaluate_start\n";
-    stats.final_total_travel_time =
-        evaluate_total(graph, queries, routes, traffic_options, stats.evaluate_us);
+    stats.final_total_travel_time = evaluate_total(
+        graph, queries, routes, traffic_options, stats.evaluate_us,
+        background_queries, background_routes);
     std::cerr << "  [phase] sor evaluate_done sec="
               << seconds(stats.evaluate_us) << "\n";
     return stats;
@@ -466,7 +525,9 @@ RunStats run_fahl(
     const std::vector<gro::Query>& queries,
     const gro::TrafficOptions& traffic_options,
     const Options& options,
-    const std::vector<gro::Route>& reference_routes) {
+    const std::vector<gro::Route>& reference_routes,
+    const std::vector<gro::Query>* background_queries = nullptr,
+    const std::vector<gro::Route>* background_routes = nullptr) {
     RunStats stats;
     gro::FAHLOptions fahl_options;
     fahl_options.alpha_percent = options.fahl_alpha_percent;
@@ -538,8 +599,9 @@ RunStats run_fahl(
 
     stats.unreachable_count = count_unreachable(graph, queries, routes);
     std::cerr << "  [phase] fahl evaluate_start\n";
-    stats.final_total_travel_time =
-        evaluate_total(graph, queries, routes, traffic_options, stats.evaluate_us);
+    stats.final_total_travel_time = evaluate_total(
+        graph, queries, routes, traffic_options, stats.evaluate_us,
+        background_queries, background_routes);
     std::cerr << "  [phase] fahl evaluate_done sec="
               << seconds(stats.evaluate_us) << "\n";
     return stats;
@@ -663,6 +725,34 @@ int main(int argc, char** argv) {
                 queries.resize(static_cast<std::size_t>(options.max_queries));
             }
 
+            // Varying-external-flow split: when controllable_fraction < 1.0,
+            // peel off (1 - f) of the workload as fixed-route background.
+            // Background free-flow Dijkstra time is logged but NOT counted in
+            // any method's reported runtime.
+            std::vector<gro::Query> background_queries;
+            std::vector<gro::Route> background_routes;
+            if (options.controllable_fraction < 1.0) {
+                gro::WorkloadSplit split = gro::split_workload(
+                    std::move(queries),
+                    options.controllable_fraction,
+                    options.background_seed);
+                queries = std::move(split.controllable);
+                background_queries = std::move(split.background);
+                require(
+                    !queries.empty(),
+                    "controllable_fraction produces empty Q_ctrl");
+                auto bg_route_start = gro::Clock::now();
+                background_routes = gro::compute_background_routes_freeflow(
+                    graph, background_queries);
+                long long bg_route_us = gro::elapsed_us(bg_route_start);
+                std::cerr << "[background] dataset="
+                          << dataset.info.dataset
+                          << " controllable=" << queries.size()
+                          << " background=" << background_queries.size()
+                          << " bg_route_sec=" << seconds(bg_route_us)
+                          << " (NOT counted in method runtime)\n";
+            }
+
             auto reference_start = gro::Clock::now();
             std::cerr << "[phase] reference_shortest_path_start "
                       << dataset.info.dataset
@@ -681,7 +771,9 @@ int main(int argc, char** argv) {
                 queries,
                 reference_routes,
                 traffic_options,
-                initial_evaluate_us);
+                initial_evaluate_us,
+                background_queries.empty() ? nullptr : &background_queries,
+                background_routes.empty() ? nullptr : &background_routes);
             std::cerr << "[phase] reference_evaluate_done "
                       << dataset.info.dataset
                       << " sec=" << seconds(initial_evaluate_us) << "\n";
@@ -695,19 +787,31 @@ int main(int argc, char** argv) {
                           << dataset.info.dataset << "\n";
                 auto total_start = gro::Clock::now();
                 RunStats stats;
+                const std::vector<gro::Query>* bg_q_ptr =
+                    background_queries.empty() ? nullptr : &background_queries;
+                const std::vector<gro::Route>* bg_r_ptr =
+                    background_routes.empty() ? nullptr : &background_routes;
                 if (method == "svp") {
-                    stats = run_svp(graph, queries, traffic_options, options);
+                    stats = run_svp(
+                        graph, queries, traffic_options, options,
+                        bg_q_ptr, bg_r_ptr);
                 } else if (method == "gor") {
-                    stats = run_gor(graph, queries, traffic_options);
+                    stats = run_gor(
+                        graph, queries, traffic_options,
+                        bg_q_ptr, bg_r_ptr);
                 } else if (method == "sor") {
-                    stats = run_sor(graph, queries, traffic_options, options);
+                    stats = run_sor(
+                        graph, queries, traffic_options, options,
+                        bg_q_ptr, bg_r_ptr);
                 } else if (method == "fahl") {
                     stats = run_fahl(
                         graph,
                         queries,
                         traffic_options,
                         options,
-                        reference_routes);
+                        reference_routes,
+                        bg_q_ptr,
+                        bg_r_ptr);
                     stats.reference_us = reference_us;
                 } else {
                     throw std::runtime_error("Unknown method: " + method);

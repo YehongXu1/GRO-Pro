@@ -1,3 +1,4 @@
+#include "external_flow.hpp"
 #include "gro.hpp"
 
 #include <algorithm>
@@ -81,6 +82,14 @@ struct Options {
     // mid-trajectory catastrophes (e.g. within-batch competition spikes) from
     // poisoning later iters.
     bool monotone_constraint = false;
+    // Varying external flow experiment (mirrors GRO.pdf Table 4).
+    // `controllable_fraction` ∈ [0.0, 1.0]: fraction of the loaded query set
+    // designated as Q_ctrl (re-routed by the method). Remaining queries become
+    // Q_bg with fixed free-flow shortest-path routes contributing only to
+    // background flow. Default 1.0 → no background, identical to current
+    // experiments.
+    double controllable_fraction = 1.0;
+    unsigned int background_seed = 42;
 };
 
 struct SelectionRun {
@@ -231,6 +240,11 @@ Options parse_args(int argc, char** argv) {
             options.tdg_gamma_schedule = parse_percent_list(require_value(arg));
         } else if (arg == "--monotone-constraint") {
             options.monotone_constraint = true;
+        } else if (arg == "--controllable-fraction") {
+            options.controllable_fraction = std::stod(require_value(arg));
+        } else if (arg == "--background-seed") {
+            options.background_seed =
+                static_cast<unsigned int>(std::stoul(require_value(arg)));
         } else if (arg == "--candidate-theta") {
             options.candidate_theta = parse_percent_value(require_value(arg));
         } else if (arg == "--impact-weights") {
@@ -274,6 +288,7 @@ Options parse_args(int argc, char** argv) {
                 << "[--hop 10] [--rep 1] "
                 << "[--datasets Hop10Rep1-0,BJRealRep10-0] "
                 << "[--dataset-list path] [--random-seed n] [--max-files n] "
+                << "[--controllable-fraction 0.0..1.0] [--background-seed n] "
                 << "[--no-progress-log]\n";
             std::exit(0);
         } else {
@@ -878,6 +893,18 @@ std::vector<SelectionRun> build_selection_runs(
                 score_top_candidates.size(),
                 90);
         }
+        // TDG-based candidate filters iterate result.trajectories, which
+        // spans both Q_ctrl and Q_bg when background flow is enabled. Drop
+        // any candidate whose id falls outside Q_ctrl so selection /
+        // rerouting never touches background queries.
+        const gro::QueryId n_ctrl = static_cast<gro::QueryId>(queries.size());
+        for (auto it = candidate_set.begin(); it != candidate_set.end(); ) {
+            if (*it >= n_ctrl) {
+                it = candidate_set.erase(it);
+            } else {
+                ++it;
+            }
+        }
         run.candidate_us = gro::elapsed_us(candidate_start);
         run.candidate_count =
             static_cast<long long>(candidate_set.size());
@@ -1023,17 +1050,52 @@ void replace_routes(
     }
 }
 
+gro::TrafficResult evaluate_with_background(
+    const gro::Graph& graph,
+    const std::vector<gro::Query>& queries,
+    std::vector<gro::Route>& routes,
+    const std::vector<gro::Query>& background_queries,
+    const std::vector<gro::Route>& background_routes,
+    const gro::TrafficOptions& traffic_options) {
+    if (background_queries.empty()) {
+        return gro::evaluate_traffic(graph, queries, routes, traffic_options);
+    }
+    const std::size_t n_ctrl = queries.size();
+    const std::size_t n_bg = background_queries.size();
+    std::vector<gro::Query> all_queries;
+    std::vector<gro::Route> all_routes;
+    all_queries.reserve(n_ctrl + n_bg);
+    all_routes.reserve(n_ctrl + n_bg);
+    all_queries.insert(all_queries.end(), queries.begin(), queries.end());
+    all_routes.insert(all_routes.end(), routes.begin(), routes.end());
+    for (std::size_t i = 0; i < n_bg; ++i) {
+        gro::Query bq = background_queries[i];
+        bq.id = static_cast<gro::QueryId>(n_ctrl + i);
+        all_queries.push_back(bq);
+        gro::Route br = background_routes[i];
+        br.query_id = static_cast<gro::QueryId>(n_ctrl + i);
+        all_routes.push_back(br);
+    }
+    return gro::evaluate_traffic(
+        graph, all_queries, all_routes, traffic_options,
+        static_cast<int>(n_ctrl));
+}
+
 gro::TrafficResult evaluate_after_routes(
     const gro::Graph& graph,
     const std::vector<gro::Query>& queries,
     std::vector<gro::Route> routes,
     const std::vector<gro::Route>& new_routes,
+    const std::vector<gro::Query>& background_queries,
+    const std::vector<gro::Route>& background_routes,
     const gro::TrafficOptions& traffic_options,
     long long& evaluate_us) {
     replace_routes(routes, new_routes);
     auto start = gro::Clock::now();
-    gro::TrafficResult result =
-        gro::evaluate_traffic(graph, queries, routes, traffic_options);
+    gro::TrafficResult result = evaluate_with_background(
+        graph, queries, routes,
+        background_queries, background_routes,
+        traffic_options);
     evaluate_us = gro::elapsed_us(start);
     return result;
 }
@@ -1313,6 +1375,38 @@ int main(int argc, char** argv) {
                 "[dataset loaded] dataset=" + dataset.info.dataset +
                     " queries=" + std::to_string(queries.size()));
 
+            // Varying-external-flow split: when controllable_fraction < 1.0,
+            // peel off (1 - f) of the workload as fixed-route background
+            // traffic. Background routes are computed once via free-flow
+            // shortest path; their wall-clock cost is logged but NOT included
+            // in any per-method runtime metric below.
+            std::vector<gro::Query> background_queries;
+            std::vector<gro::Route> background_routes;
+            if (options.controllable_fraction < 1.0) {
+                gro::WorkloadSplit split = gro::split_workload(
+                    std::move(queries),
+                    options.controllable_fraction,
+                    options.background_seed);
+                queries = std::move(split.controllable);
+                background_queries = std::move(split.background);
+                require(
+                    !queries.empty(),
+                    "controllable_fraction produces empty Q_ctrl");
+                auto bg_route_start = gro::Clock::now();
+                background_routes = gro::compute_background_routes_freeflow(
+                    graph, background_queries);
+                long long bg_route_us = gro::elapsed_us(bg_route_start);
+                log_progress(
+                    options,
+                    "[background] dataset=" + dataset.info.dataset +
+                        " controllable=" + std::to_string(queries.size()) +
+                        " background=" +
+                        std::to_string(background_queries.size()) +
+                        " bg_route_sec=" +
+                        std::to_string(seconds_from_us(bg_route_us)) +
+                        " (NOT counted in method runtime)");
+            }
+
             gro::GROAlgorithm base_algorithm(
                 graph,
                 algorithm_options,
@@ -1409,8 +1503,13 @@ int main(int argc, char** argv) {
                                     has_cached_traffic = false;
                                 } else {
                                     auto evaluate_before_start = gro::Clock::now();
-                                    traffic_result = gro::evaluate_traffic(
-                                        graph, queries, routes, traffic_options);
+                                    traffic_result = evaluate_with_background(
+                                        graph,
+                                        queries,
+                                        routes,
+                                        background_queries,
+                                        background_routes,
+                                        traffic_options);
                                     evaluate_before_us =
                                         gro::elapsed_us(evaluate_before_start);
                                 }
@@ -1721,6 +1820,8 @@ int main(int argc, char** argv) {
                                         queries,
                                         routes,
                                         new_routes,
+                                        background_queries,
+                                        background_routes,
                                         traffic_options,
                                         evaluate_after_us);
                                 gro::Cost total_after =

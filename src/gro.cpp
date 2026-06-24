@@ -451,6 +451,23 @@ const Graph& GROAlgorithm::graph() const {
     return graph_;
 }
 
+void GROAlgorithm::set_background_workload(
+    std::vector<Query> background_queries,
+    std::vector<Route> background_routes) {
+    if (background_queries.size() != background_routes.size()) {
+        throw std::runtime_error(
+            "GROAlgorithm::set_background_workload: background_queries and "
+            "background_routes must have the same size");
+    }
+    background_queries_ = std::move(background_queries);
+    background_routes_ = std::move(background_routes);
+}
+
+void GROAlgorithm::clear_background_workload() {
+    background_queries_.clear();
+    background_routes_.clear();
+}
+
 Route GROAlgorithm::shortest_path(
     const Query& query,
     const std::vector<Cost>*) const {
@@ -3308,15 +3325,37 @@ AlgorithmResult GROAlgorithm::run(const std::vector<Query>& queries) const {
     AlgorithmResult algResult;
     algResult.initial_routes = routes;
 
+    // Background workload: append after the controllable queries so query_ids
+    // remain a dense [0, n_ctrl + n_bg) index space. When background_queries_
+    // is empty, all_queries == queries and all_routes == routes byte-for-byte.
+    const QueryId n_ctrl = static_cast<QueryId>(queries.size());
+    const QueryId n_bg = static_cast<QueryId>(background_queries_.size());
+    const int eval_n_controllable = (n_bg == 0) ? -1 : static_cast<int>(n_ctrl);
+    std::vector<Query> all_queries = queries;
+    std::vector<Route> all_routes = routes;
+    if (n_bg > 0) {
+        all_queries.reserve(static_cast<std::size_t>(n_ctrl + n_bg));
+        all_routes.reserve(static_cast<std::size_t>(n_ctrl + n_bg));
+        for (QueryId i = 0; i < n_bg; ++i) {
+            Query q = background_queries_[i];
+            q.id = n_ctrl + i;
+            all_queries.push_back(q);
+            Route r = background_routes_[i];
+            r.query_id = n_ctrl + i;
+            all_routes.push_back(r);
+        }
+    }
+
     TrafficResult traffic_result;
     for (int i = 0; i < options_.max_iterations; ++i) {
         auto iteration_start = Clock::now();
         phase_start = Clock::now();
-        traffic_result = evaluate_traffic(graph_, queries, routes, traffic_options_);
+        traffic_result = evaluate_traffic(
+            graph_, all_queries, all_routes, traffic_options_, eval_n_controllable);
         log_timing(options_.enable_timing_log, i, "evaluate_traffic",
-                   static_cast<long long>(routes.size()), phase_start);
+                   static_cast<long long>(all_routes.size()), phase_start);
         log_metric(options_.enable_timing_log, i, "total_travel_time",
-                   static_cast<long long>(routes.size()),
+                   static_cast<long long>(n_ctrl),
                    traffic_result.total_travel_time);
         algResult.total_travel_time_by_iteration.push_back(
             traffic_result.total_travel_time);
@@ -3338,6 +3377,19 @@ AlgorithmResult GROAlgorithm::run(const std::vector<Query>& queries) const {
         phase_start = Clock::now();
         std::unordered_set<QueryId> candidate_query_ids =
             select_candidates(queries, traffic_result, tdg, node_impacts);
+        // select_candidates iterates over result.trajectories, which spans
+        // both Q_ctrl and Q_bg when a background workload is set. Drop any
+        // background candidates so selection/rerouting only touches Q_ctrl.
+        if (n_bg > 0) {
+            for (auto it = candidate_query_ids.begin();
+                 it != candidate_query_ids.end(); ) {
+                if (*it >= n_ctrl) {
+                    it = candidate_query_ids.erase(it);
+                } else {
+                    ++it;
+                }
+            }
+        }
         long long candidate_us = elapsed_us(phase_start);
         log_candidate_summary(
             options_.enable_timing_log,
@@ -3378,21 +3430,29 @@ AlgorithmResult GROAlgorithm::run(const std::vector<Query>& queries) const {
                 reroute_impacts,
                 i);
         for (const Route &route : new_routes) {
-            routes[route.query_id] = route;
+            // Selection / rerouting only ever touches controllable queries
+            // (the `queries` argument above is Q_ctrl), so route.query_id is
+            // guaranteed to fall in [0, n_ctrl) and the controllable slice
+            // of all_routes is the only thing updated.
+            all_routes[route.query_id] = route;
         }
         log_timing(options_.enable_timing_log, i, "iteration_total",
                    static_cast<long long>(selected_query_ids.size()), iteration_start);
     }
 
     phase_start = Clock::now();
-    traffic_result = evaluate_traffic(graph_, queries, routes, traffic_options_);
+    traffic_result = evaluate_traffic(
+        graph_, all_queries, all_routes, traffic_options_, eval_n_controllable);
     log_timing(options_.enable_timing_log, "final_evaluate_traffic",
-               static_cast<long long>(routes.size()), phase_start);
+               static_cast<long long>(all_routes.size()), phase_start);
     log_metric(options_.enable_timing_log, "final_total_travel_time",
-               static_cast<long long>(routes.size()),
+               static_cast<long long>(n_ctrl),
                traffic_result.total_travel_time);
 
-    algResult.final_routes = routes;
+    // Hand back only the controllable slice of routes; callers expect
+    // final_routes.size() == queries.size().
+    routes.assign(all_routes.begin(), all_routes.begin() + n_ctrl);
+    algResult.final_routes = std::move(routes);
     algResult.final_total_travel_time = traffic_result.total_travel_time;
     algResult.total_travel_time_by_iteration.push_back(
         traffic_result.total_travel_time);

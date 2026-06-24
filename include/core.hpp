@@ -122,11 +122,21 @@ Cost bpr_travel_time(const Edge& edge, Flow flow, const TrafficOptions& options)
 
 Flow get_edge_flow(const TrafficResult& result, EdgeId edge_id, Time time);
 
+// Optional `n_controllable`:
+//   -1 (default) => all queries are controllable and contribute to
+//                   `result.total_travel_time`.
+//   0..queries.size() => first `n_controllable` queries are controllable;
+//                        the remainder are background traffic. Background
+//                        routes still advance through the TE event loop and
+//                        contribute to per-edge flow profiles (so BPR sees
+//                        them on shared edges), but their travel time is NOT
+//                        added to `result.total_travel_time`.
 TrafficResult evaluate_traffic(
     const Graph& graph,
     const std::vector<Query>& queries,
     std::vector<Route>& routes,
-    const TrafficOptions& options);
+    const TrafficOptions& options,
+    int n_controllable = -1);
 
 long long elapsed_us(Clock::time_point start);
 

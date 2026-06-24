@@ -623,12 +623,16 @@ TrafficResult evaluate_traffic(
     const Graph& graph,
     const std::vector<Query>& queries,
     std::vector<Route>& routes,
-    const TrafficOptions& options) {
+    const TrafficOptions& options,
+    int n_controllable) {
     TrafficResult result;
     result.edge_profiles.resize(graph.edges.size());
 
     result.trajectories.assign(routes.size(), Trajectory());
     std::vector<int> query_current_position(queries.size(), 0);
+    const QueryId controllable_cap = (n_controllable < 0)
+        ? static_cast<QueryId>(queries.size())
+        : static_cast<QueryId>(n_controllable);
 
     data_structures::IndexedHeap<4, Time, QueryId> event_queue(queries.size());
     for (Route& route : routes) {
@@ -699,7 +703,9 @@ TrafficResult evaluate_traffic(
         }
 
         Cost travel_time = bpr_travel_time(edge, flow, options);
-        result.total_travel_time += travel_time;
+        if (current_query < controllable_cap) {
+            result.total_travel_time += travel_time;
+        }
         result.trajectories[current_query].travel_time += travel_time;
         
         current_time += travel_time;

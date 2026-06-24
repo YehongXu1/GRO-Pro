@@ -248,6 +248,21 @@ public:
     AlgorithmResult run_tdg_reroute_baseline(
         const std::vector<Query>& queries) const;
 
+    // Background workload: a set of fixed-route queries treated as external
+    // traffic. Their routes contribute to per-edge flow (and therefore to
+    // BPR travel times on shared edges) during every internal TE evaluation,
+    // but they are never selected or rerouted, and their travel time is not
+    // counted in the reported total_travel_time. `background_queries` and
+    // `background_routes` must be parallel vectors of the same length; the
+    // query_id on each background entry will be remapped on the fly so the
+    // background subset sits immediately after the controllable subset in
+    // the dense [0, n_ctrl + n_bg) id space.
+    void set_background_workload(
+        std::vector<Query> background_queries,
+        std::vector<Route> background_routes);
+
+    void clear_background_workload();
+
     // Critical-path timings for the parallel hot spots, captured during the
     // most recent call. Used for infinite-thread runtime estimates (each
     // parallel region's wall under infinite threads ≈ its slowest single unit).
@@ -262,6 +277,8 @@ private:
     Graph graph_;
     AlgorithmOptions options_;
     TrafficOptions traffic_options_;
+    std::vector<Query> background_queries_;
+    std::vector<Route> background_routes_;
     mutable long long last_anchor_score_max_us_ = 0;
     mutable long long last_reroute_critical_us_ = 0;
 };

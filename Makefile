@@ -59,7 +59,8 @@ SOURCES_LIB = \
 	src/svp.cpp \
 	src/gor.cpp \
 	src/sor.cpp \
-	src/fahl.cpp
+	src/fahl.cpp \
+	src/external_flow.cpp
 
 OBJECTS_LIB = $(SOURCES_LIB:.cpp=.o)
 HEADERS = $(wildcard include/*.hpp)
