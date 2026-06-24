@@ -1060,6 +1060,10 @@ gro::TrafficResult evaluate_with_background(
     if (background_queries.empty()) {
         return gro::evaluate_traffic(graph, queries, routes, traffic_options);
     }
+    // Social-cost metric: TTT covers ALL queries (Q_ctrl + Q_bg). Methods
+    // still only reroute Q_ctrl, but the reported TTT measures the whole
+    // network's total travel time — so we don't get credit for shoving
+    // congestion onto the (invisible) Q_bg subset.
     const std::size_t n_ctrl = queries.size();
     const std::size_t n_bg = background_queries.size();
     std::vector<gro::Query> all_queries;
@@ -1078,7 +1082,7 @@ gro::TrafficResult evaluate_with_background(
     }
     return gro::evaluate_traffic(
         graph, all_queries, all_routes, traffic_options,
-        static_cast<int>(n_ctrl));
+        /*n_controllable=*/ -1);
 }
 
 gro::TrafficResult evaluate_after_routes(

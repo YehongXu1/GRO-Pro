@@ -384,9 +384,12 @@ gro::Cost evaluate_total(
             br.query_id = static_cast<gro::QueryId>(n_ctrl + i);
             all_routes.push_back(br);
         }
+        // Social-cost metric: TTT covers ALL queries (Q_ctrl + Q_bg). Methods
+        // only route Q_ctrl, but TTT measures the whole network's travel
+        // time so improvements aren't credited to invisible-Q_bg sacrifice.
         result = gro::evaluate_traffic(
             graph, all_queries, all_routes, traffic_options,
-            static_cast<int>(n_ctrl));
+            /*n_controllable=*/ -1);
     }
     evaluate_us = gro::elapsed_us(start);
     const char* dump_path = std::getenv("DUMP_PER_QUERY_TIMES_PATH");
